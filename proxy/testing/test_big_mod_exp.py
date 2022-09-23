@@ -19,7 +19,7 @@ eth_account = proxy.eth.account.create('eip-198')
 proxy.eth.default_account = eth_account.address
 
 SOLIDITY_CONTRACT = '''
-pragma solidity ^0.5.8;
+pragma solidity >=0.7.0 <0.9.0;
 
 contract ModularCheck {
 
