@@ -100,7 +100,7 @@ class Test_big_mod_exp(unittest.TestCase):
         number = self.storage_contract.functions.modExp(5, 2, 7).call()
 
 
-        nonce = self.proxy.eth.get_transaction_count(eth_account.address)
+        nonce = proxy.eth.get_transaction_count(eth_account.address)
         tx = {'nonce': nonce}
         tx = self.storage_contract.functions.modExp(5, 2, 7).buildTransaction(tx)
         tx = proxy.eth.account.sign_transaction(tx, eth_account.key)
