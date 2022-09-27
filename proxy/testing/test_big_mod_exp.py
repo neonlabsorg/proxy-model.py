@@ -22,6 +22,7 @@ SOLIDITY_CONTRACT = '''
 pragma solidity >=0.7.0 <0.9.0;
 
 contract ModularCheck {
+    uint256 n = 0;
 
     function modExp(uint256 _b, uint256 _e, uint256 _m) public returns (uint256 result) {
         assembly {
@@ -48,6 +49,7 @@ contract ModularCheck {
 
             result := mload(value)
         }
+        n = result;
     }
 }
 '''
