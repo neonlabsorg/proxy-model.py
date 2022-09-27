@@ -51,6 +51,7 @@ contract ModularCheck {
 
             result := mload(value)
         }
+    }
 }
 '''
 
