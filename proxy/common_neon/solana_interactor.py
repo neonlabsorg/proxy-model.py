@@ -647,7 +647,6 @@ class SolanaInteractor:
 
         for response, tx in zip(response_list, tx_list):
             raw_result = response.get('result')
-            print("TRX RESULT: ", raw_result)
 
             result = None
             if isinstance(raw_result, dict):
