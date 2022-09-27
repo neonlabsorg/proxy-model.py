@@ -83,7 +83,6 @@ class SolTxListSender:
 
             success_sig_list = []
             for receipt, tx in zip(receipt_list, self._tx_list):
-                print("RECEIPT: ", receipt)
                 receipt_parser = SolReceiptParser(receipt)
                 slots_behind = receipt_parser.get_slots_behind()
                 if slots_behind:
