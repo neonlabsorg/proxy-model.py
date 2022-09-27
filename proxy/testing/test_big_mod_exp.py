@@ -22,9 +22,11 @@ SOLIDITY_CONTRACT = '''
 pragma solidity >=0.7.0 <0.9.0;
 
 contract ModularCheck {
-    uint256 n = 0;
 
-    function modExp(uint256 _b, uint256 _e, uint256 _m) public returns (uint256 result) {
+    function modExp() public returns (uint256 result) {
+        uint256 _b = 7719472615821079694904732333912527190217998977709370935963838933860875309329;
+        uint256 _e = 7719472615821079694904732333912527190217998977709370935963838933860875309329;
+        uint256 _m = 7719472615821079694904732333912527190217998977709370935963838933860875309322;
         assembly {
             // Free memory pointer
             let pointer := mload(0x40)
@@ -49,8 +51,6 @@ contract ModularCheck {
 
             result := mload(value)
         }
-        n = result;
-    }
 }
 '''
 
