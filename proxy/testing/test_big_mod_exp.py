@@ -98,7 +98,7 @@ class Test_big_mod_exp(unittest.TestCase):
 
     def test_big_mod_exp(self):
         print("\ntest_big_mod_exp")
-        number = self.storage_contract.functions.modExp().call()
+        eth_call_result = self.storage_contract.functions.modExp().call()
 
 
         nonce = proxy.eth.get_transaction_count(eth_account.address)
@@ -110,6 +110,5 @@ class Test_big_mod_exp(unittest.TestCase):
         self.assertIsNotNone(tx_receipt)
         self.assertEqual(tx_receipt.status, 1)
 
-        print("tx_receipt: ", tx_receipt)
-        print('result 5^2 mod 7 :', number)
-        # self.assertEqual(number, 4) # 5^2 % 7 = 4
+        print('eth_call_result :', eth_call_result)
+        self.assertEqual(eth_call_result, 4721819579619764028748889379605432748696806372499657368655739696405823245261)
