@@ -152,12 +152,12 @@ class Test_big_mod_exp(unittest.TestCase):
         print("\ntest_big_mod_exp")
         #  check of the non-BPF syscall implementation by the eth_Call request
         eth_call_result = self.storage_contract.functions.modExp(base, exponent, modulus).call()
-        self.assertEqual(eth_call_result, int(expected, 16))
+        self.assertEqual(eth_call_result, expected)
 
         #  check of the BPF syscall implementation by the eth_SendRawTransaction request
         nonce = proxy.eth.get_transaction_count(eth_account.address)
         tx = {'nonce': nonce}
-        tx = self.storage_contract.functions.modExp().buildTransaction(tx)
+        tx = self.storage_contract.functions.modExp(base, exponent, modulus).buildTransaction(tx)
         tx = proxy.eth.account.sign_transaction(tx, eth_account.key)
         tx_hash = proxy.eth.send_raw_transaction(tx.rawTransaction)
         tx_receipt = proxy.eth.wait_for_transaction_receipt(tx_hash)
