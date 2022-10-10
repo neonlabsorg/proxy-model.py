@@ -24,7 +24,7 @@ pragma solidity >=0.7.0 <0.9.0;
 contract ModularCheck {
     event Result(uint256 val);
 
-    function modExp(uint256 _b, uint256 _e, unit256 _m) public {
+    function modExp(uint256 _b, uint256 _e, uint256 _m) public {
         uint256 val = 0;
         assembly {
             // Free memory pointer
