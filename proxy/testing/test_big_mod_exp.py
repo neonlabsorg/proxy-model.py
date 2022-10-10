@@ -24,7 +24,7 @@ pragma solidity >=0.7.0 <0.9.0;
 contract ModularCheck {
     event Result(uint256 val);
 
-    function modExp(uint256 _b, uint256 _e, uint256 _m) public returns (uint256 result) {
+    function modExp(uint _b, uint _e, uint _m) public returns (uint256 result) {
         uint256 val = 0;
         assembly {
             // Free memory pointer
@@ -174,7 +174,7 @@ class Test_big_mod_exp(unittest.TestCase):
     def test_big_mod_exp(self):
         for test in TEST_DATA:
             b = int(test["Base"], 16)
-            e = int(test["Exponent"], 16)
+            e = int(test["Exponent"], 16).astype()
             m = int(test["Modulus"], 16)
             r = int(test["Expected"], 16)
             self.call_contract(b, e, m, r)
