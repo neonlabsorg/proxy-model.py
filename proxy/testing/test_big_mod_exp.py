@@ -24,7 +24,7 @@ pragma solidity >=0.7.0 <0.9.0;
 contract ModularCheck {
     event Result(uint256 val);
 
-    function modExp(uint _b, uint _e, uint _m) public returns (uint256 result) {
+    function modExp(uint256 _b, uint256 _e, uint256 _m) public returns (uint256 result) {
         uint256 val = 0;
         assembly {
             // Free memory pointer
@@ -151,7 +151,7 @@ class Test_big_mod_exp(unittest.TestCase):
     def call_contract(self, base, exponent, modulus, expected):
         print("\ntest_big_mod_exp")
         #  check of the non-BPF syscall implementation by the eth_Call request
-        eth_call_result = self.storage_contract.functions.modExp(base, exponent, modulus).call()
+        eth_call_result = self.storage_contract.functions.modExp(1, 2, 3).call()
         self.assertEqual(eth_call_result, expected)
 
         #  check of the BPF syscall implementation by the eth_SendRawTransaction request
