@@ -151,7 +151,7 @@ class Test_big_mod_exp(unittest.TestCase):
     def call_contract(self, base, exponent, modulus, expected):
         print("\ntest_big_mod_exp")
         #  check of the non-BPF syscall implementation by the eth_Call request
-        eth_call_result = self.storage_contract.functions.modExp(1, 2, 3).call()
+        eth_call_result = self.storage_contract.functions.modExp(base, exponent, modulus).call()
         self.assertEqual(eth_call_result, expected)
 
         #  check of the BPF syscall implementation by the eth_SendRawTransaction request
