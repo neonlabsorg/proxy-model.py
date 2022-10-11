@@ -178,6 +178,6 @@ class Test_big_mod_exp(unittest.TestCase):
             m = int(test["Modulus"], 16)
             r = int(test["Expected"], 16)
 
-            self.call_contract(b.to_bytes(), e.to_bytes(), m.to_bytes(), r)
+            self.call_contract(b.to_bytes(32, byteorder='little'), e.to_bytes(32, byteorder='little'), m.to_bytes(32, byteorder='little'), r)
 
 
