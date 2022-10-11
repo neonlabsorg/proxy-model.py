@@ -173,15 +173,11 @@ class Test_big_mod_exp(unittest.TestCase):
 
     def test_big_mod_exp(self):
         for test in TEST_DATA:
-            # b = int(test["Base"], 16)
-            # e = int(test["Exponent"], 16)
-            # m = int(test["Modulus"], 16)
-            # r = int(test["Expected"], 16)
-
-            b = bytes.fromhex(test["Base"])
-            e = bytes.fromhex(test["Exponent"])
-            m = bytes.fromhex(test["Modulus"])
+            b = int(test["Base"], 16)
+            e = int(test["Exponent"], 16)
+            m = int(test["Modulus"], 16)
             r = int(test["Expected"], 16)
-            self.call_contract(b, e, m, r)
+
+            self.call_contract(b.to_bytes(), e.to_bytes(), m.to_bytes(), r)
 
 
