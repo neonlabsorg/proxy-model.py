@@ -161,7 +161,7 @@ class Test_big_mod_exp(unittest.TestCase):
         print('eth_call_result :', eth_call_result)
 
         for log in tx_receipt['logs']:
-            data = int(log["data"][:2], 16)
+            data = int(log["data"][2:], 16)
             print("data:", data)
 
 
