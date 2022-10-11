@@ -144,6 +144,7 @@ class Test_big_mod_exp(unittest.TestCase):
 
     def call_contract(self, base, exponent, modulus, expected):
         print("\ntest_big_mod_exp")
+
         #  check of the non-BPF syscall implementation by the eth_Call request
         eth_call_result = self.storage_contract.functions.modExp(base, exponent, modulus).call()
         self.assertEqual(eth_call_result, expected)
@@ -157,21 +158,11 @@ class Test_big_mod_exp(unittest.TestCase):
         tx_receipt = proxy.eth.wait_for_transaction_receipt(tx_hash)
         self.assertIsNotNone(tx_receipt)
         self.assertEqual(tx_receipt.status, 1)
-
-        print('eth_call_result :', eth_call_result)
-
-        for log in tx_receipt['logs']:
-            data = int(log["data"][2:], 16)
-            print("data:", data)
-
+        send_raw_tx_result = int(tx_receipt['logs']["data"][2:], 16)
+        self.assertEqual(send_raw_tx_result, expected)
 
     def test_big_mod_exp(self):
         for test in TEST_DATA:
-            # b = test["Base"],
-            # e = int(test["Exponent"], 16)
-            # m = int(test["Modulus"], 16)
-            # r = int(test["Expected"], 16)
-
             self.call_contract(test["Base"], test["Exponent"], test["Modulus"], test["Expected"])
 
 
