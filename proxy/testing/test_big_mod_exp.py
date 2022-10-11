@@ -151,7 +151,7 @@ class Test_big_mod_exp(unittest.TestCase):
         tx_receipt = proxy.eth.wait_for_transaction_receipt(tx_hash)
         self.assertIsNotNone(tx_receipt)
         self.assertEqual(tx_receipt.status, 1)
-        log = tx_receipt['logs']
+        log = tx_receipt['logs'][0]
         send_raw_tx_result = int(log["data"][2:], 16)
         self.assertEqual(send_raw_tx_result, expected)
 
