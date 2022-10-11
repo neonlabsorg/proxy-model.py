@@ -2,16 +2,9 @@
 
 import unittest
 import os
-import json
-import random
-from typing import List
-import eth_utils
-from logged_groups import logged_group
 from web3 import Web3
 from solcx import compile_source
-from web3.types import TxReceipt, HexBytes
-
-from .testing_helpers import create_account, create_signer_account, request_airdrop, SolidityContractDeployer
+from .testing_helpers import  request_airdrop
 
 proxy_url = os.environ.get('PROXY_URL', 'http://localhost:9090/solana')
 proxy = Web3(Web3.HTTPProvider(proxy_url))
