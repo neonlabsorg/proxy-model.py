@@ -1,5 +1,5 @@
 #set ${NEON_EVM_COMMIT:=latest}
-set ${NEON_EVM_COMMIT:=d6619e42b6ac445ab762af485becf2606ea91171}
+set ${NEON_EVM_COMMIT:=03cba7ddc55a6d424981099b287db15fbc716aa5}
 set ${FAUCET_COMMIT:=latest}
 set ${PROXY_LOG_CFG:=log_cfg.json}
 set ${UNISWAP_V2_CORE_COMMIT:=stable}
