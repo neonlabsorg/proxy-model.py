@@ -176,7 +176,7 @@ class SolInteractor:
         owner = SolPubKey.from_string(raw_account.get('owner', None))
         return AccountInfo(address, account_tag, lamports, owner, data)
 
-    def get_account_info(self, pubkey: SolPubKey, length=None, commitment='processed') -> Optional[AccountInfo]:
+    def get_account_info(self, pubkey: SolPubKey, length=None, commitment='confirmed') -> Optional[AccountInfo]:
         opts = {
             "encoding": "base64",
             "commitment": commitment,
@@ -203,7 +203,7 @@ class SolInteractor:
         return self._decode_account_info(pubkey, raw_account)
 
     def get_account_info_list(self, src_account_list: List[SolPubKey], length=None,
-                              commitment='processed') -> List[Optional[AccountInfo]]:
+                              commitment='confirmed') -> List[Optional[AccountInfo]]:
         opts = {
             "encoding": "base64",
             "commitment": commitment,
@@ -235,7 +235,7 @@ class SolInteractor:
 
     def get_program_account_info_list(self, program: SolPubKey, offset: int, length: int,
                                       data_offset: int, data: bytes,
-                                      commitment='processed') -> List[AccountInfo]:
+                                      commitment='confirmed') -> List[AccountInfo]:
         opts = {
             "encoding": "base64",
             "commitment": commitment,
@@ -271,13 +271,13 @@ class SolInteractor:
             account_info_list.append(account_info)
         return account_info_list
 
-    def get_sol_balance(self, account, commitment='processed') -> int:
+    def get_sol_balance(self, account, commitment='confirmed') -> int:
         opts = {
             "commitment": commitment
         }
         return self._send_rpc_request('getBalance', str(account), opts).get('result', {}).get('value', 0)
 
-    def get_sol_balance_list(self, accounts_list: List[Union[str, SolPubKey]], commitment='processed') -> List[int]:
+    def get_sol_balance_list(self, accounts_list: List[Union[str, SolPubKey]], commitment='confirmed') -> List[int]:
         opts = {
             'commitment': commitment
         }
@@ -293,36 +293,8 @@ class SolInteractor:
 
         return balances_list
 
-    def get_token_account_balance(self, pubkey: Union[str, SolPubKey], commitment='processed') -> int:
-        opts = {
-            "commitment": commitment
-        }
-        response = self._send_rpc_request("getTokenAccountBalance", str(pubkey), opts)
-        result = response.get('result', None)
-        if result is None:
-            return 0
-        return int(result['value']['amount'])
-
-    def get_token_account_balance_list(self, pubkey_list: List[Union[str, SolPubKey]],
-                                       commitment: object = 'processed') -> List[int]:
-        opts = {
-            "commitment": commitment
-        }
-        request_list = []
-        for pubkey in pubkey_list:
-            request_list.append((str(pubkey), opts))
-
-        balance_list = []
-        response_list = self._send_rpc_batch_request('getTokenAccountBalance', request_list)
-        for response in response_list:
-            result = response.get('result', None)
-            balance = int(result['value']['amount']) if result else 0
-            balance_list.append(balance)
-
-        return balance_list
-
     def get_neon_account_info(self, eth_account: Union[str, NeonAddress],
-                              commitment='processed') -> Optional[NeonAccountInfo]:
+                              commitment='confirmed') -> Optional[NeonAccountInfo]:
         if isinstance(eth_account, str):
             eth_account = NeonAddress(eth_account)
         account_sol, nonce = neon_2program(eth_account)
@@ -331,13 +303,13 @@ class SolInteractor:
             return None
         return NeonAccountInfo.from_account_info(info)
 
-    def get_neon_account_info_list(self,
-                                   neon_account_list: List[Union[NeonAddress, str]]) -> List[Optional[NeonAccountInfo]]:
+    def get_neon_account_info_list(self, neon_account_list: List[Union[NeonAddress, str]],
+                                   commitment='confirmed') -> List[Optional[NeonAccountInfo]]:
         requests_list = []
         for neon_account in neon_account_list:
             account_sol, _nonce = neon_2program(neon_account)
             requests_list.append(account_sol)
-        responses_list = self.get_account_info_list(requests_list)
+        responses_list = self.get_account_info_list(requests_list, commitment)
         accounts_list = []
         for account_sol, info in zip(requests_list, responses_list):
             if info is None or len(info.data) < ACCOUNT_INFO_LAYOUT.sizeof() or info.tag != NEON_ACCOUNT_TAG:
