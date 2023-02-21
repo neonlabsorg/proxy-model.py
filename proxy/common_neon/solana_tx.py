@@ -5,6 +5,7 @@ from typing import Sequence, Optional, Union, Dict, Any
 import abc
 
 import solana.transaction
+import solana.rpc.commitment
 
 import solders.hash
 import solders.keypair
@@ -19,6 +20,37 @@ SolAccount = solders.keypair.Keypair
 SolSignature = solders.signature.Signature
 SolPubKey = solders.pubkey.Pubkey
 SolTxReceipt = Dict[str, Any]
+
+
+class Commitment:
+    Type = solana.rpc.commitment.Commitment
+
+    NotProcessed = solana.rpc.commitment.Commitment('not-processed')
+    Processed = solana.rpc.commitment.Processed
+    Confirmed = solana.rpc.commitment.Confirmed
+    Safe = solana.rpc.commitment.Commitment('safe')  # optimistic-finalized => 2/3 of validators
+    Finalized = solana.rpc.commitment.Finalized
+
+    CommitmentOrder = [NotProcessed, Processed, Confirmed, Safe, Finalized]
+
+    @staticmethod
+    def level(commitment: Type) -> int:
+        for index, value in enumerate(Commitment.CommitmentOrder):
+            if value == commitment:
+                return index
+
+        assert False, 'Wrong commitment'
+
+    @staticmethod
+    def to_solana(commitment: Type) -> Type:
+        if commitment == Commitment.NotProcessed:
+            return Commitment.Processed
+        elif commitment == Commitment.Safe:
+            return Commitment.Confirmed
+        elif commitment in {Commitment.Processed, Commitment.Confirmed, Commitment.Finalized}:
+            return commitment
+
+        assert False, 'Wrong commitment'
 
 
 class SolTxSizeError(Exception):
@@ -60,14 +92,14 @@ class SolTx(abc.ABC):
             elif isinstance(arg, SolTx):
                 ix_list.extend(arg._tx.instructions)
             else:
-                raise ValueError("invalid instruction:", arg)
+                raise ValueError('invalid instruction:', arg)
 
         self._tx.instructions = ix_list
         self._is_signed = False
         return self
 
     def serialize(self) -> bytes:
-        assert self._is_signed, "transaction has not been signed"
+        assert self._is_signed, 'transaction has not been signed'
         result = self._serialize()
         if len(result) > solana.transaction.PACKET_DATA_SIZE:
             raise SolTxSizeError('Transaction too big')
@@ -79,7 +111,7 @@ class SolTx(abc.ABC):
 
     @property
     def signature(self) -> SolSignature:
-        assert self._is_signed, "transaction has not been signed"
+        assert self._is_signed, 'transaction has not been signed'
         return self._signature()
 
     @abc.abstractmethod

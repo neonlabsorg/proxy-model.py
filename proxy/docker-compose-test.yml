@@ -90,7 +90,7 @@ services:
       POSTGRES_PASSWORD: neon-proxy-pass
       POSTGRES_HOST: postgres
       NEON_CLI_DEBUG_LOG: "YES"
-      FUZZING_BLOCKHASH: "NO"
+      FUZZ_TESTING: "YES"
       GATHER_STATISTICS: "YES"
       CONFIG: ci
       # Comment next two lines, if you want local stand without real gas-price

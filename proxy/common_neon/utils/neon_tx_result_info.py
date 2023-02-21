@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 import logging
 
-from .solana_block import SolanaBlockInfo
+from .solana_block import SolBlockInfo
 from .utils import str_fmt_object
 from ..evm_log_decoder import NeonLogTxEvent
 
@@ -76,7 +76,7 @@ class NeonTxResultInfo:
         object.__setattr__(self, 'sol_ix_inner_idx', sol_ix_inner_idx)
         object.__setattr__(self, '_str', '')
 
-    def set_block_info(self, block: SolanaBlockInfo, neon_sig: str, tx_idx: int, log_idx: int) -> int:
+    def set_block_info(self, block: SolBlockInfo, neon_sig: str, tx_idx: int, log_idx: int) -> int:
         object.__setattr__(self, 'block_slot', block.block_slot)
         object.__setattr__(self, 'block_hash', block.block_hash)
         object.__setattr__(self, 'neon_sig', neon_sig)

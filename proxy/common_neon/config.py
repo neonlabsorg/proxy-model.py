@@ -1,10 +1,11 @@
+import math
 import os
 
 from decimal import Decimal
 from typing import Optional
 
 from ..common_neon.environment_data import EVM_LOADER_ID
-from ..common_neon.solana_tx import SolPubKey
+from ..common_neon.solana_tx import SolPubKey, Commitment
 
 
 class Config:
@@ -36,8 +37,6 @@ class Config:
         self._min_wo_chainid_gas_price = self._env_int("MINIMAL_WO_CHAINID_GAS_PRICE", 0, 10) * (10 ** 9)
         self._neon_price_usd = Decimal('0.25')
         self._neon_decimals = self._env_int('NEON_DECIMALS', 1, 9)
-        self._finalized_commitment = os.environ.get('FINALIZED_COMMITMENT', 'finalized')
-        self._confirmed_commitment = os.environ.get('CONFIRMED_COMMITMENT', 'confirmed')
         self._start_slot = os.environ.get('START_SLOT', '0')
         self._indexer_parallel_request_cnt = self._env_int("INDEXER_PARALLEL_REQUEST_COUNT", 1, 10)
         self._indexer_poll_cnt = self._env_int("INDEXER_POLL_COUNT", 1, 1000)
@@ -45,8 +44,8 @@ class Config:
         self._indexer_check_msec = self._env_int('INDEXER_CHECK_MSEC', 50, 200)
         self._max_account_cnt = self._env_int("MAX_ACCOUNT_COUNT", 20, 60)
         self._skip_preflight = self._env_bool("SKIP_PREFLIGHT", False)
-        self._fuzzing_blockhash = self._env_bool("FUZZING_BLOCKHASH", False)
-        self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", 10, 10)
+        self._fuzz_testing = self._env_bool("FUZZ_TESTING", False)
+        self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", math.ceil(0.4 * 32), math.ceil(0.4 * 32))
         self._confirm_check_msec = self._env_int("CONFIRM_CHECK_MSEC", 10, 100)
         self._max_evm_step_cnt_emulate = self._env_int("MAX_EVM_STEP_COUNT_TO_EMULATE", 1000, 500000)
         self._neon_cli_timeout = self._env_decimal("NEON_CLI_TIMEOUT", "2.5")
@@ -60,6 +59,7 @@ class Config:
         self._hvac_mount = os.environ.get('HVAC_MOUNT', None)
         self._hvac_path = os.environ.get('HVAC_PATH', '')
         self._genesis_timestamp = self._env_int('GENESIS_BLOCK_TIMESTAMP', 0, 0)
+        self._commit_level = os.environ.get('COMMIT_LEVEL', Commitment.Confirmed)
 
         pyth_mapping_account = os.environ.get('PYTH_MAPPING_ACCOUNT', None)
         if pyth_mapping_account is not None:
@@ -71,6 +71,9 @@ class Config:
         self._validate()
 
     def _validate(self) -> None:
+        self._commit_level = Commitment.Type(self._commit_level.lower())
+        assert Commitment.level(self._commit_level) >= Commitment.level(Commitment.Confirmed)
+
         assert (self._operator_fee > 0) and (self._operator_fee < 1)
         assert (self._gas_price_suggested_pct >= 0) and (self._gas_price_suggested_pct < 1)
         assert (self._extra_gas_pct >= 0) and (self._extra_gas_pct < 1)
@@ -208,14 +211,6 @@ class Config:
         return self._neon_decimals
 
     @property
-    def finalized_commitment(self) -> str:
-        return self._finalized_commitment
-
-    @property
-    def confirmed_commitment(self) -> str:
-        return self._confirmed_commitment
-
-    @property
     def start_slot(self) -> str:
         return self._start_slot
 
@@ -244,8 +239,8 @@ class Config:
         return self._skip_preflight
 
     @property
-    def fuzzing_blockhash(self) -> bool:
-        return self._fuzzing_blockhash
+    def fuzz_testing(self) -> bool:
+        return self._fuzz_testing
 
     @property
     def confirm_timeout_sec(self) -> int:
@@ -303,6 +298,10 @@ class Config:
     def genesis_timestamp(self) -> int:
         return self._genesis_timestamp
 
+    @property
+    def commit_level(self) -> Commitment.Type:
+        return self._commit_level
+
     def as_dict(self) -> dict:
         return {
             'SOLANA_URL': self.solana_url,
@@ -334,8 +333,6 @@ class Config:
             'MINIMAL_WO_CHAINID_GAS_PRICE': self.min_wo_chainid_gas_price,
             'NEON_PRICE_USD': self.neon_price_usd,
             'NEON_DECIMALS': self.neon_decimals,
-            'FINALIZED_COMMITMENT': self.finalized_commitment,
-            'CONFIRMED_COMMITMENT': self.confirmed_commitment,
             'START_SLOT': self.start_slot,
             'INDEXER_PARALLEL_REQUEST_COUNT': self.indexer_parallel_request_cnt,
             'INDEXER_POLL_COUNT': self.indexer_poll_cnt,
@@ -343,7 +340,7 @@ class Config:
             'INDEXER_CHECK_MSEC': self.indexer_check_msec,
             'MAX_ACCOUNT_COUNT': self.max_account_cnt,
             'SKIP_PREFLIGHT': self.skip_preflight,
-            'FUZZING_BLOCKHASH': self.fuzzing_blockhash,
+            'FUZZ_TESTING': self.fuzz_testing,
             'CONFIRM_TIMEOUT_SEC': self.confirm_timeout_sec,
             'CONFIRM_CHECK_MSEC': self.confirm_check_msec,
             'MAX_EVM_STEP_COUNT_TO_EMULATE': self.max_evm_step_cnt_emulate,
@@ -357,5 +354,6 @@ class Config:
             'HVAC_TOKEN': self.hvac_token,
             'HVAC_PATH': self.hvac_path,
             'HVAC_MOUNT': self.hvac_mount,
-            'GENESIS_BLOCK_TIMESTAMP': self.genesis_timestamp
+            'GENESIS_BLOCK_TIMESTAMP': self.genesis_timestamp,
+            'COMMIT_LEVEL': self.commit_level
         }

@@ -28,7 +28,7 @@ class BaseNeonTxStrategy(abc.ABC):
 
     def __init__(self, ctx: NeonTxSendCtx):
         self._validation_error_msg: Optional[str] = None
-        self._prep_stage_list: List[BaseNeonTxPrepStage] = []
+        self._prep_stage_list: List[BaseNeonTxPrepStage] = list()
         self._ctx = ctx
         self._evm_step_cnt = ElfParams().neon_evm_steps
 
@@ -82,12 +82,12 @@ class BaseNeonTxStrategy(abc.ABC):
     def prep_before_emulate(self) -> bool:
         assert self.is_valid()
 
-        tx_list_list: List[List[SolTx]] = []
+        tx_list_list: List[List[SolTx]] = list()
         for stage in self._prep_stage_list:
             new_tx_list_list = stage.build_prep_tx_list_before_emulate()
 
             while len(new_tx_list_list) > len(tx_list_list):
-                tx_list_list.append([])
+                tx_list_list.append(list())
             for tx_list, new_tx_list in zip(tx_list_list, new_tx_list_list):
                 tx_list.extend(new_tx_list)
 

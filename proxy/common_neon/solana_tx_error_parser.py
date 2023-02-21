@@ -53,7 +53,8 @@ class SolTxErrorParser:
     _exceeded_cu_number_log = 'Program failed to complete: exceeded maximum number of instructions allowed'
     _read_only_blocked_log = 'trying to execute transaction on ro locked account'
     _read_write_blocked_log = 'trying to execute transaction on rw locked account'
-    _already_finalized_log = f'Program {EVM_LOADER_ID} failed: custom program error: 0x4'
+    _already_finalized_log = 'Program log: Storage Account is finalized'
+
     _log_truncated_log = 'Log truncated'
     _require_resize_iter_log = 'Deployment of contract which needs more than 10kb of account space needs several'
 
@@ -190,9 +191,6 @@ class SolTxErrorParser:
             self._is_log_list_init = True
             self._log_list = self._get_log_list()
 
-            if len(self._log_list) == 0:
-                LOG.error(f"Can't get logs from receipt: {self._receipt}")
-
         return self._log_list
 
     def check_if_error(self) -> bool:
@@ -279,7 +277,7 @@ class SolTxErrorParser:
         return self._get_value('data', self._numslots_behind_data)
 
     def get_nonce_error(self) -> Tuple[Optional[int], Optional[int]]:
-        log_list = self._get_log_list()
+        log_list = self.get_log_list()
         for log in log_list:
             s = self._nonce_re.search(log)
             if s is not None:

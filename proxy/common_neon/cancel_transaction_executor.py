@@ -25,8 +25,8 @@ class CancelTxExecutor:
 
         self._alt_builder = ALTTxBuilder(solana, self._ix_builder, signer)
         self._alt_tx_set = ALTTxSet()
-        self._alt_info_list: List[ALTInfo] = []
-        self._cancel_tx_list: List[SolTx] = []
+        self._alt_info_list: List[ALTInfo] = list()
+        self._cancel_tx_list: List[SolTx] = list()
         self._holder_account_set: Set[str] = set()
 
     def add_blocked_holder_account(self, holder_info: HolderAccountInfo) -> bool:
@@ -41,7 +41,7 @@ class CancelTxExecutor:
         return True
 
     def _build_cancel_tx(self, holder_info: HolderAccountInfo) -> SolLegacyTx:
-        key_list: List[SolAccountMeta] = []
+        key_list: List[SolAccountMeta] = list()
         for is_writable, exists, acct in holder_info.account_list:
             meta = SolAccountMeta(pubkey=SolPubKey.from_string(acct), is_signer=False, is_writable=is_writable)
             key_list.append(meta)
