@@ -116,11 +116,11 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
 
         LOG.debug(
             f'Total EVM steps {self._ctx.emulated_evm_step_cnt}, '
-            f'total resize iterations {self._ctx.neon_tx_exec_cfg.resize_iter_cnt}'
+            f'total resize iterations {self._ctx.resize_iter_cnt}'
         )
 
         emulated_step_cnt = max(self._ctx.emulated_evm_step_cnt, self._evm_step_cnt)
-        additional_iter_cnt = self._ctx.neon_tx_exec_cfg.resize_iter_cnt
+        additional_iter_cnt = self._ctx.resize_iter_cnt
         additional_iter_cnt += 2  # begin + finalization
         tx_list = self.build_tx_list(emulated_step_cnt, additional_iter_cnt)
         tx_sender = IterativeNeonTxSender(self, self._ctx.solana, self._ctx.signer)

@@ -73,7 +73,7 @@ class SimpleNeonTxStrategy(BaseNeonTxStrategy):
         return False
 
     def _validate_no_resize_iter_cnt(self) -> bool:
-        if self._ctx.neon_tx_exec_cfg.resize_iter_cnt <= 0:
+        if self._ctx.resize_iter_cnt <= 0:
             return True
         self._validation_error_msg = 'Has account resize iterations'
         return False

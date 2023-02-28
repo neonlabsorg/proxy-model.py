@@ -105,10 +105,6 @@ class NeonTxSendCtx:
         return self._config
 
     @property
-    def neon_sig(self) -> str:
-        return self._neon_sig
-
-    @property
     def bin_neon_sig(self) -> bytes:
         return self._bin_neon_sig
 
@@ -133,8 +129,9 @@ class NeonTxSendCtx:
         return self._solana
 
     @property
-    def neon_tx_exec_cfg(self) -> NeonTxExecCfg:
-        return self._neon_tx_exec_cfg
+    def resize_iter_cnt(self) -> int:
+        assert self._neon_tx_exec_cfg.resize_iter_cnt >= 0
+        return self._neon_tx_exec_cfg.resize_iter_cnt
 
     @property
     def emulated_evm_step_cnt(self) -> int:
