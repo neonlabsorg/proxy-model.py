@@ -236,7 +236,7 @@ def openzeppelin_test(run_number):
     fts_result = docker_compose(
         "-f docker-compose/docker-compose-full-test-suite.yml up")
     click.echo(fts_result)
-    command = f'docker cp {container_name}:/opt/allure-reports.tar.gz ./'
+    command = f'docker cp {container_name}:/opt/neon-tests/allure-reports.tar.gz ./'
     click.echo(f"run command: {command}")
     subprocess.run(command, shell=True)
 
