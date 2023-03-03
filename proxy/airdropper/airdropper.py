@@ -12,6 +12,7 @@ from sha3 import keccak_256
 from datetime import datetime
 from decimal import Decimal
 
+from ..common_neon.address import NeonAddress
 from ..common_neon.config import Config
 from ..common_neon.constants import ACCOUNT_SEED_VERSION
 from ..common_neon.solana_interactor import SolInteractor
@@ -20,6 +21,7 @@ from ..common_neon.solana_tx import SolPubKey
 from ..common_neon.pythnetwork import PythNetworkClient
 from ..common_neon.solana_neon_tx_receipt import SolTxReceiptInfo, SolNeonIxReceiptInfo
 
+from ..indexer.indexed_objects import NeonIndexedHolderInfo
 from ..indexer.indexer_base import IndexerBase
 from ..indexer.solana_tx_meta_collector import SolTxMetaDict, FinalizedSolTxMetaCollector
 from ..indexer.base_db import BaseDB
@@ -28,31 +30,17 @@ from ..indexer.sql_dict import SQLDict
 
 from dataclasses import dataclass
 
-class NeonTrxData:
-    def __init__(self, trx_hash: bytes):
-        self.trx_hash = trx_hash
-        self.sections: Dict[int, bytes] = {}
-        self.executed = False
-
-    def addData(self, offset: int, data: bytes):
-        self.sections[offset] = data
-
-    def getData(self) -> bytes:
-        # TODO: Check offsets and data
-        # LOG.debug(vars(self))
-        #LOG.debug([section.hex() for section in self.sections.values()])
-        return b''.join([v for k,v in sorted(self.sections.items())])
-
 
 LOG = logging.getLogger(__name__)
 
-EVM_LOADER_CALL_FROM_RAW_TRX     = 0x1f
-EVM_LOADER_HOLDER_WRITE          = 0x26
-EVM_LOADER_CREATE_ACC            = 0x28
-EVM_LOADER_TRX_STEP_FROM_ACCOUNT = 0x21
-EVM_LOADER_TRX_STEP_FROM_ACCOUNT_NO_CHAINID =  0x22
-EVM_LOADER_CANCEL                = 0x23
-EVN_LOADER_TRX_EXECUTE_FROM_ACCOUNT = 0x2A
+EVM_LOADER_CALL_FROM_RAW_TRX                = 0x1f
+EVM_LOADER_STEP_FROM_RAW_TRX                = 0x20
+EVM_LOADER_HOLDER_WRITE                     = 0x26
+EVM_LOADER_CREATE_ACC                       = 0x28
+EVM_LOADER_TRX_STEP_FROM_ACCOUNT            = 0x21
+EVM_LOADER_TRX_STEP_FROM_ACCOUNT_NO_CHAINID = 0x22
+EVM_LOADER_CANCEL                           = 0x23
+EVM_LOADER_TRX_EXECUTE_FROM_ACCOUNT         = 0x2A
 
 SPL_TOKEN_APPROVE                = 0x04
 SPL_TOKEN_INIT_ACC_2             = 0x10
@@ -96,12 +84,22 @@ class AirdropReadySet(BaseDB):
             cur.execute(f"SELECT 1 FROM {self._table_name} WHERE eth_address = %s", (eth_address,))
             return cur.fetchone() is not None
 
+class AirdropperState:
+    # Schedule airdrop for the specified address
+    # It is no second airdrop if one was scheduled to this address.
+    def schedule_airdrop(self, address: NeonAddress):
+        pass
 
-class Airdropper(IndexerBase):
+class AirdropperTrxAnalyzer:
+    def process(self, neon_tx: NeonTx, state: AirdropperState):
+        pass
+
+class Airdropper(IndexerBase, AirdropperState):
     def __init__(self,
                  config: Config,
                  faucet_url='',
                  wrapper_whitelist = 'ANY',
+                 analyzers: Dict[NeonAddress,AirdropperTrxAnalyzer]={},
                  max_conf = 0.1): # maximum confidence interval deviation related to price
         self._constants = SQLDict(tablename="constants")
 
@@ -137,7 +135,9 @@ class Airdropper(IndexerBase):
         self.airdrop_amount_neon = None
         self.last_update_pyth_mapping = None
         self.max_update_pyth_mapping_int = 60 * 60  # update once an hour
-        self.neon_transactions: Dict[SolPubKey, NeonTrxData] = {}
+        self.neon_large_tx: Dict[str, NeonIndexedHolderInfo] = {}
+        self.analyzers: Dict[str, AirdropperTrxAnalyzer] = analyzers
+
 
     @staticmethod
     def get_current_time():
@@ -232,7 +232,78 @@ class Airdropper(IndexerBase):
         return True
     
     def process_neon_transaction(self, sol_neon_ix: SolNeonIxReceiptInfo, trx_data: bytes):
-        LOG.debug(f"   >> {sol_neon_ix.neon_tx_sig} {trx_data.hex()}")
+        trx = NeonTx.from_string(trx_data)
+        sender = NeonAddress(trx.sender())
+        to = NeonAddress(trx.toAddress) if trx.toAddress is not None else None
+        LOG.debug(f"from: {sender}, to: {to}, calldata: {trx.callData.hex()}")
+
+        analyzer = self.analyzers.get(to, None)
+        if analyzer is not None:
+            try:
+                analyzer.process(trx, self)
+            except Exception as error:
+                LOG.warn(f"Failed to analyze {sol_neon_ix.neon_tx_sig}: {error}")
+
+    def process_trx_neon_instructions(self, trx):
+        if check_error(trx):
+            return
+
+        tx_receipt_info = SolTxReceiptInfo.from_tx(trx)
+        sol_sig = tx_receipt_info.sol_sig
+        for sol_neon_ix in tx_receipt_info.iter_sol_neon_ix():
+            instruction = sol_neon_ix.ix_data[0]
+            neon_tx_sig = sol_neon_ix.neon_tx_sig
+            LOG.debug(f"{sol_sig} instruction: {instruction} {sol_neon_ix.neon_tx_sig}")
+            if instruction == EVM_LOADER_HOLDER_WRITE:
+                data = sol_neon_ix.ix_data[41:]
+                chunk = NeonIndexedHolderInfo.DataChunk(
+                    offset=int.from_bytes(sol_neon_ix.ix_data[33:41],'little'),
+                    length=len(data),
+                    data=data
+                )
+                neon_tx_data = self.neon_large_tx.get(neon_tx_sig, None)
+                if neon_tx_data is None:
+                    LOG.debug(f"{sol_sig} New NEON trx: {neon_tx_sig} {len(chunk.data)} bytes at {chunk.offset}")
+                    key = NeonIndexedHolderInfo.Key(sol_neon_ix.get_account(0), neon_tx_sig)
+                    neon_tx_data = NeonIndexedHolderInfo(key)
+                    self.neon_large_tx[neon_tx_sig] = neon_tx_data
+                else:
+                    LOG.debug(f"{sol_sig} Add data to NEON trx: {neon_tx_sig} {len(chunk.data)} bytes at {chunk.offset}")
+                neon_tx_data.add_data_chunk(chunk)
+                neon_tx_data.add_sol_neon_ix(sol_neon_ix)
+
+            elif instruction in [EVM_LOADER_TRX_STEP_FROM_ACCOUNT,
+                                 EVM_LOADER_TRX_STEP_FROM_ACCOUNT_NO_CHAINID,
+                                 EVM_LOADER_TRX_EXECUTE_FROM_ACCOUNT]:
+                if sol_neon_ix.neon_tx_return is None:
+                    continue
+
+                neon_tx_data = self.neon_large_tx.get(neon_tx_sig, None)
+                if neon_tx_data is None:
+                    LOG.warn(f"{sol_sig} Transaction {neon_tx_sig} is not in the collected data")
+                    continue
+
+                LOG.debug(f"{sol_sig} Finalize {neon_tx_sig}")
+                if sol_neon_ix.neon_tx_return.status == 1:
+                    data_hash = '0x'+keccak_256(neon_tx_data.data).hexdigest()
+                    if data_hash != neon_tx_sig:
+                        LOG.warn(f"{sol_sig} Data hash {data_hash} does not match transaction hash {neon_tx_sig}")
+                    else:
+                        self.process_neon_transaction(sol_neon_ix, neon_tx_data.data)
+                del self.neon_large_tx[neon_tx_sig]
+
+            elif instruction == EVM_LOADER_CALL_FROM_RAW_TRX:
+                message = sol_neon_ix.ix_data[5:]
+                self.process_neon_transaction(sol_neon_ix, message)
+
+            elif instruction == EVM_LOADER_STEP_FROM_RAW_TRX:
+                message = sol_neon_ix.ix_data[13:]
+                self.process_neon_transaction(sol_neon_ix, message)
+
+            elif instruction == EVM_LOADER_CANCEL:
+                neon_tx_data = self.neon_large_tx.get(neon_tx_sig, None)
+                if neon_tx_sig in self.neon_large_tx:
+                    del self.neon_large_tx[neon_tx_sig]
 
     def process_trx_airdropper_mode(self, trx):
         if check_error(trx):
@@ -261,80 +332,12 @@ class Airdropper(IndexerBase):
             return account_keys[instr['programIdIndex']] == str(req_program_id) \
                 and base58.b58decode(instr['data'])[0] == req_tag_id
         
-        def oneOfRequiredInstructions(instr, req_program_id, req_tag_ids):
-            return account_keys[instr['programIdIndex']] == str(req_program_id) \
-                and base58.b58decode(instr['data'])[0] in req_tag_ids
-
         account_keys = trx["transaction"]["message"]["accountKeys"]
         lookup_keys = trx["meta"].get('loadedAddresses', None)
         if lookup_keys is not None:
             account_keys += lookup_keys['writable'] + lookup_keys['readonly']
 
         instructions = [(number, entry) for number, entry in enumerate(trx['transaction']['message']['instructions'])]
-
-
-        holder_instructions = [
-            EVM_LOADER_HOLDER_WRITE,
-            EVM_LOADER_TRX_STEP_FROM_ACCOUNT,
-            EVM_LOADER_TRX_STEP_FROM_ACCOUNT_NO_CHAINID,
-            EVN_LOADER_TRX_EXECUTE_FROM_ACCOUNT,
-            EVM_LOADER_CANCEL,
-        ]
-        predicate = lambda  instr: oneOfRequiredInstructions(instr, self._config.evm_loader_id, holder_instructions)
-        if True or len(find_instructions(instructions, predicate)) != 0:
-            tx_receipt_info = SolTxReceiptInfo.from_tx(trx)
-            sol_sig = tx_receipt_info.sol_sig
-            for sol_neon_ix in tx_receipt_info.iter_sol_neon_ix():
-                instruction = sol_neon_ix.ix_data[0]
-                trx_hash = bytes.fromhex(sol_neon_ix.neon_tx_sig[2:])
-                LOG.debug(f"{sol_sig} instruction: {instruction} {sol_neon_ix.neon_tx_sig}")
-                if instruction == EVM_LOADER_HOLDER_WRITE:
-                    holder = SolPubKey.from_string(sol_neon_ix.get_account(0))
-                    offset = int.from_bytes(sol_neon_ix.ix_data[33:][:8],'little')
-                    data = sol_neon_ix.ix_data[41:]
-                    neonTrxData = self.neon_transactions.get(holder, None)
-
-                    if neonTrxData and neonTrxData.trx_hash == trx_hash:
-                        LOG.debug(f"{sol_sig} Add trx: {holder} -> {trx_hash.hex()} {len(data)} bytes at {offset}")
-                        if neonTrxData.executed:
-                            LOG.warn(f"{sol_sig} Holder {holder} already executed")
-                        else:
-                            neonTrxData.addData(offset, data)
-                    else:
-                        LOG.debug(f"{sol_sig} New trx: {holder} -> {trx_hash.hex()} {len(data)} bytes at {offset}")
-                        neonTrxData = NeonTrxData(trx_hash)
-                        neonTrxData.addData(offset, data)
-                        self.neon_transactions[holder] = neonTrxData
-                elif instruction in [EVM_LOADER_TRX_STEP_FROM_ACCOUNT, EVM_LOADER_TRX_STEP_FROM_ACCOUNT_NO_CHAINID, EVN_LOADER_TRX_EXECUTE_FROM_ACCOUNT]:
-                    holder = SolPubKey.from_string(sol_neon_ix.get_account(0))
-                    neonTrxData = self.neon_transactions.get(holder, None)
-                    LOG.debug(f"{sol_sig} Execute trx from holder {holder}")
-                    if neonTrxData is None:
-                        LOG.warn(f"{sol_sig} Holder account not in the collected data")
-                        continue
-                    if neonTrxData.trx_hash != trx_hash:
-                        LOG.warn(f"{sol_sig} Holder transaction not equal to one in instruction")
-                        continue
-                    neonTrxData.executed = True
-                    if sol_neon_ix.neon_tx_return:
-                        if sol_neon_ix.neon_tx_return.status == 1:
-                            data = neonTrxData.getData()
-                            data_hash = keccak_256(data).digest()
-                            if data_hash != trx_hash:
-                                LOG.warn(f"{sol_sig} Data hash {data_hash.hex()} does not match transaction hash {trx_hash.hex()}")
-                                LOG.debug(f"{vars(neonTrxData)}")
-                            else:
-                                self.process_neon_transaction(sol_neon_ix, neonTrxData.getData())
-                        # NOTE: Do not delete holder account because execute instruction shuffled
-                        #       and the one with neon_tx_return present before others
-                        # del self.neon_transactions[holder]
-
-                elif instruction == EVM_LOADER_CANCEL:
-                    holder = SolPubKey.from_string(sol_neon_ix.get_account(0))
-                    if holder not in self.neon_transactions:
-                        LOG.warn(f"{sol_sig} Holder account not in the collected data")
-                        continue
-                    del self.neon_transactions[holder]
 
         # Finding instructions specific for airdrop.
         # Airdrop triggers on sequence:
@@ -393,7 +396,8 @@ class Airdropper(IndexerBase):
                     if not check_res:
                         continue
 
-                    self.schedule_airdrop(create_acc)
+                    account = NeonAddress(base58.b58decode(create_acc['data'])[1:][:20])
+                    self.schedule_airdrop(account)
 
     def get_sol_usd_price(self):
         should_reload = self.always_reload_price
@@ -430,8 +434,8 @@ class Airdropper(IndexerBase):
         LOG.info(f"Airdrop amount: ${self.airdrop_amount_usd} ({self.airdrop_amount_neon} NEONs)\n")
         return int(self.airdrop_amount_neon * pow(Decimal(10), self._config.neon_decimals))
 
-    def schedule_airdrop(self, create_acc):
-        eth_address = "0x" + bytearray(base58.b58decode(create_acc['data'])[1:][:20]).hex()
+    def schedule_airdrop(self, account: NeonAddress):
+        eth_address = str(account)
         if self.airdrop_ready.is_airdrop_ready(eth_address) or eth_address in self.airdrop_scheduled:
             # Target account already supplied with airdrop or airdrop already scheduled
             return
@@ -480,7 +484,14 @@ class Airdropper(IndexerBase):
         for meta in self._sol_tx_collector.iter_tx_meta(last_block_slot, self._sol_tx_collector.last_block_slot):
             self.current_slot = meta.block_slot
             if meta.tx['transaction']['message']['instructions'] is not None:
-                self.process_trx_airdropper_mode(meta.tx)
-                #LOG.info(f"trx: {meta.sol_sig}")
+                # self.process_trx_airdropper_mode(meta.tx)
+                self.process_trx_neon_instructions(meta.tx)
+            #LOG.info(f"trx: {meta.sol_sig}")
         self.latest_processed_slot = self._sol_tx_collector.last_block_slot
+
+        # Find the minimum start_block_slot through unfinished neon_large_tx
+        for tx in self.neon_large_tx.values():
+            self.latest_processed_slot = min(self.latest_processed_slot, tx.start_block_slot-1)
+            LOG.debug(f"trx {tx.neon_tx_sig} started from {tx.start_block_slot}")
         self._constants['latest_processed_slot'] = self.latest_processed_slot
+        LOG.debug(f"Latest processed slot: {self.latest_processed_slot}, Solana finalized slot {self._sol_tx_collector.last_block_slot}")

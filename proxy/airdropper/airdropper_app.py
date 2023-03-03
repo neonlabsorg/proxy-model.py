@@ -2,10 +2,12 @@ import os
 import logging
 
 from ..common.logger import Logger
+from ..common_neon.address import NeonAddress
 from ..common_neon.config import Config
 from ..common.logger import Logger
 
 from .airdropper import Airdropper
+from .portal_analyzer import PortalTrxAnalyzer
 
 
 LOG = logging.getLogger(__name__)
@@ -28,7 +30,11 @@ class AirdropperApp:
                   wrapper_whitelist: {wrapper_whitelist},
                   Max confidence interval: {max_conf}""")
 
-        self._airdropper = Airdropper(config, faucet_url, wrapper_whitelist, max_conf)
+        analyzers = {
+            NeonAddress("0xee3db83916ccdc3593b734f7f2d16d630f39f1d0"): PortalTrxAnalyzer(set()),
+        }
+
+        self._airdropper = Airdropper(config, faucet_url, wrapper_whitelist, analyzers, max_conf)
 
     def run(self) -> int:
         Logger.setup()
