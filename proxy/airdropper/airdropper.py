@@ -84,13 +84,19 @@ class AirdropReadySet(BaseDB):
             cur.execute(f"SELECT 1 FROM {self._table_name} WHERE eth_address = %s", (eth_address,))
             return cur.fetchone() is not None
 
+# Interface class for work with airdropper state from analyzers objects
 class AirdropperState:
     # Schedule airdrop for the specified address
     # It is no second airdrop if one was scheduled to this address.
     def schedule_airdrop(self, address: NeonAddress):
         pass
 
+# Base class to create NeonEVM transaction analyzers for airdropper
 class AirdropperTrxAnalyzer:
+    # Function to process NeonEVM transaction to find one that should be rewarded with airdrop
+    # Arguments:
+    #  - neon_tx - information about NeonEVM transaction
+    #  - state - airdropper state
     def process(self, neon_tx: NeonTx, state: AirdropperState):
         pass
 
@@ -231,6 +237,7 @@ class Airdropper(IndexerBase, AirdropperState):
 
         return True
     
+    # Method to process NeonEVM transaction extracted from the instructions
     def process_neon_transaction(self, sol_neon_ix: SolNeonIxReceiptInfo, trx_data: bytes):
         trx = NeonTx.from_string(trx_data)
         sender = NeonAddress(trx.sender())
@@ -244,6 +251,17 @@ class Airdropper(IndexerBase, AirdropperState):
             except Exception as error:
                 LOG.warn(f"Failed to analyze {sol_neon_ix.neon_tx_sig}: {error}")
 
+    # Method to process Solana transactions and extract NeonEVM transaction from the contract instructions.
+    # For large NeonEVM transaction that passing to contract via account data, this method extracts and 
+    # combines chunk of data from different HolderWrite instructions. At the any time `neon_large_tx` 
+    # dictionary contains actual NeonEVM transactions written into the holder accounts. The stored account 
+    # are cleared in case of execution, cancel trx or writing chunk of data from another NeonEVM transaction. 
+    # This logic are implemented according to the work with holder account inside contract.
+    # Note: the `neon_large_tx` dictionary stored only in memory, so `last_processed_slot` move forward only 
+    # after finalize corresponding holder account. It is necessary for correct transaction processing after 
+    # restart the airdriop service.
+    # Note: this implementation analyzes only the final step in case of iterative execution. It simplifies it 
+    # but does not process events generated from the Solidity contract.
     def process_trx_neon_instructions(self, trx):
         if check_error(trx):
             return
@@ -494,7 +512,9 @@ class Airdropper(IndexerBase, AirdropperState):
                 self.process_trx_neon_instructions(meta.tx)
         self.latest_processed_slot = self._sol_tx_collector.last_block_slot
 
-        # Find the minimum start_block_slot through unfinished neon_large_tx
+        # Find the minimum start_block_slot through unfinished neon_large_tx. It is necessary for correct
+        # transaction processing after restart the airdrop service. See `process_trx_neon_instructions`
+        # for more information.
         for tx in self.neon_large_tx.values():
             self.latest_processed_slot = min(self.latest_processed_slot, tx.start_block_slot-1)
             LOG.debug(f"trx {tx.neon_tx_sig} started from {tx.start_block_slot}")
