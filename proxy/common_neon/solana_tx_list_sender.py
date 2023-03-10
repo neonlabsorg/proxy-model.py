@@ -170,7 +170,11 @@ class SolTxListSender:
         }
 
         if tx_status in good_tx_status_set:
-            return self._get_tx_list_from_state(tx_state_list)
+            tx_list = self._get_tx_list_from_state(tx_state_list)
+            if tx_status == SolTxSendState.Status.BlockhashNotFoundError:
+                for tx in tx_list:
+                    tx.recent_blockhash = None
+            return tx_list
 
         error_tx_status_dict = {
             s.NodeBehindError: NodeBehindError,
