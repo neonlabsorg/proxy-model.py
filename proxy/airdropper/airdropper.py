@@ -307,7 +307,7 @@ class Airdropper(IndexerBase, AirdropperState):
                         LOG.warning(f"{sol_sig} Data hash {data_hash} does not match transaction hash {sol_neon_ix.neon_tx_sig}")
                     else:
                         self.process_neon_transaction(sol_neon_ix, neon_tx_data.data)
-                self.neon_large_tx.pop(neon_tx_id, None)
+                self.neon_large_tx.pop(neon_tx_id.value, None)
 
             elif instruction == EVM_LOADER_CALL_FROM_RAW_TRX:
                 message = sol_neon_ix.ix_data[5:]
@@ -319,7 +319,7 @@ class Airdropper(IndexerBase, AirdropperState):
 
             elif instruction == EVM_LOADER_CANCEL:
                 neon_tx_id = NeonIndexedHolderInfo.Key(sol_neon_ix.get_account(0), sol_neon_ix.neon_tx_sig)
-                self.neon_large_tx.pop(neon_tx_id, None)
+                self.neon_large_tx.pop(neon_tx_id.value, None)
 
     def process_trx_airdropper_mode(self, trx):
         if check_error(trx):
