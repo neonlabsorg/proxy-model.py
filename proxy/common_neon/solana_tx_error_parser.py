@@ -13,7 +13,7 @@ from ..common_neon.utils import get_from_dict
 LOG = logging.getLogger(__name__)
 
 
-class SolTxError(Exception):
+class SolTxError(RuntimeError):
     def __init__(self, receipt: SolTxReceipt):
         self.result = receipt
 
@@ -58,7 +58,7 @@ class SolTxErrorParser:
     _log_truncated_log = 'Log truncated'
     _require_resize_iter_log = 'Deployment of contract which needs more than 10kb of account space needs several'
 
-    _blockhash_notfound_err = 'BlockhashNotFound'
+    _block_hash_notfound_err = 'BlockhashNotFound'
     _numslots_behind_data = 'numSlotsBehind'
 
     _create_account_re = re.compile(
@@ -262,10 +262,10 @@ class SolTxErrorParser:
                 return True
         return False
 
-    def check_if_blockhash_notfound(self) -> bool:
+    def check_if_block_hash_notfound(self) -> bool:
         if not self._receipt:
             return True
-        return self.get_error() == self._blockhash_notfound_err
+        return self.get_error() == self._block_hash_notfound_err
 
     def check_if_alt_uses_invalid_index(self) -> bool:
         return self.get_error_code_msg() == (-32602, self._alt_invalid_idx_msg)

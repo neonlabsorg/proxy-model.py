@@ -45,7 +45,7 @@ class Config:
         self._max_account_cnt = self._env_int("MAX_ACCOUNT_COUNT", 20, 60)
         self._skip_preflight = self._env_bool("SKIP_PREFLIGHT", False)
         self._fuzz_testing = self._env_bool("FUZZ_TESTING", False)
-        self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", math.ceil(0.4 * 32), math.ceil(0.4 * 32))
+        self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", 4, math.ceil(0.4 * 32))
         self._confirm_check_msec = self._env_int("CONFIRM_CHECK_MSEC", 10, 100)
         self._max_evm_step_cnt_emulate = self._env_int("MAX_EVM_STEP_COUNT_TO_EMULATE", 1000, 500000)
         self._neon_cli_timeout = self._env_decimal("NEON_CLI_TIMEOUT", "2.5")

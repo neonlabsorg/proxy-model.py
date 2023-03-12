@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Sequence, Optional, Union, Dict, Any
+from typing import Sequence, Optional, Union, Dict, Any, Set
 
 import abc
 
@@ -15,7 +15,7 @@ import solders.signature
 
 SolTxIx = solders.instruction.Instruction
 SolAccountMeta = solana.transaction.AccountMeta
-SolBlockhash = solders.hash.Hash
+SolBlockHash = solders.hash.Hash
 SolAccount = solders.keypair.Keypair
 SolSignature = solders.signature.Signature
 SolPubKey = solders.pubkey.Pubkey
@@ -31,15 +31,25 @@ class Commitment:
     Safe = solana.rpc.commitment.Commitment('safe')  # optimistic-finalized => 2/3 of validators
     Finalized = solana.rpc.commitment.Finalized
 
-    CommitmentOrder = [NotProcessed, Processed, Confirmed, Safe, Finalized]
+    Order = [NotProcessed, Processed, Confirmed, Safe, Finalized]
 
     @staticmethod
     def level(commitment: Type) -> int:
-        for index, value in enumerate(Commitment.CommitmentOrder):
+        for index, value in enumerate(Commitment.Order):
             if value == commitment:
                 return index
 
         assert False, 'Wrong commitment'
+
+    @staticmethod
+    def upper_set(commitment: Type) -> Set[Type]:
+        level = Commitment.level(commitment)
+        return set(Commitment.Order[level:])
+
+    @staticmethod
+    def lower_set(commitment: Type) -> Set[Type]:
+        level = Commitment.level(commitment)
+        return set(Commitment.Order[:level])
 
     @staticmethod
     def to_solana(commitment: Type) -> Type:
@@ -53,12 +63,12 @@ class Commitment:
         assert False, 'Wrong commitment'
 
 
-class SolTxSizeError(Exception):
+class SolTxSizeError(RuntimeError):
     pass
 
 
 class SolTx(abc.ABC):
-    _empty_blockhash = SolBlockhash.default()
+    _empty_block_hash = SolBlockHash.default()
 
     def __init__(self, name: str = '', instructions: Optional[Sequence[SolTxIx]] = None):
         self._name = name
@@ -73,15 +83,15 @@ class SolTx(abc.ABC):
         return len(self._tx.instructions) == 0
 
     @property
-    def recent_blockhash(self) -> Optional[SolBlockhash]:
-        blockhash = self._tx.recent_blockhash
-        if blockhash == self._empty_blockhash:
+    def recent_block_hash(self) -> Optional[SolBlockHash]:
+        block_hash = self._tx.recent_blockhash
+        if block_hash == self._empty_block_hash:
             return None
-        return blockhash
+        return block_hash
 
-    @recent_blockhash.setter
-    def recent_blockhash(self, blockhash: Optional[SolBlockhash]) -> None:
-        self._tx.recent_blockhash = blockhash
+    @recent_block_hash.setter
+    def recent_block_hash(self, block_hash: Optional[SolBlockHash]) -> None:
+        self._tx.recent_blockhash = block_hash
         self._is_signed = False
 
     def add(self, *args: Union[SolTx, SolTxIx]) -> SolTx:
@@ -108,6 +118,10 @@ class SolTx(abc.ABC):
     def sign(self, signer: SolAccount) -> None:
         self._sign(signer)
         self._is_signed = True
+
+    @property
+    def is_signed(self) -> bool:
+        return self._is_signed
 
     @property
     def signature(self) -> SolSignature:

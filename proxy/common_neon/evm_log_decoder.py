@@ -54,9 +54,9 @@ class NeonLogTxEvent:
 
     address: bytes
     topic_list: List[bytes]
-    data: bytes
+    data: bytes = b''
 
-    sol_sig: str
+    sol_sig: str = ''
     idx: int = 0
     inner_idx: Optional[int] = None
     total_gas_used: int = 0
@@ -132,12 +132,12 @@ class _NeonLogDecoder:
     def _decode_mnemonic(self, line: str) -> Tuple[str, List[str]]:
         match = self._re_data.match(line)
         if match is None:
-            return '', []
+            return '', list()
 
         tail: str = match.group(1)
         data_list: List[str] = tail.split()
         if len(data_list) < 2:
-            return '', []
+            return '', list()
 
         mnemonic = base64.b64decode(data_list[0]).decode('utf-8')
         return mnemonic, data_list[1:]
@@ -198,9 +198,7 @@ class _NeonLogDecoder:
             LOG.error(f'Failed to decode enter event, address has wrong length: {address}')
             return None
 
-        return NeonLogTxEvent(
-            event_type=event_type, is_hidden=True, address=address, data=b'', topic_list=[], sol_sig=''
-        )
+        return NeonLogTxEvent(event_type=event_type, is_hidden=True, address=address, topic_list=list())
 
     @staticmethod
     def _decode_neon_tx_exit(data_list: List[str]) -> Optional[NeonLogTxEvent]:
@@ -229,7 +227,7 @@ class _NeonLogDecoder:
             LOG.error(f'Failed to decode exit event, wrong type: {type_name}')
             return None
 
-        return NeonLogTxEvent(event_type=event_type, is_hidden=True, address=b'', topic_list=[], data=b'', sol_sig='')
+        return NeonLogTxEvent(event_type=event_type, is_hidden=True, address=b'', topic_list=list())
 
     @staticmethod
     def _decode_neon_tx_event(log_num: int, data_list: List[str]) -> Optional[NeonLogTxEvent]:
@@ -264,9 +262,7 @@ class _NeonLogDecoder:
 
         event_type = NeonLogTxEvent.Type.Log
 
-        return NeonLogTxEvent(
-            event_type=event_type, is_hidden=False, address=address, topic_list=topic_list, data=data, sol_sig=''
-        )
+        return NeonLogTxEvent(event_type=event_type, is_hidden=False, address=address, topic_list=topic_list, data=data)
 
     @staticmethod
     def _decode_neon_tx_sig(data_list: List[str]) -> Optional[NeonLogTxSig]:
@@ -307,7 +303,7 @@ class _NeonLogDecoder:
         neon_tx_sig: Optional[NeonLogTxSig] = None
         neon_tx_ix: Optional[NeonLogTxIx] = None
         neon_tx_return: Optional[NeonLogTxReturn] = None
-        neon_tx_event_list: List[NeonLogTxEvent] = []
+        neon_tx_event_list: List[NeonLogTxEvent] = list()
 
         for line in log_iter:
             if sol_bpf_cycle_usage is None:

@@ -23,7 +23,7 @@ from sha3 import keccak_256
 # '''
 
 
-class InvalidNeonTx(Exception):
+class InvalidNeonTx(RuntimeError):
     pass
 
 

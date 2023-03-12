@@ -103,7 +103,7 @@ class MPExecutorFreeALTQueueTask(MPExecutorBaseTask):
             try:
                 tx_sender.send(tx_list)
             except BaseException as exc:
-                LOG.debug('Failed to execute.', exc_info=exc)
+                LOG.debug('Failed to execute', exc_info=exc)
             tx_list.clear()
 
         tx_list: List[SolTx] = list()

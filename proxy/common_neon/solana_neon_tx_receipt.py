@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import logging
 import re
 
 from dataclasses import dataclass
 from enum import Enum
 from typing import Optional, Dict, Union, Iterator, List, Any, Tuple, cast
-import logging
+
 import base58
 
 from ..common_neon.environment_data import EVM_LOADER_ID
 from ..common_neon.evm_log_decoder import decode_log_list, NeonLogTxReturn, NeonLogTxEvent
+from ..common_neon.solana_tx import SolTxReceipt
 from ..common_neon.utils import str_fmt_object
 
 
@@ -439,7 +441,7 @@ class SolTxReceiptInfo(SolTxMetaInfo):
     _ix_log_msg_list: List[_SolIxLogList]
 
     @staticmethod
-    def from_tx(tx: Dict[str, Any]) -> SolTxReceiptInfo:
+    def from_tx_receipt(tx: SolTxReceipt) -> SolTxReceiptInfo:
         block_slot = tx['slot']
         sol_sig = tx['transaction']['signatures'][0]
         sol_sig_slot = SolTxSigSlotInfo(sol_sig=sol_sig, block_slot=block_slot)
@@ -536,7 +538,8 @@ class SolTxReceiptInfo(SolTxMetaInfo):
 
         return self._account_key_list[program_idx]
 
-    def _has_ix_data(self, ix: Dict[str, Any]) -> bool:
+    @staticmethod
+    def _has_ix_data(ix: Dict[str, Any]) -> bool:
         ix_data = ix.get('data', None)
         return (ix_data is not None) and (len(ix_data) > 1)
 

@@ -20,43 +20,48 @@ class ALTError(RuntimeError):
     pass
 
 
-class BadResourceError(Exception):
+class BadResourceError(RuntimeError):
     pass
 
 
-class BlockedAccountsError(Exception):
+class BlockedAccountsError(RuntimeError):
     pass
 
 
-class NodeBehindError(Exception):
-    def __int__(self):
-        super().__init__('The Solana node is not synchronized with a Solana cluster.')
+class NodeBehindError(RuntimeError):
+    def __init__(self):
+        super().__init__('The Solana node is not synchronized with a Solana cluster')
 
 
-class SolanaUnavailableError(Exception):
-    def __int__(self):
-        super().__init__('The Solana node is unavailable.')
+class SolanaUnavailableError(RuntimeError):
+    def __init__(self):
+        super().__init__('The Solana node is unavailable')
 
 
-class NonceTooLowError(Exception):
+class NonceTooLowError(RuntimeError):
     pass
 
 
-class NoMoreRetriesError(Exception):
-    def __int__(self):
-        super().__init__('The transaction is too complicated. No more retries to complete the Neon transaction.')
+class NoMoreRetriesError(RuntimeError):
+    def __init__(self):
+        super().__init__('The transaction is too complicated. No more retries to complete the Neon transaction')
 
 
-class CUBudgetExceededError(Exception):
-    def __int__(self):
-        super().__init__('The transaction is too complicated. Solana`s computing budget is exceeded.')
+class CUBudgetExceededError(RuntimeError):
+    def __init__(self):
+        super().__init__('The transaction is too complicated. Solana`s computing budget is exceeded')
 
 
-class InvalidIxDataError(Exception):
-    def __int__(self):
-        super().__init__('Wrong instruction data.')
+class InvalidIxDataError(RuntimeError):
+    def __init__(self):
+        super().__init__('Wrong instruction data')
 
 
-class RequireResizeIterError(Exception):
-    def __int__(self):
-        super().__init__('Transaction requires resize iterations.')
+class RequireResizeIterError(RuntimeError):
+    def __init__(self):
+        super().__init__('Transaction requires resize iterations')
+
+
+class BlockHashNotFound(RuntimeError):
+    def __init__(self):
+        super().__init__('Blockhash not found')

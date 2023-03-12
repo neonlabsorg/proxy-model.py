@@ -80,7 +80,7 @@ class OpResInit:
         except BadResourceError:
             raise
         except BaseException as exc:
-            LOG.error(f'Fail to init accounts for resource {resource}.', exc_info=exc)
+            LOG.error(f'Fail to init accounts for resource {resource}', exc_info=exc)
             raise BadResourceError(exc)
 
     def _validate_operator_balance(self, resource: OpResInfo) -> None:

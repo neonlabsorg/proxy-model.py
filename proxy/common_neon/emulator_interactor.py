@@ -28,10 +28,10 @@ def call_tx_emulated(config: Config, neon_tx: NeonTx) -> NeonEmulatedResult:
     LOG.debug(f'sender address: 0x{neon_sender_acc}')
     if contract:
         dst = 'deploy'
-        LOG.debug(f'deploy contract: {contract}')
+        LOG.debug(f'deploy contract: 0x{contract}')
     else:
         dst = neon_tx.toAddress.hex()
-        LOG.debug(f'destination address {dst}')
+        LOG.debug(f'destination address 0x{dst}')
     LOG.debug(f"Calling data: {(dst, neon_sender_acc, neon_tx.callData.hex(), hex(neon_tx.value))}")
     emulator_json = call_emulated(config, dst, neon_sender_acc, neon_tx.callData.hex(), hex(neon_tx.value))
     LOG.debug(f'emulator returns: {emulator_json}')

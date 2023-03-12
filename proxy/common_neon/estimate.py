@@ -10,7 +10,7 @@ from ..common_neon.eth_proto import NeonTx
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_alt_builder import ALTTxBuilder
 from ..common_neon.neon_instruction import NeonIxBuilder
-from ..common_neon.solana_tx import SolAccount, SolPubKey, SolAccountMeta, SolBlockhash, SolTxSizeError
+from ..common_neon.solana_tx import SolAccount, SolPubKey, SolAccountMeta, SolBlockHash, SolTxSizeError
 from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.address import NeonAddress
 
@@ -33,7 +33,7 @@ class _GasTxBuilder:
         ])
         self._signer = SolAccount.from_seed(operator_key)
         neon_address = NeonAddress.from_private_key(operator_key)
-        self._blockhash = SolBlockhash.from_string('4NCYB3kRT8sCNodPNuCZo8VUh4xqpBQxsxed2wd9xaD4')
+        self._block_hash = SolBlockHash.from_string('4NCYB3kRT8sCNodPNuCZo8VUh4xqpBQxsxed2wd9xaD4')
 
         self._neon_ix_builder = NeonIxBuilder(self._signer.pubkey())
         self._neon_ix_builder.init_iterative(holder.pubkey())
@@ -49,7 +49,7 @@ class _GasTxBuilder:
             self._neon_ix_builder.make_tx_step_from_data_ix(ElfParams().neon_evm_steps, 1)
         ])
 
-        tx.recent_blockhash = self._blockhash
+        tx.recent_block_hash = self._block_hash
         tx.sign(self._signer)
         return tx
 

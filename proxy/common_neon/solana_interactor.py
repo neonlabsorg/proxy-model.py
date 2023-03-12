@@ -15,7 +15,7 @@ from ..common_neon.config import Config
 from ..common_neon.constants import NEON_ACCOUNT_TAG
 from ..common_neon.errors import SolanaUnavailableError
 from ..common_neon.layouts import ACCOUNT_INFO_LAYOUT
-from ..common_neon.solana_tx import SolTx, SolBlockhash, SolPubKey, Commitment
+from ..common_neon.solana_tx import SolTx, SolBlockHash, SolPubKey, Commitment
 from ..common_neon.solana_tx_error_parser import SolTxErrorParser
 from ..common_neon.utils import SolBlockInfo
 from ..common_neon.layouts import HolderAccountInfo, AccountInfo, NeonAccountInfo, ALTAccountInfo
@@ -416,27 +416,27 @@ class SolInteractor:
         opts = {
             'commitment': Commitment.to_solana(commitment)
         }
-        blockhash_resp = self._send_rpc_request('getLatestBlockhash', opts)
-        result = blockhash_resp.get('result', None)
+        response = self._send_rpc_request('getLatestBlockhash', opts)
+        result = response.get('result', None)
         if result is None:
             if default:
                 return default
-            LOG.debug(f'{blockhash_resp}')
-            raise RuntimeError('failed to get latest blockhash')
+            LOG.debug(f'{response}')
+            raise RuntimeError('failed to get latest block hash')
         return result.get('context', dict()).get('slot', 0)
 
-    def get_recent_blockhash(self, commitment=Commitment.Confirmed) -> SolBlockhash:
+    def get_recent_block_hash(self, commitment=Commitment.Finalized) -> SolBlockHash:
         opts = {
             'commitment': Commitment.to_solana(commitment)
         }
-        blockhash_resp = self._send_rpc_request('getLatestBlockhash', opts)
-        result = blockhash_resp.get('result', None)
+        response = self._send_rpc_request('getLatestBlockhash', opts)
+        result = response.get('result', None)
         if result is None:
-            raise RuntimeError('failed to get recent blockhash')
-        blockhash = result.get('value', dict()).get('blockhash', None)
-        return SolBlockhash.from_string(blockhash)
+            raise RuntimeError('failed to get recent block hash')
+        block_hash = result.get('value', dict()).get('blockhash', None)
+        return SolBlockHash.from_string(block_hash)
 
-    def get_blockhash(self, block_slot: int) -> SolBlockhash:
+    def get_block_hash(self, block_slot: int) -> SolBlockHash:
         block_opts = {
             'encoding': 'json',
             'transactionDetails': 'none',
@@ -444,7 +444,7 @@ class SolInteractor:
         }
 
         block = self._send_rpc_request('getBlock', block_slot, block_opts)
-        return SolBlockhash.from_string(block.get('result', dict()).get('blockhash', None))
+        return SolBlockHash.from_string(block.get('result', dict()).get('blockhash', None))
 
     def get_block_height(self, block_slot: Optional[int] = None, commitment=Commitment.Confirmed) -> int:
         opts = {
@@ -529,29 +529,34 @@ class SolInteractor:
         resp_list = self._send_rpc_batch_request('getBlockCommitment', [[block_slot] for block_slot in block_slot_list])
 
         block_status_list: List[SolBlockStatus] = list()
-        for block_slot, finalized_block_info, resp in zip(block_slot_list, finalized_block_info_list, resp_list):
-            block_status = self._get_block_status(block_slot, finalized_block_info, resp)
+        for block_slot, finalized_block_info, response in zip(block_slot_list, finalized_block_info_list, resp_list):
+            block_status = self._get_block_status(block_slot, finalized_block_info, response)
             block_status_list.append(block_status)
 
         return block_status_list
 
     def get_block_status(self, block_slot: int) -> SolBlockStatus:
         finalized_block_info = self.get_block_info(block_slot, commitment=Commitment.Finalized)
-        resp_list = self._send_rpc_request('getBlockCommitment', [block_slot])
-        return self._get_block_status(block_slot, finalized_block_info, )
+        response = self._send_rpc_request('getBlockCommitment', [block_slot])
+        return self._get_block_status(block_slot, finalized_block_info, response)
 
-    _tx_status_list_limit = 100
-
-    def _get_tx_status_for_tx_sig_list(self, tx_sig_list: List[str], search_in_history: bool) -> List[SolSigStatus]:
+    def check_confirmation_of_tx_sig_list(self, tx_sig_list: List[str],
+                                          confirmed_set: Set[Commitment.Type],
+                                          base_block_slot: Optional[int]) -> bool:
         if len(tx_sig_list) == 0:
-            return list()
+            return True
+
+        if base_block_slot is not None:
+            base_block_height = self.get_block_height(block_slot=base_block_slot)
+            block_height = self.get_block_height(commitment=Commitment.Finalized)
+            search_in_history = abs(block_height - base_block_height) > 400  # 512 - size of cache on Solana
+        else:
+            search_in_history = False
 
         opts = {
             'searchTransactionHistory': search_in_history
         }
-
-        limit = self._tx_status_list_limit
-        result_list: List[SolSigStatus] = list()
+        limit = 100
 
         while len(tx_sig_list) > 0:
             (part_tx_sig_list, tx_sig_list) = (tx_sig_list[:limit], tx_sig_list[limit:])
@@ -559,61 +564,14 @@ class SolInteractor:
 
             status_list = response.get('result', dict()).get('value', list())
             if len(status_list) == 0:
-                for sig in part_tx_sig_list:
-                    result_list.append(SolSigStatus.init_empty(sig))
-                continue
+                return False
 
-            for sig, status in zip(part_tx_sig_list, status_list):
-                if status is None:
-                    result_list.append(SolSigStatus.init_empty(sig))
-                    continue
-
-                result_list.append(
-                    SolSigStatus(
-                        sol_sig=sig,
-                        block_slot=status.get('slot', None),
-                        commitment=status.get('confirmationStatus', Commitment.NotProcessed)
-                    )
-                )
-
-        return result_list
-
-    def get_slot_status_for_tx_sig_list(self, tx_sig_list: List[str]) -> List[SolSigStatus]:
-        tx_status_list = self._get_tx_status_for_tx_sig_list(tx_sig_list, True)
-
-        block_slot_list = list(set([status.block_slot for status in tx_status_list if status.block_slot is not None]))
-        block_status_list = self.get_block_status_list(block_slot_list)
-        block_status_dict = {status.block_slot: status.commitment for status in block_status_list}
-
-        for tx_status in tx_status_list:
-            commitment = block_status_dict.get(tx_status.block_slot, tx_status.commitment)
-            if commitment != tx_status.commitment:
-                object.__setattr__(tx_status, 'commitment', commitment)
-        return tx_status_list
-
-    def check_tx_sig_list_commitment(self, tx_sig_list: List[str], commitment_set: Set[Commitment.Type],
-                                     base_block_slot: Optional[int] = None) -> str:
-        check_block_status = Commitment.Safe in commitment_set
-
-        if (not check_block_status) and (base_block_slot is not None):
-            base_block_height = self.get_block_height(block_slot=base_block_slot)
-            block_height = self.get_block_height(commitment=Commitment.Finalized)
-            check_block_status = abs(block_height - base_block_height) > 400  # 512 - size of cache on Solana
-
-        limit = self._tx_status_list_limit
-
-        while len(tx_sig_list) > 0:
-            (part_tx_sig_list, tx_sig_list) = (tx_sig_list[:limit], tx_sig_list[limit:])
-
-            if check_block_status:
-                tx_status_list = self.get_slot_status_for_tx_sig_list(part_tx_sig_list)
-            else:
-                tx_status_list = self._get_tx_status_for_tx_sig_list(part_tx_sig_list, False)
-
-            for tx_status in tx_status_list:
-                if tx_status.commitment not in commitment_set:
-                    return tx_status.sol_sig
-        return ''
+            for status in status_list:
+                if not status:
+                    return False
+                elif status.get('confirmationStatus', '') not in confirmed_set:
+                    return False
+        return True
 
     def get_tx_receipt_list(self, tx_sig_list: List[str],
                             commitment: Commitment.Type) -> List[Optional[Dict[str, Any]]]:

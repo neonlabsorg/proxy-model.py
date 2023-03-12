@@ -8,6 +8,14 @@ from typing import Dict, Any, List, Tuple
 from ..environment_data import LOG_FULL_OBJECT_INFO
 
 
+def str_enum(value: Enum) -> str:
+    value = str(value)
+    idx = value.find('.')
+    if idx != -1:
+        value = value[idx + 1:]
+    return value
+
+
 def str_fmt_object(obj: Any, skip_prefix=True) -> str:
     type_name = 'Type'
     class_prefix = "<class '"
@@ -27,11 +35,7 @@ def str_fmt_object(obj: Any, skip_prefix=True) -> str:
             if value or LOG_FULL_OBJECT_INFO:
                 return True, value
         elif isinstance(value, Enum):
-            value = str(value)
-            idx = value.find('.')
-            if idx != -1:
-                value = value[idx + 1:]
-            return True, value
+            return True, str_enum(value)
         elif isinstance(value, list) or isinstance(value, set):
             if LOG_FULL_OBJECT_INFO:
                 result_list: List[Any] = []
