@@ -415,6 +415,7 @@ def operator2_keypair_path():
 
 def send_transaction(client, trx, acc):
     print(f' send_transaction')
+    trx.recent_block_hash = client.get_latest_blockhash(Finalized).value.blockhash
     result = client.send_transaction(trx, acc, opts=TxOpts(skip_confirmation=True, preflight_commitment=Confirmed))
     print(f' send result: {result.value}')
     confirm_transaction(client, result.value)
