@@ -29,6 +29,7 @@ class SolTxSendState:
         BadNonceError = enum.auto()
         AltInvalidIndexError = enum.auto()
         AlreadyFinalizedError = enum.auto()
+        LogTruncatedError = enum.auto()
         BlockedAccountError = enum.auto()
         CUBudgetExceededError = enum.auto()
         BlockHashNotFoundError = enum.auto()
@@ -198,6 +199,7 @@ class SolTxListSender:
         good_tx_status_set = {
             s.WaitForReceipt,
             s.GoodReceipt,
+            s.LogTruncatedError,
             s.AccountAlreadyExistsError,
         }
 
@@ -244,6 +246,7 @@ class SolTxListSender:
             s.NoReceipt,
             s.BlockHashNotFoundError,
             s.AltInvalidIndexError,
+            s.LogTruncatedError
         }
 
         if tx_status in good_tx_status_set:
@@ -317,6 +320,8 @@ class SolTxListSender:
         if state_tx_cnt is not None:
             LOG.debug(f'tx nonce {tx_nonce} != state tx count {state_tx_cnt}')
             return s.BadNonceError
+        elif tx_error_parser.check_if_log_truncated():
+            return s.LogTruncatedError
 
         return s.GoodReceipt
 

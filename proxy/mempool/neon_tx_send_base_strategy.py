@@ -4,13 +4,14 @@ import logging
 from typing import Optional, List, cast
 
 from ..common_neon.elf_params import ElfParams
-from ..common_neon.solana_neon_tx_receipt import SolTxReceiptInfo
+from ..common_neon.solana_neon_tx_receipt import SolTxReceiptInfo, SolNeonIxReceiptInfo
 from ..common_neon.solana_tx import SolBlockHash, SolTx, SolTxIx
 from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_tx_list_sender import SolTxListSender, SolTxSendState
 from ..common_neon.utils import NeonTxResultInfo
 
 from ..mempool.neon_tx_sender_ctx import NeonTxSendCtx
+
 
 LOG = logging.getLogger(__name__)
 
@@ -61,12 +62,6 @@ class BaseNeonTxStrategy(abc.ABC):
         except Exception as e:
             self._validation_error_msg = str(e)
             return False
-
-    def _validate_notdeploy_tx(self) -> bool:
-        if len(self._ctx.neon_tx.toAddress) == 0:
-            self._validation_error_msg = 'Deploy transaction'
-            return False
-        return True
 
     def _validate_tx_size(self) -> bool:
         tx = self._build_tx()
@@ -123,46 +118,12 @@ class BaseNeonTxStrategy(abc.ABC):
             ]
         )
 
-    def _build_cancel_tx(self) -> SolLegacyTx:
-        return self._build_cu_tx(name='CancelWithHash', ix=self._ctx.ix_builder.make_cancel_ix())
-
     @staticmethod
-    def _decode_neon_tx_result(tx_send_state_list: List[SolTxSendState], is_canceled: bool) -> NeonTxResultInfo:
-        neon_tx_res = NeonTxResultInfo()
-        neon_gas_used = 0
-        has_good_receipt = False
-        is_already_finalized = False
-        s = SolTxSendState.Status
-
-        for tx_send_state in tx_send_state_list:
-            if tx_send_state.status == s.AlreadyFinalizedError:
-                is_already_finalized = True
-                continue
-            elif tx_send_state.status != s.GoodReceipt:
-                continue
-
-            tx_receipt_info = SolTxReceiptInfo.from_tx_receipt(tx_send_state.receipt)
-            for sol_neon_ix in tx_receipt_info.iter_sol_neon_ix():
-                has_good_receipt = True
-                neon_gas_used = max(neon_gas_used, sol_neon_ix.neon_gas_used)
-
-                res = sol_neon_ix.neon_tx_return
-                if res is None:
-                    continue
-
-                neon_tx_res.set_result(status=res.status, gas_used=res.gas_used)
-                LOG.debug(f'Got Neon tx result: {neon_tx_res}')
-                return neon_tx_res
-
-        if not neon_tx_res.is_valid():
-            if is_already_finalized:
-                neon_tx_res.set_result(status=1, gas_used=neon_gas_used)
-                LOG.debug(f'Set finalized Neon tx result: {neon_tx_res}')
-            elif is_canceled and has_good_receipt:
-                neon_tx_res.set_result(status=1, gas_used=neon_gas_used)
-                LOG.debug(f'Set canceled Neon tx result: {neon_tx_res}')
-
-        return neon_tx_res
+    def _find_sol_neon_ix(tx_send_state: SolTxSendState) -> Optional[SolNeonIxReceiptInfo]:
+        tx_receipt_info = SolTxReceiptInfo.from_tx_receipt(tx_send_state.receipt)
+        for sol_neon_ix in tx_receipt_info.iter_sol_neon_ix():
+            return sol_neon_ix
+        return None
 
     @abc.abstractmethod
     def _build_tx(self) -> SolLegacyTx:

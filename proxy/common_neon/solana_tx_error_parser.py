@@ -220,14 +220,20 @@ class SolTxErrorParser:
             return True
 
         if error_type == self._program_failed_to_complete_type:
+            if self.check_if_log_truncated():
+                return True
+
             log_list = self.get_log_list()
             for log in reversed(log_list):
                 if log.startswith(self._exceeded_cu_number_log):
                     return True
-                if log == self._log_truncated_log:
-                    if self.get_error_code_msg() == (-32002, self._program_failed_msg):
-                        return True
 
+        return False
+
+    def check_if_log_truncated(self) -> bool:
+        log_list = self.get_log_list()
+        if len(log_list) > 0:
+            return log_list[-1] == self._log_truncated_log
         return False
 
     def check_if_require_resize_iter(self) -> bool:
