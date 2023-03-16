@@ -22,22 +22,20 @@ class MPExecutorExecNeonTxTask(MPExecutorBaseTask):
             self.execute_neon_tx_impl(mp_tx_req)
         except BlockedAccountsError:
             LOG.debug(f"Failed to execute tx {mp_tx_req.sig}, got blocked accounts result")
-            return MPTxExecResult(MPTxExecResultCode.BlockedAccount, neon_tx_exec_cfg)
-        except NodeBehindError:
-            LOG.debug(f"Failed to execute tx {mp_tx_req.sig}, got node behind error")
-            return MPTxExecResult(MPTxExecResultCode.NodeBehind, neon_tx_exec_cfg)
-        except SolanaUnavailableError:
-            LOG.debug(f"Failed to execute tx {mp_tx_req.sig}, got solana unavailable error")
-            return MPTxExecResult(MPTxExecResultCode.SolanaUnavailable, neon_tx_exec_cfg)
-        except NonceTooLowError:
-            LOG.debug(f"Failed to execute tx {mp_tx_req.sig}, got nonce too low error")
-            return MPTxExecResult(MPTxExecResultCode.NonceTooLow, neon_tx_exec_cfg)
-        except BadResourceError as e:
-            LOG.debug(f"Failed to execute tx {mp_tx_req.sig}, got bad resource error {str(e)}")
+            return MPTxExecResult(MPTxExecResultCode.Reschedule, neon_tx_exec_cfg)
+        except (NodeBehindError, SolanaUnavailableError) as exc:
+            LOG.warning(f'Failed to execute tx {mp_tx_req.sig}, got solana error', exc_info=exc)
+            return MPTxExecResult(MPTxExecResultCode.Reschedule, neon_tx_exec_cfg)
+        except BadResourceError as exc:
+            # TODO: move to rescrudule result
+            LOG.debug(f'Failed to execute tx {mp_tx_req.sig}, got bad resource error: {str(exc)}')
             return MPTxExecResult(MPTxExecResultCode.BadResource, neon_tx_exec_cfg)
         except BaseException as exc:
-            LOG.error(f'Failed to execute tx {mp_tx_req.sig}.', exc_info=exc)
-            return MPTxExecResult(MPTxExecResultCode.Unspecified, exc)
+            if isinstance(exc, NonceTooLowError):
+                # sender is absent on the level of SolTxSender
+                exc = NonceTooLowError(mp_tx_req.sender_address, exc.tx_nonce, exc.state_tx_cnt)
+            LOG.error(f'Failed to execute tx {mp_tx_req.sig}', exc_info=exc)
+            return MPTxExecResult(MPTxExecResultCode.Failed, exc)
         return MPTxExecResult(MPTxExecResultCode.Done, neon_tx_exec_cfg)
 
     def execute_neon_tx_impl(self, mp_tx_req: MPTxExecRequest):

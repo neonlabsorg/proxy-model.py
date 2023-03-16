@@ -222,12 +222,9 @@ class MPCloseALTListRequest(MPRequest):
 
 class MPTxExecResultCode(IntEnum):
     Done = 0
-    BlockedAccount = 1
-    SolanaUnavailable = 2
-    NodeBehind = 3
-    NonceTooLow = 4
-    BadResource = 5
-    Unspecified = 255
+    Reschedule = 1
+    Failed = 2
+    BadResource = 3
 
 
 @dataclass(frozen=True)

@@ -29,17 +29,36 @@ class BlockedAccountsError(RuntimeError):
 
 
 class NodeBehindError(RuntimeError):
-    def __init__(self):
-        super().__init__('The Solana node is not synchronized with a Solana cluster')
+    def __init__(self, slots_behind: int):
+        super().__init__(f'The Solana node is behind by {slots_behind} from the Solana cluster')
 
 
 class SolanaUnavailableError(RuntimeError):
-    def __init__(self):
-        super().__init__('The Solana node is unavailable')
+    def __init__(self, msg: str):
+        super().__init__(msg)
 
 
 class NonceTooLowError(RuntimeError):
-    pass
+    def __init__(self, sender_address: str, tx_nonce: int, state_tx_cnt: int):
+        super().__init__(
+            f'nonce too low: address {sender_address}, '
+            f'tx: {tx_nonce} state: {state_tx_cnt}'
+        )
+        self._sender_address = sender_address
+        self._tx_nonce = tx_nonce
+        self._state_tx_cnt = state_tx_cnt
+
+    @property
+    def sender_address(self) -> str:
+        return self._sender_address
+
+    @property
+    def tx_nonce(self) -> int:
+        return self._tx_nonce
+
+    @property
+    def state_tx_cnt(self) -> int:
+        return self._state_tx_cnt
 
 
 class NoMoreRetriesError(RuntimeError):

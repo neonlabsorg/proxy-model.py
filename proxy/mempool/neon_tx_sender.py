@@ -48,7 +48,7 @@ class NeonTxSendStrategyExecutor:
     def _validate_nonce(self) -> None:
         self._init_state_tx_cnt()
         if self._ctx.state_tx_cnt > self._ctx.neon_tx.nonce:
-            raise NonceTooLowError()
+            raise NonceTooLowError(self._ctx.sender, self._ctx.neon_tx.nonce, self._ctx.state_tx_cnt)
 
     def _execute(self) -> NeonTxResultInfo:
         for Strategy in self._strategy_list:
