@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, List
 
 from .solana_alt import ALTAddress
+from .solana_tx_list_sender import SolTxSendState
 
 
 NeonEmulatedResult = Dict[str, Any]
@@ -16,6 +17,7 @@ class NeonTxExecCfg:
         self._alt_address_dict: Dict[str, ALTAddress] = dict()
         self._account_dict: NeonAccountDict = dict()
         self._resize_iter_cnt = 0
+        self._tx_state_list_dict: Dict[str, List[SolTxSendState]] = dict()
 
     @property
     def state_tx_cnt(self) -> int:
@@ -58,3 +60,17 @@ class NeonTxExecCfg:
 
     def add_alt_address(self, alt_address: ALTAddress) -> None:
         self._alt_address_dict[alt_address.table_account] = alt_address
+
+    def pop_tx_state_list(self, tx_name_list: List[str]) -> List[SolTxSendState]:
+        tx_state_list: List[SolTxSendState] = list()
+        for tx_name in tx_name_list:
+            tx_state_sublist = self._tx_state_list_dict.pop(tx_name, None)
+            if tx_state_sublist is None:
+                continue
+
+            tx_state_list.extend(tx_state_sublist)
+        return tx_state_list
+
+    def add_tx_state_list(self, tx_state_list: List[SolTxSendState]) -> None:
+        for tx_state in tx_state_list:
+            self._tx_state_list_dict.setdefault(tx_state.name, list()).append(tx_state)

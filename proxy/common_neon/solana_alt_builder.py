@@ -33,6 +33,8 @@ class ALTTxSet:
 
 class ALTTxBuilder:
     tx_account_cnt = 30
+    _create_name = 'CreateLookupTable'
+    _extend_name = 'ExtendLookupTable'
 
     def __init__(self, solana: SolInteractor, ix_builder: NeonIxBuilder, signer: SolAccount) -> None:
         self._solana = solana
@@ -42,12 +44,15 @@ class ALTTxBuilder:
 
     def _get_recent_block_slot(self) -> int:
         while True:
-            recent_block_slot = self._solana.get_recent_block_slot(Commitment.Finalized)
+            recent_block_slot = self._solana.get_block_slot(Commitment.Finalized)
             if recent_block_slot == self._recent_block_slot:
                 time.sleep(0.1)  # To make unique address for Address Lookup Table
                 continue
             self._recent_block_slot = recent_block_slot
             return recent_block_slot
+
+    def get_tx_name_list(self) -> List[str]:
+        return [self._create_name, self._extend_name]
 
     def build_alt_info(self, legacy_tx: SolLegacyTx) -> ALTInfo:
         recent_block_slot = self._get_recent_block_slot()
@@ -60,7 +65,7 @@ class ALTTxBuilder:
     def build_alt_tx_set(self, alt_info: ALTInfo) -> ALTTxSet:
         # Tx to create an Account Lookup Table
         create_alt_tx = SolLegacyTx(
-            name='CreateLookupTable',
+            name=self._create_name,
             instructions=[
                 self._ix_builder.make_create_lookup_table_ix(
                     alt_info.table_account,
@@ -77,7 +82,7 @@ class ALTTxBuilder:
         while len(acct_list):
             acct_list_part, acct_list = acct_list[:self.tx_account_cnt], acct_list[self.tx_account_cnt:]
             tx = SolLegacyTx(
-                name='ExtendLookupTable',
+                name=self._extend_name,
                 instructions=[
                     self._ix_builder.make_extend_lookup_table_ix(
                         alt_info.table_account,

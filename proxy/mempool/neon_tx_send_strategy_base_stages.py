@@ -18,13 +18,18 @@ LOG = logging.getLogger(__name__)
 
 
 class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
-    def build_prep_tx_list_before_emulate(self) -> List[List[SolTx]]:
+    name = 'WriteHolderAccount'
+
+    def get_tx_name_list(self) -> List[str]:
+        return [self.name]
+
+    def build_tx_list(self) -> List[List[SolTx]]:
         if self._ctx.is_holder_completed:
-            return []
+            return list()
 
         builder = self._ctx.ix_builder
 
-        tx_list: List[SolTx] = []
+        tx_list: List[SolTx] = list()
         holder_msg_offset = 0
         holder_msg = copy.copy(builder.holder_msg)
         neon_tx_sig = self._ctx.bin_neon_sig
@@ -76,7 +81,10 @@ class ALTNeonTxPrepStage(BaseNeonTxPrepStage):
 
         return True
 
-    def build_prep_tx_list_before_emulate(self) -> List[List[SolTx]]:
+    def get_tx_name_list(self) -> List[str]:
+        return self._alt_builder.get_tx_name_list()
+
+    def build_tx_list(self) -> List[List[SolTx]]:
         if len(self._alt_tx_set) == 0:
             return list()
 
@@ -115,8 +123,7 @@ def alt_strategy(cls):
             account_list_len = self._ctx.len_account_list() + 6
             if account_list_len < ALTTxBuilder.tx_account_cnt:
                 self._validation_error_msg = (
-                    f'Number of accounts {account_list_len} '
-                    f'less than {ALTTxBuilder.tx_account_cnt}'
+                    f'Number of accounts {account_list_len} less than {ALTTxBuilder.tx_account_cnt}'
                 )
                 return False
             return True

@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 class EthereumError(Exception):
     def __init__(self, message: str, code=-32000, data=None):
         self.code = code
@@ -48,27 +51,23 @@ class NonceTooLowError(RuntimeError):
         self._tx_nonce = tx_nonce
         self._state_tx_cnt = state_tx_cnt
 
-    @property
-    def sender_address(self) -> str:
-        return self._sender_address
-
-    @property
-    def tx_nonce(self) -> int:
-        return self._tx_nonce
-
-    @property
-    def state_tx_cnt(self) -> int:
-        return self._state_tx_cnt
+    def clone(self, sender_address) -> NonceTooLowError:
+        return NonceTooLowError(sender_address, self._tx_nonce, self._state_tx_cnt)
 
 
 class NoMoreRetriesError(RuntimeError):
     def __init__(self):
-        super().__init__('The transaction is too complicated. No more retries to complete the Neon transaction')
+        super().__init__('The Neon transaction is too complicated. No more retries to complete the Neon transaction')
+
+
+class WrongNumberOfItersError(RuntimeError):
+    def __init__(self):
+        super().__init__('Wrong number of iterations of the Neon transaction')
 
 
 class CUBudgetExceededError(RuntimeError):
     def __init__(self):
-        super().__init__('The transaction is too complicated. Solana`s computing budget is exceeded')
+        super().__init__('The Neon transaction is too complicated. Solana`s computing budget is exceeded')
 
 
 class InvalidIxDataError(RuntimeError):

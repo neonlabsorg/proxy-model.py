@@ -43,7 +43,6 @@ class Config:
         self._indexer_log_skip_cnt = self._env_int("INDEXER_LOG_SKIP_COUNT", 1, 1000)
         self._indexer_check_msec = self._env_int('INDEXER_CHECK_MSEC', 50, 200)
         self._max_account_cnt = self._env_int("MAX_ACCOUNT_COUNT", 20, 60)
-        self._skip_preflight = self._env_bool("SKIP_PREFLIGHT", False)
         self._fuzz_testing = self._env_bool("FUZZ_TESTING", False)
         self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", 4, math.ceil(0.4 * 32))
         self._confirm_check_msec = self._env_int("CONFIRM_CHECK_MSEC", 10, 100)
@@ -235,10 +234,6 @@ class Config:
         return self._max_account_cnt
 
     @property
-    def skip_preflight(self) -> bool:
-        return self._skip_preflight
-
-    @property
     def fuzz_testing(self) -> bool:
         return self._fuzz_testing
 
@@ -339,7 +334,6 @@ class Config:
             'INDEXER_LOG_SKIP_COUNT': self.indexer_log_skip_cnt,
             'INDEXER_CHECK_MSEC': self.indexer_check_msec,
             'MAX_ACCOUNT_COUNT': self.max_account_cnt,
-            'SKIP_PREFLIGHT': self.skip_preflight,
             'FUZZ_TESTING': self.fuzz_testing,
             'CONFIRM_TIMEOUT_SEC': self.confirm_timeout_sec,
             'CONFIRM_CHECK_MSEC': self.confirm_check_msec,

@@ -1,5 +1,7 @@
 import logging
 
+from typing import cast
+
 from ..common_neon.elf_params import ElfParams
 from ..common_neon.errors import BadResourceError
 from ..common_neon.errors import BlockedAccountsError, NodeBehindError, SolanaUnavailableError, NonceTooLowError
@@ -9,7 +11,6 @@ from ..mempool.mempool_executor_task_base import MPExecutorBaseTask
 from ..mempool.neon_tx_sender import NeonTxSendStrategyExecutor
 from ..mempool.neon_tx_sender_ctx import NeonTxSendCtx
 from ..mempool.operator_resource_mng import OpResInfo
-
 
 LOG = logging.getLogger(__name__)
 
@@ -33,7 +34,7 @@ class MPExecutorExecNeonTxTask(MPExecutorBaseTask):
         except BaseException as exc:
             if isinstance(exc, NonceTooLowError):
                 # sender is absent on the level of SolTxSender
-                exc = NonceTooLowError(mp_tx_req.sender_address, exc.tx_nonce, exc.state_tx_cnt)
+                exc = cast(NonceTooLowError, exc).clone(mp_tx_req.sender_address)
             LOG.error(f'Failed to execute tx {mp_tx_req.sig}', exc_info=exc)
             return MPTxExecResult(MPTxExecResultCode.Failed, exc)
         return MPTxExecResult(MPTxExecResultCode.Done, neon_tx_exec_cfg)

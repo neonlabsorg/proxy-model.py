@@ -1,7 +1,7 @@
 import abc
 import logging
 
-from typing import Optional, List, cast
+from typing import Optional, List, Generator, cast
 
 from ..common_neon.elf_params import ElfParams
 from ..common_neon.solana_neon_tx_receipt import SolTxReceiptInfo, SolNeonIxReceiptInfo
@@ -21,7 +21,11 @@ class BaseNeonTxPrepStage(abc.ABC):
         self._ctx = ctx
 
     @abc.abstractmethod
-    def build_prep_tx_list_before_emulate(self) -> List[List[SolTx]]:
+    def get_tx_name_list(self) -> List[str]:
+        pass
+
+    @abc.abstractmethod
+    def build_tx_list(self) -> List[List[SolTx]]:
         pass
 
     @abc.abstractmethod
@@ -37,6 +41,7 @@ class BaseNeonTxStrategy(abc.ABC):
         self._prep_stage_list: List[BaseNeonTxPrepStage] = list()
         self._ctx = ctx
         self._evm_step_cnt = ElfParams().neon_evm_steps
+        self.__sol_tx_list_sender: Optional[SolTxListSender] = None
 
     @property
     def ctx(self) -> NeonTxSendCtx:
@@ -63,6 +68,34 @@ class BaseNeonTxStrategy(abc.ABC):
             self._validation_error_msg = str(e)
             return False
 
+    def prep_before_emulate(self) -> bool:
+        assert self.is_valid()
+
+        return self._send_tx_list([], self._build_prep_tx_list())
+
+    def update_after_emulate(self) -> None:
+        assert self.is_valid()
+
+        for stage in self._prep_stage_list:
+            stage.update_after_emulate()
+
+    @abc.abstractmethod
+    def execute(self) -> NeonTxResultInfo:
+        pass
+
+    def _build_prep_tx_list(self) -> Generator[List[SolTx], None, None]:
+        tx_list_list: List[List[SolTx]] = list()
+
+        for stage in self._prep_stage_list:
+            new_tx_list_list = stage.build_tx_list()
+
+            while len(new_tx_list_list) > len(tx_list_list):
+                tx_list_list.append(list())
+            for tx_list, new_tx_list in zip(tx_list_list, new_tx_list_list):
+                tx_list.extend(new_tx_list)
+
+        yield from tx_list_list
+
     def _validate_tx_size(self) -> bool:
         tx = self._build_tx()
 
@@ -79,31 +112,28 @@ class BaseNeonTxStrategy(abc.ABC):
         self._validation_error_msg = 'Transaction without chain-id'
         return False
 
-    def prep_before_emulate(self) -> bool:
-        assert self.is_valid()
+    def _send_tx_list(self, tx_name_list: List[str], tx_list_generator: Generator[List[SolTx], None, None]) -> bool:
+        tx_list_sender = self._sol_tx_list_sender
+        tx_state_list = self._ctx.pop_tx_state_list(tx_name_list)
+        try:
+            if len(tx_state_list) > 0:
+                tx_list_sender.recheck(tx_state_list)
+                return True
 
-        tx_list_list: List[List[SolTx]] = list()
-        for stage in self._prep_stage_list:
-            new_tx_list_list = stage.build_prep_tx_list_before_emulate()
+            has_tx_list = False
+            for tx_list in tx_list_generator:
+                if len(tx_list) > 0:
+                    has_tx_list = True
+                    tx_list_sender.send(tx_list)
+            return has_tx_list
+        finally:
+            self._ctx.add_tx_state_list(tx_list_sender.tx_state_list)
 
-            while len(new_tx_list_list) > len(tx_list_list):
-                tx_list_list.append(list())
-            for tx_list, new_tx_list in zip(tx_list_list, new_tx_list_list):
-                tx_list.extend(new_tx_list)
-
-        if len(tx_list_list) == 0:
-            return False
-
-        tx_sender = SolTxListSender(self._ctx.config, self._ctx.solana, self._ctx.signer)
-        for tx_list in tx_list_list:
-            tx_sender.send(tx_list)
-        return True
-
-    def update_after_emulate(self) -> None:
-        assert self.is_valid()
-
-        for stage in self._prep_stage_list:
-            stage.update_after_emulate()
+    @property
+    def _sol_tx_list_sender(self) -> SolTxListSender:
+        if self.__sol_tx_list_sender is None:
+            self.__sol_tx_list_sender = SolTxListSender(self._ctx.config, self._ctx.solana, self._ctx.signer)
+        return self.__sol_tx_list_sender
 
     def _build_cu_tx(self, ix: SolTxIx, name: str = '') -> SolLegacyTx:
         if len(name) == 0:
@@ -131,8 +161,4 @@ class BaseNeonTxStrategy(abc.ABC):
 
     @abc.abstractmethod
     def _validate(self) -> bool:
-        pass
-
-    @abc.abstractmethod
-    def execute(self) -> NeonTxResultInfo:
         pass

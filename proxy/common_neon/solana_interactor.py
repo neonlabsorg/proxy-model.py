@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import base64
-import dataclasses
+from dataclasses import dataclass
 import itertools
 import json
 import time
@@ -25,13 +25,19 @@ LOG = logging.getLogger(__name__)
 RPCResponse = Dict[str, Any]
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
+class SolRecentBlockHash:
+    block_hash: SolBlockHash
+    last_valid_block_height: int
+
+
+@dataclass(frozen=True)
 class SolSendResult:
     error: Dict[str, Any]
     result: Optional[str]
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class SolSigStatus:
     sol_sig: str
     block_slot: Optional[int]
@@ -42,7 +48,7 @@ class SolSigStatus:
         return SolSigStatus(sol_sig=sol_sig, block_slot=None, commitment=Commitment.NotProcessed)
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class SolBlockStatus:
     block_slot: int
     commitment: Commitment.Type
@@ -425,7 +431,7 @@ class SolInteractor:
             raise RuntimeError('failed to get latest block hash')
         return result.get('context', dict()).get('slot', 0)
 
-    def get_recent_block_hash(self, commitment=Commitment.Finalized) -> SolBlockHash:
+    def get_recent_block_hash(self, commitment=Commitment.Finalized) -> SolRecentBlockHash:
         opts = {
             'commitment': Commitment.to_solana(commitment)
         }
@@ -433,8 +439,13 @@ class SolInteractor:
         result = response.get('result', None)
         if result is None:
             raise RuntimeError('failed to get recent block hash')
-        block_hash = result.get('value', dict()).get('blockhash', None)
-        return SolBlockHash.from_string(block_hash)
+        result = result.get('value', dict())
+        block_hash = result.get('blockhash')
+        last_valid_block_height = result.get('lastValidBlockHeight')
+        return SolRecentBlockHash(
+            block_hash=SolBlockHash.from_string(block_hash),
+            last_valid_block_height=last_valid_block_height
+        )
 
     def get_block_hash(self, block_slot: int) -> SolBlockHash:
         block_opts = {
@@ -540,16 +551,15 @@ class SolInteractor:
         response = self._send_rpc_request('getBlockCommitment', [block_slot])
         return self._get_block_status(block_slot, finalized_block_info, response)
 
-    def check_confirmation_of_tx_sig_list(self, tx_sig_list: List[str],
-                                          confirmed_set: Set[Commitment.Type],
-                                          base_block_slot: Optional[int]) -> bool:
+    def check_confirm_of_tx_sig_list(self, tx_sig_list: List[str],
+                                     confirmed_set: Set[Commitment.Type],
+                                     valid_block_height: int) -> bool:
         if len(tx_sig_list) == 0:
             return True
 
-        if base_block_slot is not None:
-            base_block_height = self.get_block_height(block_slot=base_block_slot)
-            block_height = self.get_block_height(commitment=Commitment.Finalized)
-            search_in_history = abs(block_height - base_block_height) > 400  # 512 - size of cache on Solana
+        block_height = self.get_block_height()
+        if block_height >= valid_block_height:
+            search_in_history = True
         else:
             search_in_history = False
 

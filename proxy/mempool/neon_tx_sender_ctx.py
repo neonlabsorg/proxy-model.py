@@ -12,6 +12,7 @@ from ..common_neon.neon_instruction import NeonIxBuilder
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_tx import SolPubKey, SolAccountMeta, SolAccount
 from ..common_neon.solana_alt import ALTAddress
+from ..common_neon.solana_tx_list_sender import SolTxSendState
 
 
 LOG = logging.getLogger(__name__)
@@ -156,5 +157,11 @@ class NeonTxSendCtx:
 
     def add_alt_address(self, alt_address: ALTAddress) -> None:
         self._neon_tx_exec_cfg.add_alt_address(alt_address)
+
+    def pop_tx_state_list(self, tx_name_list: List[str]) -> List[SolTxSendState]:
+        return self._neon_tx_exec_cfg.pop_tx_state_list(tx_name_list)
+
+    def add_tx_state_list(self, tx_state_list: List[SolTxSendState]) -> None:
+        self._neon_tx_exec_cfg.add_tx_state_list(tx_state_list)
 
 
