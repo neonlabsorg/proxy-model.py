@@ -3,7 +3,7 @@ import logging
 from ..common_neon.address import NeonAddress
 from ..common_neon.data import NeonEmulatedResult
 from ..common_neon.emulator_interactor import call_tx_emulated
-from ..common_neon.errors import NonceTooLowError, CUBudgetExceededError, InvalidIxDataError, RequireResizeIterError
+from ..common_neon.errors import NonceTooLowError, WrongStrategyError
 from ..common_neon.errors import NoMoreRetriesError
 from ..common_neon.utils import NeonTxResultInfo
 
@@ -51,15 +51,23 @@ class NeonTxSendStrategyExecutor:
             raise NonceTooLowError(self._ctx.sender, self._ctx.neon_tx.nonce, self._ctx.state_tx_cnt)
 
     def _execute(self) -> NeonTxResultInfo:
-        for Strategy in self._strategy_list:
+        start = self._ctx.strategy_idx
+        end = len(self._strategy_list)
+        for strategy_idx in range(start, end):
+            Strategy = self._strategy_list[strategy_idx]
             try:
                 strategy: BaseNeonTxStrategy = Strategy(self._ctx)
                 if not strategy.validate():
                     LOG.debug(f'Skip strategy {Strategy.name}: {strategy.validation_error_msg}')
                     continue
-                LOG.debug(f'Use strategy {Strategy.name}')
 
-                for retry in range(self._ctx.config.retry_on_fail):
+                LOG.debug(f'Use strategy {Strategy.name}')
+                strategy.start()
+                self._ctx.set_strategy_idx(strategy_idx)
+
+                # Try `retry_on_fail` times to prepare Neon tx for execution
+                retry_on_fail = self._ctx.config.retry_on_fail
+                for retry in range(retry_on_fail):
                     has_changes = strategy.prep_before_emulate()
                     if has_changes or (retry == 0):
                         self._emulate_neon_tx()
@@ -69,11 +77,12 @@ class NeonTxSendStrategyExecutor:
 
                     return strategy.execute()
 
+                # Can't prepare Neon tx for execution in `retry_on_fail` attempts (each call of preparing returned True)
                 raise NoMoreRetriesError()
 
-            except (CUBudgetExceededError, InvalidIxDataError, RequireResizeIterError):
+            except WrongStrategyError:
                 continue
-            except (Exception,):
+            except (BaseException,):
                 raise
             finally:
                 self._init_state_tx_cnt()

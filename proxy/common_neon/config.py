@@ -167,10 +167,6 @@ class Config:
         return self._use_earliest_block_if_0_passed
 
     @property
-    def account_permission_update_int(self) -> int:
-        return self._account_permission_update_int
-
-    @property
     def allow_underpriced_tx_wo_chainid(self) -> bool:
         return self._allow_underpriced_tx_wo_chainid
 
@@ -318,7 +314,6 @@ class Config:
             'ENABLE_PRIVATE_API': self.enable_private_api,
             'ENABLE_SEND_TX_API': self.enable_send_tx_api,
             'USE_EARLIEST_BLOCK_IF_0_PASSED': self.use_earliest_block_if_0_passed,
-            'ACCOUNT_PERMISSION_UPDATE_INT': self.account_permission_update_int,
             'ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID': self.allow_underpriced_tx_wo_chainid,
             'EXTRA_GAS_PCT': self.extra_gas_pct,
             'OPERATOR_FEE': self.operator_fee,

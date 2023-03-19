@@ -360,7 +360,7 @@ class AccountInfo(NamedTuple):
     @staticmethod
     def frombytes(data: bytes):
         cont = ACCOUNT_INFO_LAYOUT.parse(data)
-        return AccountInfo(cont.ether, cont.tx_count)
+        return AccountInfo(cont.ether, cont.tx_cnt)
 
 
 def getAccountData(client: Client, account: Union[str, Pubkey], expected_length: int) -> bytes:

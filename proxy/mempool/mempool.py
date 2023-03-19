@@ -281,9 +281,6 @@ class MemPool:
         if mp_tx_res.code == MPTxExecResultCode.Reschedule:
             self._on_reschedule_tx(tx)
             return MPTxEndCode.Rescheduled
-        elif mp_tx_res.code == MPTxExecResultCode.BadResource:
-            self._on_bad_resource(tx)
-            return MPTxEndCode.Rescheduled
         elif mp_tx_res.code == MPTxExecResultCode.Failed:
             exc = cast(BaseException, mp_tx_res.data)
             self._on_fail_tx(tx, exc)
@@ -311,11 +308,6 @@ class MemPool:
                 LOG.error(f'Exception on the result processing of tx {tx.sig}', exc_info=exc)
 
         await self._kick_tx_schedule()
-
-    def _on_bad_resource(self, tx: MPTxRequest):
-        LOG.debug(f'Disable resource for {tx.sig}')
-        self._op_res_mng.disable_resource(tx.sig)
-        self._tx_schedule.reschedule_tx(tx)
 
     def _on_done_tx(self, tx: MPTxRequest):
         resource = self._op_res_mng.release_resource(tx.sig)

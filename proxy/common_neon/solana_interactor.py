@@ -532,20 +532,6 @@ class SolInteractor:
 
         return SolBlockStatus(block_slot, Commitment.Confirmed)
 
-    def get_block_status_list(self, block_slot_list: List[int]) -> List[SolBlockStatus]:
-        if len(block_slot_list) == 0:
-            return list()
-
-        finalized_block_info_list = self.get_block_info_list(block_slot_list, commitment=Commitment.Finalized)
-        resp_list = self._send_rpc_batch_request('getBlockCommitment', [[block_slot] for block_slot in block_slot_list])
-
-        block_status_list: List[SolBlockStatus] = list()
-        for block_slot, finalized_block_info, response in zip(block_slot_list, finalized_block_info_list, resp_list):
-            block_status = self._get_block_status(block_slot, finalized_block_info, response)
-            block_status_list.append(block_status)
-
-        return block_status_list
-
     def get_block_status(self, block_slot: int) -> SolBlockStatus:
         finalized_block_info = self.get_block_info(block_slot, commitment=Commitment.Finalized)
         response = self._send_rpc_request('getBlockCommitment', [block_slot])

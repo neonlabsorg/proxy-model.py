@@ -17,6 +17,7 @@ class NeonTxExecCfg:
         self._alt_address_dict: Dict[str, ALTAddress] = dict()
         self._account_dict: NeonAccountDict = dict()
         self._resize_iter_cnt = 0
+        self._strategy_idx = 0
         self._tx_state_list_dict: Dict[str, List[SolTxSendState]] = dict()
 
     @property
@@ -60,6 +61,13 @@ class NeonTxExecCfg:
 
     def add_alt_address(self, alt_address: ALTAddress) -> None:
         self._alt_address_dict[alt_address.table_account] = alt_address
+
+    @property
+    def strategy_idx(self) -> int:
+        return self._strategy_idx
+
+    def set_strategy_idx(self, idx: int) -> None:
+        self._strategy_idx = idx
 
     def pop_tx_state_list(self, tx_name_list: List[str]) -> List[SolTxSendState]:
         tx_state_list: List[SolTxSendState] = list()

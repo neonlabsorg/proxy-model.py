@@ -50,8 +50,7 @@ class NeonTxSendCtx:
         if holder_info.tag == ACTIVE_HOLDER_TAG:
             if holder_info.neon_tx_sig != self._neon_sig:
                 raise BadResourceError(
-                    f'Holder account {str(self._resource.holder)} '
-                    f'has another neon tx: {holder_info.neon_tx_sig}'
+                    f'Holder account {str(self._resource.holder)} has another neon tx: {holder_info.neon_tx_sig}'
                 )
             self._is_holder_completed = True
         elif holder_info.tag == FINALIZED_HOLDER_TAG:
@@ -158,10 +157,15 @@ class NeonTxSendCtx:
     def add_alt_address(self, alt_address: ALTAddress) -> None:
         self._neon_tx_exec_cfg.add_alt_address(alt_address)
 
+    @property
+    def strategy_idx(self) -> int:
+        return self._neon_tx_exec_cfg.strategy_idx
+
+    def set_strategy_idx(self, idx: int) -> None:
+        self._neon_tx_exec_cfg.set_strategy_idx(idx)
+
     def pop_tx_state_list(self, tx_name_list: List[str]) -> List[SolTxSendState]:
         return self._neon_tx_exec_cfg.pop_tx_state_list(tx_name_list)
 
     def add_tx_state_list(self, tx_state_list: List[SolTxSendState]) -> None:
         self._neon_tx_exec_cfg.add_tx_state_list(tx_state_list)
-
-

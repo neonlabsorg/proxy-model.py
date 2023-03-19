@@ -23,30 +23,48 @@ class ALTError(RuntimeError):
     pass
 
 
-class BadResourceError(RuntimeError):
+class RescheduleError(RuntimeError):
     pass
 
 
-class BlockedAccountsError(RuntimeError):
-    pass
-
-
-class NodeBehindError(RuntimeError):
-    def __init__(self, slots_behind: int):
-        super().__init__(f'The Solana node is behind by {slots_behind} from the Solana cluster')
-
-
-class SolanaUnavailableError(RuntimeError):
+class BadResourceError(RescheduleError):
     def __init__(self, msg: str):
         super().__init__(msg)
 
 
+class BlockedAccountsError(RescheduleError):
+    def __init__(self):
+        super().__init__('Blocked accounts error')
+
+
+class NodeBehindError(RescheduleError):
+    def __init__(self, slots_behind: int):
+        super().__init__(f'The Solana node is behind by {slots_behind} from the Solana cluster')
+
+
+class SolanaUnavailableError(RescheduleError):
+    def __init__(self, msg: str):
+        super().__init__(msg)
+
+
+class NoMoreRetriesError(RescheduleError):
+    def __init__(self):
+        super().__init__('The Neon transaction is too complicated. No more retries to complete the Neon transaction')
+
+
+class BlockHashNotFound(RescheduleError):
+    def __init__(self):
+        super().__init__('Blockhash not found')
+
+
+class CommitLevelError(RescheduleError):
+    def __init__(self, base_level: str, level: str):
+        super().__init__(f'Current level {level} is less than {base_level}')
+
+
 class NonceTooLowError(RuntimeError):
     def __init__(self, sender_address: str, tx_nonce: int, state_tx_cnt: int):
-        super().__init__(
-            f'nonce too low: address {sender_address}, '
-            f'tx: {tx_nonce} state: {state_tx_cnt}'
-        )
+        super().__init__(f'nonce too low: address {sender_address}, tx: {tx_nonce} state: {state_tx_cnt}')
         self._sender_address = sender_address
         self._tx_nonce = tx_nonce
         self._state_tx_cnt = state_tx_cnt
@@ -55,31 +73,21 @@ class NonceTooLowError(RuntimeError):
         return NonceTooLowError(sender_address, self._tx_nonce, self._state_tx_cnt)
 
 
-class NoMoreRetriesError(RuntimeError):
-    def __init__(self):
-        super().__init__('The Neon transaction is too complicated. No more retries to complete the Neon transaction')
+class WrongStrategyError(RuntimeError):
+    pass
 
 
-class WrongNumberOfItersError(RuntimeError):
-    def __init__(self):
-        super().__init__('Wrong number of iterations of the Neon transaction')
-
-
-class CUBudgetExceededError(RuntimeError):
+class CUBudgetExceededError(WrongStrategyError):
     def __init__(self):
         super().__init__('The Neon transaction is too complicated. Solana`s computing budget is exceeded')
 
 
-class InvalidIxDataError(RuntimeError):
+class InvalidIxDataError(WrongStrategyError):
     def __init__(self):
         super().__init__('Wrong instruction data')
 
 
-class RequireResizeIterError(RuntimeError):
+class RequireResizeIterError(WrongStrategyError):
     def __init__(self):
         super().__init__('Transaction requires resize iterations')
 
-
-class BlockHashNotFound(RuntimeError):
-    def __init__(self):
-        super().__init__('Blockhash not found')

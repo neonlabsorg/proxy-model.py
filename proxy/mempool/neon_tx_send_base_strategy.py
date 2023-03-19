@@ -39,6 +39,7 @@ class BaseNeonTxStrategy(abc.ABC):
     def __init__(self, ctx: NeonTxSendCtx):
         self._validation_error_msg: Optional[str] = None
         self._prep_stage_list: List[BaseNeonTxPrepStage] = list()
+        self._prep_tx_name_list: List[str] = list()
         self._ctx = ctx
         self._evm_step_cnt = ElfParams().neon_evm_steps
         self.__sol_tx_list_sender: Optional[SolTxListSender] = None
@@ -68,10 +69,19 @@ class BaseNeonTxStrategy(abc.ABC):
             self._validation_error_msg = str(e)
             return False
 
+    def start(self) -> None:
+        assert self.is_valid()
+
+        self._prep_tx_name_list.clear()
+        for stage in self._prep_stage_list:
+            self._prep_tx_name_list.extend(stage.get_tx_name_list())
+
     def prep_before_emulate(self) -> bool:
         assert self.is_valid()
 
-        return self._send_tx_list([], self._build_prep_tx_list())
+        tx_name_list = self._prep_tx_name_list
+        self._prep_tx_name_list.clear()
+        return self._send_tx_list(tx_name_list, self._build_prep_tx_list())
 
     def update_after_emulate(self) -> None:
         assert self.is_valid()
@@ -122,9 +132,8 @@ class BaseNeonTxStrategy(abc.ABC):
 
             has_tx_list = False
             for tx_list in tx_list_generator:
-                if len(tx_list) > 0:
+                if tx_list_sender.send(tx_list):
                     has_tx_list = True
-                    tx_list_sender.send(tx_list)
             return has_tx_list
         finally:
             self._ctx.add_tx_state_list(tx_list_sender.tx_state_list)

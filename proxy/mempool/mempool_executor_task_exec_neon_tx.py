@@ -3,14 +3,14 @@ import logging
 from typing import cast
 
 from ..common_neon.elf_params import ElfParams
-from ..common_neon.errors import BadResourceError
-from ..common_neon.errors import BlockedAccountsError, NodeBehindError, SolanaUnavailableError, NonceTooLowError
+from ..common_neon.errors import RescheduleError, NonceTooLowError
 
 from ..mempool.mempool_api import MPTxExecRequest, MPTxExecResult, MPTxExecResultCode
 from ..mempool.mempool_executor_task_base import MPExecutorBaseTask
 from ..mempool.neon_tx_sender import NeonTxSendStrategyExecutor
 from ..mempool.neon_tx_sender_ctx import NeonTxSendCtx
 from ..mempool.operator_resource_mng import OpResInfo
+
 
 LOG = logging.getLogger(__name__)
 
@@ -21,16 +21,9 @@ class MPExecutorExecNeonTxTask(MPExecutorBaseTask):
         try:
             assert neon_tx_exec_cfg is not None
             self.execute_neon_tx_impl(mp_tx_req)
-        except BlockedAccountsError:
-            LOG.debug(f"Failed to execute tx {mp_tx_req.sig}, got blocked accounts result")
+        except RescheduleError as exc:
+            LOG.debug(f'Failed to execute tx {mp_tx_req.sig}, got reschedule error {str(exc)}')
             return MPTxExecResult(MPTxExecResultCode.Reschedule, neon_tx_exec_cfg)
-        except (NodeBehindError, SolanaUnavailableError) as exc:
-            LOG.warning(f'Failed to execute tx {mp_tx_req.sig}, got solana error', exc_info=exc)
-            return MPTxExecResult(MPTxExecResultCode.Reschedule, neon_tx_exec_cfg)
-        except BadResourceError as exc:
-            # TODO: move to rescrudule result
-            LOG.debug(f'Failed to execute tx {mp_tx_req.sig}, got bad resource error: {str(exc)}')
-            return MPTxExecResult(MPTxExecResultCode.BadResource, neon_tx_exec_cfg)
         except BaseException as exc:
             if isinstance(exc, NonceTooLowError):
                 # sender is absent on the level of SolTxSender

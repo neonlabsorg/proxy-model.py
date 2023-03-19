@@ -1,19 +1,19 @@
 import enum
+import logging
 import random
 import time
-import logging
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set
 
 from ..common_neon.config import Config
-from ..common_neon.utils import str_enum
-from ..common_neon.errors import CUBudgetExceededError
-from ..common_neon.errors import NodeBehindError, NoMoreRetriesError, NonceTooLowError, BlockedAccountsError
-from ..common_neon.errors import InvalidIxDataError, RequireResizeIterError, BlockHashNotFound
+from ..common_neon.errors import RescheduleError, WrongStrategyError
+from ..common_neon.errors import BlockHashNotFound, NonceTooLowError
+from ..common_neon.errors import CUBudgetExceededError, InvalidIxDataError, RequireResizeIterError
+from ..common_neon.errors import CommitLevelError, NodeBehindError, NoMoreRetriesError, BlockedAccountsError
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_tx import SolTx, SolBlockHash, SolTxReceipt, SolAccount, Commitment
 from ..common_neon.solana_tx_error_parser import SolTxErrorParser, SolTxError
-
+from ..common_neon.utils import str_enum
 
 LOG = logging.getLogger(__name__)
 
@@ -35,24 +35,34 @@ class SolTxSendState:
         BlockHashNotFoundError = enum.auto()
         AltInvalidIndexError = enum.auto()
 
-        # Fail errors
+        # Rescheduling errors
         NodeBehindError = enum.auto()
-        BadNonceError = enum.auto()
         BlockedAccountError = enum.auto()
+
+        # Wrong strategy error
         CUBudgetExceededError = enum.auto()
         InvalidIxDataError = enum.auto()
         RequireResizeIterError = enum.auto()
+
+        # Fail errors
+        BadNonceError = enum.auto()
         UnknownError = enum.auto()
 
     status: Status
     tx: SolTx
     valid_block_height: int
-    receipt: SolTxReceipt
+    receipt: Optional[SolTxReceipt]
     error: Optional[BaseException]
 
     @property
     def sig(self) -> str:
         return str(self.tx.signature)
+
+    @property
+    def block_slot(self) -> Optional[int]:
+        if self.receipt is None:
+            return None
+        return self.receipt.get('slot')
 
     @property
     def name(self) -> str:
@@ -63,6 +73,7 @@ class SolTxListSender:
     _one_block_time = 0.4
     _commitment_set = Commitment.upper_set(Commitment.Confirmed)
     _big_block_height = 2 ** 64 - 1
+    _big_block_slot = 2 ** 64 - 1
 
     def __init__(self, config: Config, solana: SolInteractor, signer: SolAccount):
         self._config = config
@@ -76,32 +87,32 @@ class SolTxListSender:
         self._tx_state_dict: Dict[str, SolTxSendState] = dict()
         self._tx_state_list_dict: Dict[SolTxSendState.Status, List[SolTxSendState]] = dict()
 
-    def send(self, tx_list: List[SolTx]) -> None:
+    def send(self, tx_list: List[SolTx]) -> bool:
         self._clear()
         if len(tx_list) == 0:
-            return
+            return False
 
         self._tx_list = tx_list
-        self._send()
+        return self._send()
 
-    def recheck(self, tx_state_list: List[SolTxSendState]) -> None:
+    def recheck(self, tx_state_list: List[SolTxSendState]) -> bool:
         self._clear()
         if len(tx_state_list) == 0:
-            return
+            return False
 
+        # We should check all (failed too) txs again, because the state can be changed
         tx_sig_list = [tx_state.sig for tx_state in tx_state_list]
         self._get_tx_receipt_list(tx_sig_list, tx_state_list)
 
         self._get_tx_list_for_send()
-        self._send()
+        return self._send()
 
     @property
     def tx_state_list(self) -> List[SolTxSendState]:
         return list(self._tx_state_dict.values())
 
-    def has_good_receipt_list(self) -> bool:
-        s = SolTxSendState.Status
-        return (s.GoodReceipt in self._tx_state_list_dict) or (s.LogTruncatedError in self._tx_state_dict)
+    def has_receipt(self) -> bool:
+        return len(self._tx_state_dict) > 0
 
     def _clear(self) -> None:
         self._block_hash = None
@@ -109,7 +120,18 @@ class SolTxListSender:
         self._tx_state_dict.clear()
         self._tx_state_list_dict.clear()
 
-    def _send(self) -> None:
+    def _send(self) -> bool:
+        try:
+            self._send_impl()
+            self._validate_commit_level()
+            return True  # always True, because we send txs
+        except (WrongStrategyError, RescheduleError):
+            raise
+        except (BaseException,):
+            self._validate_commit_level()
+            raise
+
+    def _send_impl(self) -> None:
         retry_on_fail = self._config.retry_on_fail
 
         for retry_idx in range(retry_on_fail):
@@ -132,6 +154,22 @@ class SolTxListSender:
 
         if len(self._tx_list) > 0:
             raise NoMoreRetriesError()
+
+    def _validate_commit_level(self) -> None:
+        commit_level = self._config.commit_level
+        if commit_level == Commitment.Confirmed:
+            return
+
+        # find minimal block slot
+        min_block_slot = self._big_block_slot
+        for tx_state in self._tx_state_dict.values():
+            tx_block_slot = tx_state.block_slot
+            if tx_block_slot is not None:
+                min_block_slot = min(min_block_slot, tx_block_slot)
+
+        min_block_status = self._solana.get_block_status(min_block_slot)
+        if Commitment.level(min_block_status.commitment) < Commitment.level(commit_level):
+            raise CommitLevelError(commit_level, min_block_status.commitment)
 
     def _fmt_stat(self) -> str:
         if not LOG.isEnabledFor(logging.DEBUG):
@@ -279,8 +317,9 @@ class SolTxListSender:
 
         # The first few txs failed on blocked accounts, but the subsequent tx successfully locked the accounts.
         if tx_status == status.BlockedAccountError:
-            if self.has_good_receipt_list() or (status.WaitForReceipt in self._tx_state_list_dict):
-                return True
+            for completed_status in completed_tx_status_set:
+                if completed_status in self._tx_state_list_dict:
+                    return True
 
         tx_state = tx_state_list[0]
         error = tx_state.error or SolTxError(tx_state.receipt)
@@ -323,7 +362,7 @@ class SolTxListSender:
     @dataclass(frozen=True)
     class _DecodeResult:
         tx_status: SolTxSendState.Status
-        error: Optional[BaseException] = None
+        error: Optional[BaseException]
 
     def _decode_tx_status(self, tx: SolTx, tx_receipt: Optional[SolTxReceipt]) -> _DecodeResult:
         status = SolTxSendState.Status
@@ -337,18 +376,18 @@ class SolTxListSender:
                 LOG.debug(f'bad block hash: {tx.recent_block_hash}')
                 self._bad_block_hash_set.add(tx.recent_block_hash)
             # no exception: reset blockhash on tx signing
-            return self._DecodeResult(status.BlockHashNotFoundError)
+            return self._DecodeResult(status.BlockHashNotFoundError, None)
         elif tx_error_parser.check_if_alt_uses_invalid_index():
             # no exception: sleep on 1 block before getting receipt
-            return self._DecodeResult(status.AltInvalidIndexError)
+            return self._DecodeResult(status.AltInvalidIndexError, None)
         elif tx_error_parser.check_if_already_finalized():
             # no exception: receipt exists - the goal is reached
-            return self._DecodeResult(status.AlreadyFinalizedError)
+            return self._DecodeResult(status.AlreadyFinalizedError, None)
         elif tx_error_parser.check_if_accounts_blocked():
             return self._DecodeResult(status.BlockedAccountError, BlockedAccountsError())
         elif tx_error_parser.check_if_account_already_exists():
             # no exception: account exists - the goal is reached
-            return self._DecodeResult(status.AccountAlreadyExistsError)
+            return self._DecodeResult(status.AccountAlreadyExistsError, None)
         elif tx_error_parser.check_if_invalid_ix_data():
             return self._DecodeResult(status.InvalidIxDataError, InvalidIxDataError())
         elif tx_error_parser.check_if_budget_exceeded():
@@ -358,7 +397,7 @@ class SolTxListSender:
         elif tx_error_parser.check_if_error():
             LOG.debug(f'unknown error receipt {str(tx.signature)}: {tx_receipt}')
             # no exception: will be converted to DEFAULT EXCEPTION
-            return self._DecodeResult(status.UnknownError)
+            return self._DecodeResult(status.UnknownError, None)
 
         state_tx_cnt, tx_nonce = tx_error_parser.get_nonce_error()
         if state_tx_cnt is not None:
@@ -366,12 +405,15 @@ class SolTxListSender:
             return self._DecodeResult(status.BadNonceError, NonceTooLowError('?', tx_nonce, state_tx_cnt))
         elif tx_error_parser.check_if_log_truncated():
             # no exception: by default this is a good receipt
-            return self._DecodeResult(status.LogTruncatedError)
+            return self._DecodeResult(status.LogTruncatedError, None)
 
-        return self._DecodeResult(status.GoodReceipt)
+        return self._DecodeResult(status.GoodReceipt, None)
 
     def _add_tx_state(self, tx: SolTx, tx_receipt: Optional[SolTxReceipt], no_receipt_status: SolTxSendState.Status):
-        res = self._DecodeResult(no_receipt_status) if tx_receipt is None else self._decode_tx_status(tx, tx_receipt)
+        if tx_receipt is None:
+            res = self._DecodeResult(no_receipt_status, None)
+        else:
+            res = self._decode_tx_status(tx, tx_receipt)
         valid_block_height = self._block_hash_dict.get(tx.recent_block_hash, self._big_block_height)
 
         tx_send_state = SolTxSendState(
