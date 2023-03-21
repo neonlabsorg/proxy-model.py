@@ -95,14 +95,14 @@ class SolTxListSender:
         self._tx_list = tx_list
         return self._send()
 
-    def recheck(self, tx_state_list: List[SolTxSendState]) -> bool:
+    def recheck(self, tx_list: List[SolTx]) -> bool:
         self._clear()
-        if len(tx_state_list) == 0:
+        if len(tx_list) == 0:
             return False
 
         # We should check all (failed too) txs again, because the state can be changed
-        tx_sig_list = [tx_state.sig for tx_state in tx_state_list]
-        self._get_tx_receipt_list(tx_sig_list, tx_state_list)
+        tx_sig_list = [str(tx.signature) for tx in tx_list]
+        self._get_tx_receipt_list(tx_sig_list, tx_list)
 
         self._get_tx_list_for_send()
         return self._send()
@@ -332,18 +332,20 @@ class SolTxListSender:
             return
 
         tx_sig_list: List[str] = list()
+        tx_list: List[SolTx] = list()
         valid_block_height = self._big_block_height
         for tx_state in tx_state_list:
             tx_sig_list.append(tx_state.sig)
+            tx_list.append(tx_state.tx)
             valid_block_height = min(valid_block_height, tx_state.valid_block_height)
 
         self._wait_for_confirmation_of_tx_list(tx_sig_list, valid_block_height)
-        self._get_tx_receipt_list(tx_sig_list, tx_state_list)
+        self._get_tx_receipt_list(tx_sig_list, tx_list)
 
-    def _get_tx_receipt_list(self, tx_sig_list: Optional[List[str]], tx_state_list: List[SolTxSendState]) -> None:
+    def _get_tx_receipt_list(self, tx_sig_list: Optional[List[str]], tx_list: List[SolTx]) -> None:
         tx_receipt_list = self._solana.get_tx_receipt_list(tx_sig_list, Commitment.Confirmed)
-        for tx_state, tx_receipt in zip(tx_state_list, tx_receipt_list):
-            self._add_tx_state(tx_state.tx, tx_receipt, SolTxSendState.Status.NoReceiptError)
+        for tx, tx_receipt in zip(tx_list, tx_receipt_list):
+            self._add_tx_state(tx, tx_receipt, SolTxSendState.Status.NoReceiptError)
 
     def _wait_for_confirmation_of_tx_list(self, tx_sig_list: List[str], valid_block_height: int) -> None:
         confirm_timeout = self._config.confirm_timeout_sec

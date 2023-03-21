@@ -2,7 +2,6 @@ import logging
 
 from typing import List, Generator
 
-from ..common_neon.errors import WrongNumberOfItersError
 from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_tx_list_sender import SolTxSendState
 from ..common_neon.utils import NeonTxResultInfo
@@ -27,9 +26,6 @@ class SimpleNeonTxStrategy(BaseNeonTxStrategy):
 
         self._send_tx_list([self.name], self._build_tx_list())
         tx_send_state_list = self._sol_tx_list_sender.tx_state_list
-        if len(tx_send_state_list) != 1:
-            raise WrongNumberOfItersError()
-
         tx_state = tx_send_state_list[0]
         neon_tx_res = NeonTxResultInfo()
         status = SolTxSendState.Status

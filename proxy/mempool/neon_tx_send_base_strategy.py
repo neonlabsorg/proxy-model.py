@@ -124,10 +124,9 @@ class BaseNeonTxStrategy(abc.ABC):
 
     def _send_tx_list(self, tx_name_list: List[str], tx_list_generator: Generator[List[SolTx], None, None]) -> bool:
         tx_list_sender = self._sol_tx_list_sender
-        tx_state_list = self._ctx.pop_tx_state_list(tx_name_list)
+        tx_list = self._ctx.pop_sol_tx_list(tx_name_list)
         try:
-            if len(tx_state_list) > 0:
-                tx_list_sender.recheck(tx_state_list)
+            if tx_list_sender.recheck(tx_list):
                 return True
 
             has_tx_list = False
@@ -136,7 +135,7 @@ class BaseNeonTxStrategy(abc.ABC):
                     has_tx_list = True
             return has_tx_list
         finally:
-            self._ctx.add_tx_state_list(tx_list_sender.tx_state_list)
+            self._ctx.add_sol_tx_list([tx_state.tx for tx_state in tx_list_sender.tx_state_list])
 
     @property
     def _sol_tx_list_sender(self) -> SolTxListSender:
