@@ -35,7 +35,7 @@ COMPUTE_BUDGET_ID: Pubkey = Pubkey.from_string("ComputeBudget1111111111111111111
 
 solana_url = os.environ.get("SOLANA_URL", "http://localhost:8899")
 EVM_LOADER = os.environ.get("EVM_LOADER")
-ETH_TOKEN_MINT_ID: Pubkey = Pubkey.from_string(os.environ.get("ETH_TOKEN_MINT"))
+ETH_TOKEN_MINT_ID: Pubkey = Pubkey.from_string(os.environ.get("NEON_TOKEN_MINT"))
 
 EVM_LOADER_SO = os.environ.get("EVM_LOADER_SO", 'target/bpfel-unknown-unknown/release/evm_loader.so')
 client = Client(solana_url)

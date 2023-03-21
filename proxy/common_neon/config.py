@@ -296,9 +296,9 @@ class Config:
     def as_dict(self) -> dict:
         return {
             'SOLANA_URL': self.solana_url,
-            'EVM_LOADER_ID': self.evm_loader_id,
+            'EVM_LOADER_ID': str(self.evm_loader_id),
             'PP_SOLANA_URL': self.pyth_solana_url,
-            'PYTH_MAPPING_ACCOUNT': self.pyth_mapping_account,
+            'PYTH_MAPPING_ACCOUNT': str(self.pyth_mapping_account),
             'UPDATE_PYTH_MAPPING_PERIOD_SEC': self.update_pyth_mapping_period_sec,
             'MEMPOOL_CAPACITY': self.mempool_capacity,
             'MEMPOOL_EXECUTOR_LIMIT_CNT': self.mempool_executor_limit_cnt,

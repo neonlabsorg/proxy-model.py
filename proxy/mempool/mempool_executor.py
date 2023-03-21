@@ -28,7 +28,6 @@ LOG = logging.getLogger(__name__)
 
 class MPExecutor(mp.Process, IPickableDataServerUser):
     def __init__(self, config: Config, executor_id: int, srv_sock: socket.socket):
-        LOG.info(f"Initialize mempool_executor: {executor_id}")
         self._id = executor_id
         self._srv_sock = srv_sock
         self._config = config
@@ -49,6 +48,8 @@ class MPExecutor(mp.Process, IPickableDataServerUser):
         mp.Process.__init__(self)
 
     def _init_in_proc(self):
+        LOG.info(f'Init MemPoolExecutor: {self._id}')
+
         self._event_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._event_loop)
 
@@ -66,12 +67,12 @@ class MPExecutor(mp.Process, IPickableDataServerUser):
         self._free_alt_task = MPExecutorFreeALTQueueTask(self._config, self._solana)
 
     async def on_data_received(self, data: Any) -> Any:
-        mp_req = cast(MPRequest, data)
-        with logging_context(req_id=mp_req.req_id, exectr=self._id):
-            try:
+        try:
+            mp_req = cast(MPRequest, data)
+            with logging_context(req_id=mp_req.req_id, exectr=self._id):
                 return self._handle_request(mp_req)
-            except BaseException as exc:
-                LOG.error('Exception during handle request', exc_info=exc)
+        except BaseException as exc:
+            LOG.error('Exception during handle request', exc_info=exc)
         return None
 
     def _handle_request(self, mp_req: MPRequest) -> Any:
@@ -101,7 +102,7 @@ class MPExecutor(mp.Process, IPickableDataServerUser):
         elif mp_req.type == MPRequestType.CloseALTList:
             mp_close_req = cast(MPCloseALTListRequest, mp_req)
             return self._free_alt_task.close_alt_list(mp_close_req)
-        LOG.error(f"Failed to process mp_request, unknown type: {mp_req.type}")
+        LOG.error(f'Failed to process mp_request, unknown type: {mp_req.type}')
 
     def run(self) -> None:
         Logger.setup()
