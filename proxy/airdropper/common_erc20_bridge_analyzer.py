@@ -11,7 +11,6 @@ LOG = logging.getLogger(__name__)
 TRANSFER_EVENT = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
 
 class CommonERC20BridgeAnalyzer(AirdropperTrxAnalyzer):
-    # TODO: write description for tokens_whitelist
     # tokens_whitelist - the whiltelist of tokens for the transfer of which
     #   to airdrop NEONs. This set should contains ERC20 addresses separated by comma.
     # If tokens_whitelist is empty then any token transfer lead to airdrop
