@@ -1,8 +1,7 @@
-from .airdropper import AirdropperState, AirdropperTrxAnalyzer
+from .airdropper import AirdropperState, AirdropperTrxAnalyzer, AirdropperTxInfo
 from ..common_neon.eth_proto import NeonTx
 from ..common_neon.address import NeonAddress
 from typing import Set
-from ..indexer.indexed_objects import NeonIndexedTxInfo
 
 import logging
 from construct import ConstructError, Const, Struct, GreedyBytes, Byte, Bytes, BytesInteger, this, Int32ub, Int16ub, Int64ub, Switch, Enum
@@ -64,7 +63,7 @@ class PortalTrxAnalyzer(AirdropperTrxAnalyzer):
         self.tokens_whitelist = tokens_whitelist
         pass
 
-    def process(self, neon_tx: NeonIndexedTxInfo, state: AirdropperState):
+    def process(self, neon_tx: AirdropperTxInfo, state: AirdropperState):
         callData = bytes.fromhex(neon_tx._neon_receipt.neon_tx.calldata[2:])
         LOG.debug(f'callData: {callData.hex()}')
         if callData[0:4] == COMPLETE_TRANSFER:
