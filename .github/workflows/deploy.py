@@ -271,13 +271,13 @@ def deploy_check(proxy_tag, neon_evm_tag, head_ref_branch, skip_uniswap, test_fi
 
     if not skip_pull:
         click.echo('pull docker images...')
-        out = docker_compose(f"-f proxy/docker-compose-test.yml pull")
+        out = docker_compose(f"-f docker-compose/docker-compose-test.yml pull")
         click.echo(out)
     else:
         click.echo('skip pulling of docker images')
 
     try:
-        docker_compose(f"-f proxy/docker-compose-test.yml up -d")
+        docker_compose(f"-f docker-compose/docker-compose-test.yml up -d")
     except:
         raise RuntimeError("Docker-compose failed to start")
 
@@ -361,7 +361,7 @@ def stop_containers():
 
 def cleanup_docker():
     click.echo(f"Cleanup docker-compose...")
-    docker_compose("-f proxy/docker-compose-test.yml down -t 1")
+    docker_compose("-f docker-compose/docker-compose-test.yml down -t 1")
     click.echo(f"Cleanup docker-compose done.")
 
     click.echo(f"Cleanup old docker containers...")
@@ -432,7 +432,7 @@ def send_notification(url, build_url):
 
     tpl["blocks"][0]["text"]["text"] = (
         f"*Build <{build_url}|`{build_id}`> of repository `{repo_name}` is failed.*"
-        f"\n<{build_url}|View build details>"
+        f"\n<{build_url}|View builosetd details>"
     )
     requests.post(url=url, data=json.dumps(tpl))
 
