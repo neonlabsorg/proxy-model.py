@@ -164,12 +164,8 @@ jobs:
       - name: wait until proxy is ready
         timeout-minutes: 5
         run: |
-          while true; do
-            status=$(curl -s -X POST -o /dev/null -w "%{http_code}" http://${{ env.PROXY_IP }}:9090/solana);
-            if [ "$status" != "200" ]; then
-              echo "URL no longer returns 200 status code";
-              break;
-            fi
+          while [[ "$(curl -s -X POST -o /dev/null -w ''%{http_code}'' http://${{ env.PROXY_IP }}:9090/solana)" != "200" ]];
+            do echo  "Proxy is not ready yet. Waiting 5 seconds...";
             sleep 5;
           done
       - name: Run docker container
