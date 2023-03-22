@@ -163,13 +163,13 @@ jobs:
         run: docker pull ${{ env.IMAGE }}
       - name: Run docker container
         run: |
-          docker run -i -e PROXY_IP={{env.PROXY_IP}} \
-          -e SOLANA_IP={{env.SOLANA_IP}} \
+          docker run -i -e PROXY_IP=${{env.PROXY_IP}} \
+          -e SOLANA_IP=${{env.SOLANA_IP}} \
           -e DUMP_ENVS=true \
           -e NETWORK_ID=111 \
-          -e FAUCET_URL="http://{{env.PROXY_IP}}:3333/request_neon" \
-          -e SOLANA_URL="http://{{env.SOLANA_IP}}:8899" \
-          -e PROXY_URL="http://{{env.PROXY_IP}}:9090/solana" \
+          -e FAUCET_URL="http://${{env.PROXY_IP}}:3333/request_neon" \
+          -e SOLANA_URL="http://${{env.SOLANA_IP}}:8899" \
+          -e PROXY_URL="http://${{env.PROXY_IP}}:9090/solana" \
           -e NETWORK_NAME="aws_custom" \
           -d --name=${{ env.CONTAINER }} ${{ env.IMAGE }} /bin/bash
       - name: Run OpenZeppelin tests
