@@ -166,7 +166,7 @@ jobs:
           docker run -i -d --name=${{ env.CONTAINER }} ${{ env.IMAGE }} /bin/bash
       - name: Run OpenZeppelin tests
         run: |
-          docker exec -i -e OZ_BALANCES_REPORT_FLAG=1 ${{ env.CONTAINER }}  ./clickfile.py run oz \
+          docker exec -i -e PROXY_IP={{env.PROXY_IP}} -e SOLANA_IP={{env.SOLANA_IP}} ${{ env.CONTAINER }}  ./clickfile.py run oz \
             --network aws \
             --jobs 8 \
             --users 10
