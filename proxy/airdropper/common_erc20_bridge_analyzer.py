@@ -1,7 +1,6 @@
-from .airdropper import AirdropperState, AirdropperTrxAnalyzer
+from .airdropper import AirdropperState, AirdropperTrxAnalyzer, AirdropperTxInfo
 from ..common_neon.address import NeonAddress
 from typing import Set
-from ..indexer.indexed_objects import NeonIndexedTxInfo
 
 import logging
 
@@ -18,11 +17,11 @@ class CommonERC20BridgeAnalyzer(AirdropperTrxAnalyzer):
         self.tokens_whitelist = tokens_whitelist
         pass
 
-    def process(self, neon_tx: NeonIndexedTxInfo, state: AirdropperState):
+    def process(self, neon_tx: AirdropperTxInfo, state: AirdropperState):
         callData = bytes.fromhex(neon_tx._neon_receipt.neon_tx.calldata[2:])
         LOG.debug(f'callData: {callData.hex()}')
         
-        for event in [ev for ev in neon_tx.neon_tx_res.log_list if ev['neonIsHidden']==False]:
+        for event in neon_tx.iter_events():
             if len(event['topics']) == 3 and event['topics'][0] == TRANSFER_EVENT and event['topics'][1] == '0x' + 64*'0':
                 tokenID = event['address']
                 if len(self.tokens_whitelist) == 0 or tokenID in self.tokens_whitelist:
