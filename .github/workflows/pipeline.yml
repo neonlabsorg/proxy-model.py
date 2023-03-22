@@ -179,6 +179,9 @@ jobs:
           -e PROXY_URL="http://${{env.PROXY_IP}}:9090/solana" \
           -e NETWORK_NAME="aws_custom" \
           -d --name=${{ env.CONTAINER }} ${{ env.IMAGE }} /bin/bash
+      - name: test step
+        run: |
+          docker exec -i ${{ env.CONTAINER }} bash -c "cd ./compatibility/openzeppelin-contracts && npm ci && npm run compile"
       - name: Run OpenZeppelin tests
         run: |
           docker exec -i ${{ env.CONTAINER }} ./clickfile.py run oz \
