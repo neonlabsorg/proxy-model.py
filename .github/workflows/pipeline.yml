@@ -3,11 +3,12 @@ on:
   workflow_dispatch:
     inputs:
       full_test_suite:
+        default: false
         required: true
       neon_evm_commit:
-        required: true
+        required: false
       neon_evm_branch:
-        required: true
+        required: false
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
   push:
@@ -194,6 +195,7 @@ jobs:
       - openzeppelin-tests
       - basic-tests
     runs-on: test-runner
+    if: ${{always() && needs.prepare-infrastructure.result != 'skipped'}}
     steps:
       - uses: actions/checkout@v3
       - name: Destroy terraform infrastructure
