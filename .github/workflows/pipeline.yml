@@ -161,6 +161,17 @@ jobs:
 #        run: python3 ./.github/workflows/deploy.py openzeppelin --run_number=${GITHUB_RUN_NUMBER}
       - name: Pull docker image
         run: docker pull ${{ env.IMAGE }}
+      - name: wait until proxy is ready
+        timeout-minutes: 5
+        run: |
+          while true; do
+            status=$(curl -s -X POST -o /dev/null -w "%{http_code}" http://${{ env.PROXY_IP }}:9090/solana);
+            if [ "$status" != "200" ]; then
+              echo "URL no longer returns 200 status code";
+              break;
+            fi
+            sleep 5;
+          done
       - name: Run docker container
         run: |
           docker run -i -e PROXY_IP=${{env.PROXY_IP}} \
