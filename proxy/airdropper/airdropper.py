@@ -205,6 +205,7 @@ class Airdropper(IndexerBase, AirdropperState):
         self.max_update_pyth_mapping_int = 60 * 60  # update once an hour
         self.neon_large_tx: Dict[str, NeonIndexedHolderInfo] = {}
         self.neon_processed_tx: Dict[str, AirdropperTxInfo] = {}
+        self.last_finalized_slot: int = 0
         self.analyzers: Dict[str, AirdropperTrxAnalyzer] = analyzers
 
 
@@ -302,19 +303,19 @@ class Airdropper(IndexerBase, AirdropperState):
     
     # Method to process NeonEVM transaction extracted from the instructions
     def process_neon_transaction(self, tx_info: AirdropperTxInfo):
-        LOG.debug(f'PROCESS {tx_info.key} status {tx_info.status} result {tx_info.neon_tx_res.status}: {tx_info}')
+        if tx_info.status != AirdropperTxInfo.Status.Done or tx_info.neon_tx_res.status != '0x1':
+            LOG.debug(f'SKIPPED {tx_info.key} status {tx_info.status} result {tx_info.neon_tx_res.status}: {tx_info}')
+            return
+        
         try:
             tx_info.finalize()
-            for event in tx_info.iter_events():
-                LOG.debug(f'    {event}')
-
             trx = tx_info._neon_receipt.neon_tx
             sender = trx.addr
             to = NeonAddress(trx.to_addr) if trx.to_addr is not None else None
             LOG.debug(f"from: {sender}, to: {to}, calldata: {trx.calldata}")
             analyzer = self.analyzers.get(to, None)
             if analyzer is not None:
-                    analyzer.process(tx_info, self)
+                analyzer.process(tx_info, self)
         except Exception as error:
             LOG.warning(f"Failed to analyze {tx_info.key}: {error}")
 
@@ -337,12 +338,14 @@ class Airdropper(IndexerBase, AirdropperState):
         tx_receipt_info = SolTxReceiptInfo.from_tx(trx)
         sol_sig = tx_receipt_info.sol_sig
 
-        finalized_trx = [k for k,v in self.neon_processed_tx.items() if v.status != AirdropperTxInfo.Status.InProgress and v.last_block_slot < tx_receipt_info.block_slot]
-        if len(finalized_trx):
-            LOG.debug(f'Finalized: {finalized_trx}')
-            for k in finalized_trx:
-                tx_info = self.neon_processed_tx.pop(k)
-                self.process_neon_transaction(tx_info)
+        if self.last_finalized_slot < tx_receipt_info.block_slot:
+            self.last_finalized_slot = tx_receipt_info.block_slot
+            finalized_trx = [k for k,v in self.neon_processed_tx.items() if v.status != AirdropperTxInfo.Status.InProgress and v.last_block_slot < tx_receipt_info.block_slot]
+            if len(finalized_trx):
+                LOG.debug(f'Finalized: {finalized_trx}')
+                for k in finalized_trx:
+                    tx_info = self.neon_processed_tx.pop(k)
+                    self.process_neon_transaction(tx_info)
 
         for sol_neon_ix in tx_receipt_info.iter_sol_neon_ix():
             instruction = sol_neon_ix.ix_data[0]
