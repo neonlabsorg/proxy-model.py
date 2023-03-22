@@ -181,10 +181,11 @@ jobs:
           -d --name=${{ env.CONTAINER }} ${{ env.IMAGE }} /bin/bash
       - name: Run OpenZeppelin tests
         run: |
-          docker exec -i ${{ env.CONTAINER }}  ./clickfile.py run oz \
+          docker exec -i ${{ env.CONTAINER }} ./clickfile.py run oz \
             --network aws_custom \
             --jobs 8 \
-            --users 10
+            --users 10 \
+            --amount 20000
       - name: Print OpenZeppelin report
         run: |
           docker exec -i ${{ env.CONTAINER }} ./clickfile.py ozreport
