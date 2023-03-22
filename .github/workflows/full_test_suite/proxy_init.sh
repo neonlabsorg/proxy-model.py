@@ -25,7 +25,6 @@ curl -O https://raw.githubusercontent.com/neonlabsorg/proxy-model.py/${branch}/d
 # Set required environment variables
 export REVISION=${proxy_model_commit}
 export SOLANA_URL=http:\/\/${solana_ip}:8899
-export PROXY_URL=http:\/\/${proxy_ip}:9090\/solana
 export NEON_EVM_COMMIT=${neon_evm_commit}
 export FAUCET_COMMIT=${faucet_model_commit}
 export CI_PP_SOLANA_URL=${ci_pp_solana_url}
@@ -65,15 +64,19 @@ docker-compose -f docker-compose-test.yml -f docker-compose-test.override.yml pu
 
 
 # Check if Solana is available, max attepts is 100(each for 2 seconds)
-CHECK_COMMAND='curl $SOLANA_URL -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1, \"method\":\"getHealth\"}"'
+CHECK_COMMAND='curl $SOLANA_URL -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1, \"method\":\"getHealth\"}" 2> /dev/null'
 MAX_COUNT=100
 CURRENT_ATTEMPT=1
-CHECK_COMMAND_RESULT=$(eval CHECK_COMMAND)
-while [[ "$CHECK_COMMAND_RESULT" != "{\"jsonrpc\":\"2.0\",\"result\":\"ok\",\"id\":1}" && $CURRENT_ATTEMPT -lt $MAX_COUNT ]]
+while [[ $CURRENT_ATTEMPT -lt $MAX_COUNT ]]
 do
-  CHECK_COMMAND_RESULT=$(eval CHECK_COMMAND)
+  echo "solana attempt: $CURRENT_ATTEMPT" 1>&2
+  CHECK_COMMAND_RESULT=$(eval $CHECK_COMMAND)
   echo $CHECK_COMMAND_RESULT >> /tmp/output.txt
-  echo "attempt: $CURRENT_ATTEMPT" 1>&2
+  if [[ "$CHECK_COMMAND_RESULT" == "{\"jsonrpc\":\"2.0\",\"result\":\"ok\",\"id\":1}" ]]; then
+    echo 'solana is up' 1>&2
+    break
+  fi
+
   ((CURRENT_ATTEMPT=CURRENT_ATTEMPT+1))
   sleep 2
 done;
@@ -88,15 +91,20 @@ docker rm -f solana
 
 
 # Wait for proxy
-CHECK_COMMAND='curl $PROXY_URL -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_blockNumber\",\"params\": []}" | grep -c "\"result\""'
-MAX_COUNT=100
+export PROXY_URL=http:\/\/localhost:9090\/solana
+CHECK_COMMAND='curl $PROXY_URL -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_blockNumber\",\"params\":[]}" 2> /dev/null | grep -cF "\"result\""'
+MAX_COUNT=500
 CURRENT_ATTEMPT=1
-CHECK_COMMAND_RESULT=$(eval CHECK_COMMAND)
-while [[ "$CHECK_COMMAND_RESULT" == "0" && $CURRENT_ATTEMPT -lt $MAX_COUNT ]]
+while [[ $CURRENT_ATTEMPT -lt $MAX_COUNT ]]
 do
-  CHECK_COMMAND_RESULT=$(eval CHECK_COMMAND)
+  echo "proxy attempt: $CURRENT_ATTEMPT" 1>&2
+  CHECK_COMMAND_RESULT=$(eval $CHECK_COMMAND)
   echo $CHECK_COMMAND_RESULT >> /tmp/output.txt
-  echo "attempt: $CURRENT_ATTEMPT" 1>&2
+  if [[ "$CHECK_COMMAND_RESULT" == "1" ]]; then
+    echo 'proxy is up' 1>&2
+    break
+  fi
+
   ((CURRENT_ATTEMPT=CURRENT_ATTEMPT+1))
   sleep 2
 done;
