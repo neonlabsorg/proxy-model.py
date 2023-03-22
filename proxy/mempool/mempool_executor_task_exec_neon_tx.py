@@ -22,7 +22,7 @@ class MPExecutorExecNeonTxTask(MPExecutorBaseTask):
             assert neon_tx_exec_cfg is not None
             self.execute_neon_tx_impl(mp_tx_req)
         except RescheduleError as exc:
-            LOG.debug(f'Failed to execute tx {mp_tx_req.sig}, got reschedule error {str(exc)}')
+            LOG.debug(f'Failed to execute tx {mp_tx_req.sig}, got reschedule error: {str(exc)}')
             return MPTxExecResult(MPTxExecResultCode.Reschedule, neon_tx_exec_cfg)
         except BaseException as exc:
             if isinstance(exc, NonceTooLowError):

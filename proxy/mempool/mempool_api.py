@@ -270,7 +270,7 @@ class MPSenderTxCntResult:
 class MPOpResInitResultCode(IntEnum):
     Success = 0
     Failed = 1
-    Unspecified = 255
+    Reschedule = 2
 
 
 @dataclass(frozen=True)

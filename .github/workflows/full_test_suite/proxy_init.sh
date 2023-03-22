@@ -25,6 +25,7 @@ curl -O https://raw.githubusercontent.com/neonlabsorg/proxy-model.py/${branch}/p
 # Set required environment variables
 export REVISION=${proxy_model_commit}
 export SOLANA_URL=http:\/\/${solana_ip}:8899
+export PROXY_URL=http:\/\/${proxy_ip}:9090\/solana
 export NEON_EVM_COMMIT=${neon_evm_commit}
 export FAUCET_COMMIT=${faucet_model_commit}
 export CI_PP_SOLANA_URL=${ci_pp_solana_url}
@@ -56,7 +57,7 @@ EOF
 
 
 # Get list of services
-SERVICES=$(docker-compose -f docker-compose-test.yml config --services | grep -vP "solana|airdropper|prometheus|neon_test_invoke_program_loader")
+SERVICES=$(docker-compose -f docker-compose-test.yml config --services | grep -vP "solana|airdropper|neon_test_invoke_program_loader|hashicorp")
 
 
 # Pull latest versions
@@ -64,13 +65,14 @@ docker-compose -f docker-compose-test.yml -f docker-compose-test.override.yml pu
 
 
 # Check if Solana is available, max attepts is 100(each for 2 seconds)
-CHECK_COMMAND=`curl $SOLANA_URL -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1, "method":"getHealth"}'`
+CHECK_COMMAND='curl $SOLANA_URL -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1, \"method\":\"getHealth\"}"'
 MAX_COUNT=100
 CURRENT_ATTEMPT=1
-while [[ "$CHECK_COMMAND" != "{\"jsonrpc\":\"2.0\",\"result\":\"ok\",\"id\":1}" && $CURRENT_ATTEMPT -lt $MAX_COUNT ]]
+CHECK_COMMAND_RESULT=$(eval CHECK_COMMAND)
+while [[ "$CHECK_COMMAND_RESULT" != "{\"jsonrpc\":\"2.0\",\"result\":\"ok\",\"id\":1}" && $CURRENT_ATTEMPT -lt $MAX_COUNT ]]
 do
-  CHECK_COMMAND=`curl $SOLANA_URL -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1, "method":"getHealth"}'`
-  echo $CHECK_COMMAND >> /tmp/output.txt
+  CHECK_COMMAND_RESULT=$(eval CHECK_COMMAND)
+  echo $CHECK_COMMAND_RESULT >> /tmp/output.txt
   echo "attempt: $CURRENT_ATTEMPT" 1>&2
   ((CURRENT_ATTEMPT=CURRENT_ATTEMPT+1))
   sleep 2
@@ -83,3 +85,18 @@ docker-compose -f docker-compose-test.yml -f docker-compose-test.override.yml up
 
 # Remove unused
 docker rm -f solana
+
+
+# Wait for proxy
+CHECK_COMMAND='curl $PROXY_URL -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_blockNumber\",\"params\": []}" | grep -c "\"result\""'
+MAX_COUNT=100
+CURRENT_ATTEMPT=1
+CHECK_COMMAND_RESULT=$(eval CHECK_COMMAND)
+while [[ "$CHECK_COMMAND_RESULT" == "0" && $CURRENT_ATTEMPT -lt $MAX_COUNT ]]
+do
+  CHECK_COMMAND_RESULT=$(eval CHECK_COMMAND)
+  echo $CHECK_COMMAND_RESULT >> /tmp/output.txt
+  echo "attempt: $CURRENT_ATTEMPT" 1>&2
+  ((CURRENT_ATTEMPT=CURRENT_ATTEMPT+1))
+  sleep 2
+done;

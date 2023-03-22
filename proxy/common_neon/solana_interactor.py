@@ -499,7 +499,7 @@ class SolInteractor:
             error = response.get('error', None)
             if error:
                 if SolTxErrorParser(error).check_if_already_processed():
-                    result = str(tx.signature)
+                    result = str(tx.sig)
                     LOG.debug(f'Transaction is already processed: {str(result)}')
                     error = None
                 else:

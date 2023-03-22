@@ -1,11 +1,15 @@
-import solders.message
-import solana.transaction
+from __future__ import annotations
 
-from .solana_tx import SolTx, SolAccount, SolSignature
+import solders.transaction
+import solders.message
+
+from .solana_tx import SolTx, SolAccount, SolSig
 
 
 SolLegacyMsg = solders.message.Message
-SolLegacyLowLevelTx = solana.transaction.Transaction
+SolLegacyLowLevelTx = solders.transaction.Transaction
+
+_SolTxError = solders.transaction.TransactionError
 
 
 class SolLegacyTx(SolTx):
@@ -13,17 +17,30 @@ class SolLegacyTx(SolTx):
 
     @property
     def low_level_tx(self) -> SolLegacyLowLevelTx:
-        return self._tx
+        return self._solders_legacy_tx
 
     @property
     def message(self) -> SolLegacyMsg:
-        return self._tx.compile_message()
+        return self._solders_legacy_tx.message
 
     def _serialize(self) -> bytes:
-        return self._tx.serialize()
+        if not self._verify_sign_list():
+            raise AttributeError('Transaction has not been signed correctly')
 
-    def _signature(self) -> SolSignature:
-        return self._tx.signature()
+        return bytes(self._solders_legacy_tx)
 
-    def _sign(self, signer: SolAccount) -> None:
-        self._tx.sign(signer)
+    def _verify_sign_list(self) -> bool:
+        try:
+            self._solders_legacy_tx.verify()
+        except _SolTxError:
+            return False
+        return True
+
+    def _sig(self) -> SolSig:
+        return self._solders_legacy_tx.signatures[0]
+
+    def _sign(self, *signer: SolAccount) -> None:
+        self._solders_legacy_tx.sign(signer, self._solders_legacy_tx.message.recent_blockhash)
+
+    def _clone(self) -> SolLegacyTx:
+        return SolLegacyTx(self.name, self._decode_ix_list())

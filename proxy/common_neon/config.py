@@ -43,7 +43,7 @@ class Config:
         self._indexer_log_skip_cnt = self._env_int("INDEXER_LOG_SKIP_COUNT", 1, 1000)
         self._indexer_check_msec = self._env_int('INDEXER_CHECK_MSEC', 50, 200)
         self._max_account_cnt = self._env_int("MAX_ACCOUNT_COUNT", 20, 60)
-        self._fuzz_testing = self._env_bool("FUZZ_TESTING", False)
+        self._fuzz_fail_pct = self._env_int("FUZZ_FAIL_PCT", 0, 0)
         self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", 4, math.ceil(0.4 * 32))
         self._confirm_check_msec = self._env_int("CONFIRM_CHECK_MSEC", 10, 100)
         self._max_evm_step_cnt_emulate = self._env_int("MAX_EVM_STEP_COUNT_TO_EMULATE", 1000, 500000)
@@ -77,6 +77,7 @@ class Config:
         assert (self._gas_price_suggested_pct >= 0) and (self._gas_price_suggested_pct < 1)
         assert (self._extra_gas_pct >= 0) and (self._extra_gas_pct < 1)
         assert (self._slot_processing_delay < 32)
+        assert (self._fuzz_fail_pct >= 0) and (self._fuzz_fail_pct < 100)
 
     @staticmethod
     def _env_bool(name: str, default_value: bool) -> bool:
@@ -177,7 +178,7 @@ class Config:
     @property
     def operator_fee(self) -> Decimal:
         return self._operator_fee
-    
+
     @property
     def slot_processing_delay(self) -> int:
         """Slot processing delay relative to the last confirmed slot on Solana cluster"""
@@ -230,8 +231,8 @@ class Config:
         return self._max_account_cnt
 
     @property
-    def fuzz_testing(self) -> bool:
-        return self._fuzz_testing
+    def fuzz_fail_pct(self) -> int:
+        return self._fuzz_fail_pct
 
     @property
     def confirm_timeout_sec(self) -> int:
@@ -329,7 +330,7 @@ class Config:
             'INDEXER_LOG_SKIP_COUNT': self.indexer_log_skip_cnt,
             'INDEXER_CHECK_MSEC': self.indexer_check_msec,
             'MAX_ACCOUNT_COUNT': self.max_account_cnt,
-            'FUZZ_TESTING': self.fuzz_testing,
+            'FUZZ_FAIL_PCT': self.fuzz_fail_pct,
             'CONFIRM_TIMEOUT_SEC': self.confirm_timeout_sec,
             'CONFIRM_CHECK_MSEC': self.confirm_check_msec,
             'MAX_EVM_STEP_COUNT_TO_EMULATE': self.max_evm_step_cnt_emulate,

@@ -66,7 +66,7 @@ class ALTTxBuilder:
         # Tx to create an Account Lookup Table
         create_alt_tx = SolLegacyTx(
             name=self._create_name,
-            instructions=[
+            ix_list=[
                 self._ix_builder.make_create_lookup_table_ix(
                     alt_info.table_account,
                     alt_info.recent_block_slot,
@@ -83,7 +83,7 @@ class ALTTxBuilder:
             acct_list_part, acct_list = acct_list[:self.tx_account_cnt], acct_list[self.tx_account_cnt:]
             tx = SolLegacyTx(
                 name=self._extend_name,
-                instructions=[
+                ix_list=[
                     self._ix_builder.make_extend_lookup_table_ix(
                         alt_info.table_account,
                         acct_list_part

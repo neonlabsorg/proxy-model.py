@@ -2,18 +2,20 @@ import enum
 import logging
 import random
 import time
+
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Set
 
 from ..common_neon.config import Config
-from ..common_neon.errors import RescheduleError, WrongStrategyError
 from ..common_neon.errors import BlockHashNotFound, NonceTooLowError
 from ..common_neon.errors import CUBudgetExceededError, InvalidIxDataError, RequireResizeIterError
 from ..common_neon.errors import CommitLevelError, NodeBehindError, NoMoreRetriesError, BlockedAccountsError
+from ..common_neon.errors import RescheduleError, WrongStrategyError
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_tx import SolTx, SolBlockHash, SolTxReceipt, SolAccount, Commitment
 from ..common_neon.solana_tx_error_parser import SolTxErrorParser, SolTxError
 from ..common_neon.utils import str_enum
+
 
 LOG = logging.getLogger(__name__)
 
@@ -38,6 +40,7 @@ class SolTxSendState:
         # Rescheduling errors
         NodeBehindError = enum.auto()
         BlockedAccountError = enum.auto()
+        BlockedAccountPrepError = enum.auto()
 
         # Wrong strategy error
         CUBudgetExceededError = enum.auto()
@@ -56,7 +59,7 @@ class SolTxSendState:
 
     @property
     def sig(self) -> str:
-        return str(self.tx.signature)
+        return str(self.tx.sig)
 
     @property
     def block_slot(self) -> Optional[int]:
@@ -101,8 +104,17 @@ class SolTxListSender:
             return False
 
         # We should check all (failed too) txs again, because the state can be changed
-        tx_sig_list = [str(tx.signature) for tx in tx_list]
+        tx_sig_list = [str(tx.sig) for tx in tx_list]
         self._get_tx_receipt_list(tx_sig_list, tx_list)
+
+        # Try to block accounts
+        status = SolTxSendState.Status
+        tx_state_list = self._tx_state_list_dict.get(status.BlockedAccountError, list())
+        for tx_state in tx_state_list:
+            tx = tx_state.tx
+            if not tx.is_cloned():
+                self._add_tx_state(tx.clone(), None, status.NoReceiptError)
+                break
 
         self._get_tx_list_for_send()
         return self._send()
@@ -211,21 +223,23 @@ class SolTxListSender:
         return self._block_hash
 
     def _sign_tx_list(self) -> None:
-        fuzz_testing = self._config.fuzz_testing
+        fuzz_fail_pct = self._config.fuzz_fail_pct
         block_hash = self._get_block_hash()
 
         for tx in self._tx_list:
             if tx.is_signed:
-                tx_sig = str(tx.signature)
+                tx_sig = str(tx.sig)
                 self._tx_state_dict.pop(tx_sig, None)
                 if tx.recent_block_hash in self._bad_block_hash_set:
                     tx.recent_block_hash = None
+                    LOG.debug(f'Flash block hash: {tx.recent_block_hash}')
 
             if tx.recent_block_hash is not None:
+                LOG.debug(f'Block hash {tx.recent_block_hash} is not None')
                 continue
 
             # Fuzz testing of bad blockhash
-            if fuzz_testing and (random.randint(0, 3) == 1):
+            if fuzz_fail_pct > 0 and (random.randint(1, 100) <= fuzz_fail_pct):
                 tx.recent_block_hash = self._get_fuzz_block_hash()
             # <- Fuzz testing
             else:
@@ -233,14 +247,14 @@ class SolTxListSender:
             tx.sign(self._signer)
 
     def _send_tx_list(self) -> None:
-        fuzz_testing = self._config.fuzz_testing
+        fuzz_fail_pct = self._config.fuzz_fail_pct
 
         # Fuzz testing of skipping of txs by Solana node
         skipped_tx_list: List[SolTx] = list()
-        if fuzz_testing and (len(self._tx_list) > 1):
-            flag_list = [random.randint(0, 5) != 1 for _ in self._tx_list]
-            skipped_tx_list = [tx for tx, flag in zip(self._tx_list, flag_list) if not flag]
-            self._tx_list = [tx for tx, flag in zip(self._tx_list, flag_list) if flag]
+        if fuzz_fail_pct and (len(self._tx_list) > 1):
+            flag_list = [random.randint(1, 100) <= fuzz_fail_pct for _ in self._tx_list]
+            skipped_tx_list = [tx for tx, flag in zip(self._tx_list, flag_list) if flag]
+            self._tx_list = [tx for tx, flag in zip(self._tx_list, flag_list) if not flag]
         # <- Fuzz testing
 
         LOG.debug(f'send transactions: {self._fmt_tx_name_stat()}')
@@ -283,7 +297,13 @@ class SolTxListSender:
             remove_tx_status_set.add(tx_status)
             tx_state_list = self._tx_state_list_dict.get(tx_status)
             for tx_state in tx_state_list:
-                self._tx_list.append(tx_state.tx)
+                if tx_state.tx.is_cloned():
+                    continue
+
+                tx = tx_state.tx
+                if tx_state.status == status.BlockedAccountError:
+                    tx = tx.clone()
+                self._tx_list.append(tx)
 
         for tx_status in remove_tx_status_set:
             self._tx_state_list_dict.pop(tx_status)
@@ -301,7 +321,7 @@ class SolTxListSender:
             return False
 
         tx_state_list = self._tx_state_list_dict.get(tx_status, None)
-        if (tx_state_list is None) or (len(tx_state_list) == 0):
+        if tx_state_list is None:
             return False
 
         if tx_status == status.AltInvalidIndexError:
@@ -311,6 +331,7 @@ class SolTxListSender:
             status.NoReceiptError,
             status.BlockHashNotFoundError,
             status.AltInvalidIndexError,
+            status.BlockedAccountPrepError
         }
         if tx_status in resubmitted_tx_status_set:
             return True
@@ -339,7 +360,7 @@ class SolTxListSender:
             tx_list.append(tx_state.tx)
             valid_block_height = min(valid_block_height, tx_state.valid_block_height)
 
-        self._wait_for_confirmation_of_tx_list(tx_sig_list, valid_block_height)
+        self._wait_for_confirm_of_tx_list(tx_sig_list, valid_block_height)
         self._get_tx_receipt_list(tx_sig_list, tx_list)
 
     def _get_tx_receipt_list(self, tx_sig_list: Optional[List[str]], tx_list: List[SolTx]) -> None:
@@ -347,7 +368,7 @@ class SolTxListSender:
         for tx, tx_receipt in zip(tx_list, tx_receipt_list):
             self._add_tx_state(tx, tx_receipt, SolTxSendState.Status.NoReceiptError)
 
-    def _wait_for_confirmation_of_tx_list(self, tx_sig_list: List[str], valid_block_height: int) -> None:
+    def _wait_for_confirm_of_tx_list(self, tx_sig_list: List[str], valid_block_height: int) -> None:
         confirm_timeout = self._config.confirm_timeout_sec
         confirm_check_delay = float(self._config.confirm_check_msec) / 1000
         elapsed_time = 0.0
@@ -386,6 +407,8 @@ class SolTxListSender:
             # no exception: receipt exists - the goal is reached
             return self._DecodeResult(status.AlreadyFinalizedError, None)
         elif tx_error_parser.check_if_accounts_blocked():
+            if tx_error_parser.check_if_preprocessed_error():
+                return self._DecodeResult(status.BlockedAccountPrepError, None)
             return self._DecodeResult(status.BlockedAccountError, BlockedAccountsError())
         elif tx_error_parser.check_if_account_already_exists():
             # no exception: account exists - the goal is reached
@@ -397,7 +420,7 @@ class SolTxListSender:
         elif tx_error_parser.check_if_require_resize_iter():
             return self._DecodeResult(status.RequireResizeIterError, RequireResizeIterError())
         elif tx_error_parser.check_if_error():
-            LOG.debug(f'unknown error receipt {str(tx.signature)}: {tx_receipt}')
+            LOG.debug(f'unknown error receipt {str(tx.sig)}: {tx_receipt}')
             # no exception: will be converted to DEFAULT EXCEPTION
             return self._DecodeResult(status.UnknownError, None)
 

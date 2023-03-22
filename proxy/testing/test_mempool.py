@@ -126,6 +126,10 @@ class MockResourceManager(OpResMng):
 
 class FakeConfig(Config):
     @property
+    def fuzz_fail_pct(self) -> int:
+        return 0
+
+    @property
     def evm_loader_id(self) -> SolPubKey:
         return SolPubKey.from_string('CmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2')
 

@@ -149,7 +149,7 @@ class BaseNeonTxStrategy(abc.ABC):
 
         return SolLegacyTx(
             name=name,
-            instructions=[
+            ix_list=[
                 self._ctx.ix_builder.make_compute_budget_heap_ix(),
                 self._ctx.ix_builder.make_compute_budget_cu_ix(),
                 ix

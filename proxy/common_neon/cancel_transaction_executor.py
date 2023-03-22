@@ -48,7 +48,7 @@ class CancelTxExecutor:
 
         return SolLegacyTx(
             name='CancelWithHash',
-            instructions=[
+            ix_list=[
                 self._ix_builder.make_cancel_ix(
                     holder_account=holder_info.holder_account,
                     neon_tx_sig=bytes.fromhex(holder_info.neon_tx_sig[2:]),
@@ -65,7 +65,7 @@ class CancelTxExecutor:
         self._alt_info_list.append(alt_info)
         self._alt_tx_set.extend(alt_tx_set)
 
-        return SolV0Tx(name='CancelWithHash', address_table_lookups=[alt_info]).add(legacy_tx)
+        return SolV0Tx(name='CancelWithHash', ix_list=None, alt_info_list=[alt_info]).add(legacy_tx)
 
     def execute_tx_list(self) -> None:
         if not len(self._cancel_tx_list):

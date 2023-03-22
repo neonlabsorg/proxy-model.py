@@ -9,6 +9,7 @@ from ..common_neon.config import Config
 from ..common_neon.elf_params import ElfParams
 from ..common_neon.operator_secret_mng import OpSecretMng
 from ..common_neon.solana_interactor import SolInteractor
+from ..common_neon.errors import RescheduleError
 
 from ..statistic.data import NeonOpResListData
 from ..statistic.proxy_client import ProxyStatClient
@@ -52,6 +53,9 @@ class MPExecutorOpResTask(MPExecutorBaseTask):
         try:
             OpResInit(self._config, self._solana).init_resource(resource)
             return MPOpResInitResult(code=MPOpResInitResultCode.Success)
+        except RescheduleError as exc:
+            LOG.debug(f'Failed to init operator resource {resource}, got reschedule error: {str(exc)}')
+            return MPOpResInitResult(code=MPOpResInitResultCode.Reschedule)
         except BaseException as exc:
-            LOG.error(f'Failed to init operator resource tx {resource}.', exc_info=exc)
+            LOG.error(f'Failed to init operator resource tx {resource}', exc_info=exc)
             return MPOpResInitResult(code=MPOpResInitResultCode.Failed)

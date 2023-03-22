@@ -39,7 +39,7 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
             (holder_msg_part, holder_msg) = (holder_msg[:holder_msg_size], holder_msg[holder_msg_size:])
             tx = SolLegacyTx(
                 name='WriteHolderAccount',
-                instructions=[builder.make_write_ix(neon_tx_sig, holder_msg_offset, holder_msg_part)]
+                ix_list=[builder.make_write_ix(neon_tx_sig, holder_msg_offset, holder_msg_part)]
             )
             tx_list.append(tx)
             holder_msg_offset += holder_msg_size
@@ -100,7 +100,7 @@ class ALTNeonTxPrepStage(BaseNeonTxPrepStage):
         self._actual_alt_info = None
 
     def build_tx(self, legacy_tx: SolLegacyTx) -> SolV0Tx:
-        return SolV0Tx(name=legacy_tx.name, address_table_lookups=self._alt_info_list).add(legacy_tx)
+        return SolV0Tx(name=legacy_tx.name, ix_list=None, alt_info_list=self._alt_info_list).add(legacy_tx)
 
 
 def alt_strategy(cls):

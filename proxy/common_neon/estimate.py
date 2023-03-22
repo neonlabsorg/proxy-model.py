@@ -43,11 +43,14 @@ class _GasTxBuilder:
         self._neon_ix_builder.init_neon_tx(tx)
         self._neon_ix_builder.init_neon_account_list(account_list)
 
-        tx = SolLegacyTx(instructions=[
-            self._neon_ix_builder.make_compute_budget_heap_ix(),
-            self._neon_ix_builder.make_compute_budget_cu_ix(),
-            self._neon_ix_builder.make_tx_step_from_data_ix(ElfParams().neon_evm_steps, 1)
-        ])
+        tx = SolLegacyTx(
+            name='Estimate',
+            ix_list=[
+                self._neon_ix_builder.make_compute_budget_heap_ix(),
+                self._neon_ix_builder.make_compute_budget_cu_ix(),
+                self._neon_ix_builder.make_tx_step_from_data_ix(ElfParams().neon_evm_steps, 1)
+            ]
+        )
 
         tx.recent_block_hash = self._block_hash
         tx.sign(self._signer)

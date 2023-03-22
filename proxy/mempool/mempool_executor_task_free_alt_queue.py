@@ -127,7 +127,7 @@ class MPExecutorFreeALTQueueTask(MPExecutorBaseTask):
             alt_info.block_height = block_height
             tx = SolLegacyTx(
                 name=name,
-                instructions=[make_ix(ix_builder, SolPubKey.from_string(alt_info.table_account))]
+                ix_list=[make_ix(ix_builder, SolPubKey.from_string(alt_info.table_account))]
             )
             tx_list.append(tx)
 

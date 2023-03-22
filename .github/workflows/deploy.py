@@ -365,7 +365,7 @@ def cleanup_docker():
     click.echo(f"Cleanup docker-compose done.")
 
     click.echo(f"Cleanup old docker containers...")
-    command = "sudo docker ps -a | awk '/Created|Exited/{s=\"sudo docker rm \" $(NF); system(s)}'"
+    command = "sudo docker ps -a | awk '/Created|Exited/{s=\"sudo docker rm \" $(NF); print(s); system(s)}'"
     subprocess.run(command, shell=True)
     click.echo(f"Cleanup old docker containers done.")
 
