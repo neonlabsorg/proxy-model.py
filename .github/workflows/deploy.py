@@ -62,6 +62,10 @@ def docker_compose(args: str):
     command = f'docker-compose {args}'
     click.echo(f"run command: {command}")
     out = subprocess.run(command, shell=True)
+    click.echo("return code: " + str(out.returncode))
+    if out.returncode != 0:
+        raise RuntimeError(f"Command {command} failed. Err: {out.stderr}")
+
     return out
 
 
