@@ -219,8 +219,8 @@ def openzeppelin_test(run_number):
     fts_threshold = 2370
     os.environ["FTS_CONTAINER_NAME"] = container_name
     os.environ["FTS_IMAGE"] = NEON_TESTS_IMAGE
-    os.environ["FTS_USERS_NUMBER"] = '15'
-    os.environ["FTS_JOBS_NUMBER"] = '8'
+    os.environ["FTS_USERS_NUMBER"] = '10'
+    os.environ["FTS_JOBS_NUMBER"] = '4'
     os.environ["NETWORK_NAME"] = f'full-test-suite-{run_number}'
     os.environ["NETWORK_ID"] = '111'
     os.environ["REQUEST_AMOUNT"] = '20000'
