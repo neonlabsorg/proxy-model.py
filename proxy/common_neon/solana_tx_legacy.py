@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import List
+
 import solders.transaction
 import solders.message
 
@@ -7,7 +9,6 @@ from .solana_tx import SolTx, SolAccount, SolSig
 
 
 SolLegacyMsg = solders.message.Message
-SolLegacyLowLevelTx = solders.transaction.Transaction
 
 _SolTxError = solders.transaction.TransactionError
 
@@ -16,25 +17,14 @@ class SolLegacyTx(SolTx):
     """Legacy transaction class to represent an atomic versioned transaction."""
 
     @property
-    def low_level_tx(self) -> SolLegacyLowLevelTx:
-        return self._solders_legacy_tx
-
-    @property
     def message(self) -> SolLegacyMsg:
         return self._solders_legacy_tx.message
 
+    def _sig_result_list(self) -> List[bool]:
+        return self._solders_legacy_tx.verify_with_results()
+
     def _serialize(self) -> bytes:
-        if not self._verify_sign_list():
-            raise AttributeError('Transaction has not been signed correctly')
-
         return bytes(self._solders_legacy_tx)
-
-    def _verify_sign_list(self) -> bool:
-        try:
-            self._solders_legacy_tx.verify()
-        except _SolTxError:
-            return False
-        return True
 
     def _sig(self) -> SolSig:
         return self._solders_legacy_tx.signatures[0]

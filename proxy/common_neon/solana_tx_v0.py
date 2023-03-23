@@ -34,6 +34,9 @@ class SolV0Tx(SolTx):
     def _sig(self) -> SolSig:
         return self._solders_v0_tx.signatures[0]
 
+    def _sig_result_list(self) -> List[bool]:
+        return self._solders_v0_tx.verify_with_results()
+
     def _serialize(self) -> bytes:
         return bytes(self._solders_v0_tx)
 
