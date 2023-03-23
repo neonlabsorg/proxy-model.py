@@ -161,13 +161,6 @@ jobs:
       - uses: actions/checkout@v3
       - name: Pull docker image
         run: docker pull ${{ env.NEON_TEST_IMAGE }}
-      - name: Wait until proxy is ready
-        timeout-minutes: 5
-        run: |
-          while [[ "$(curl -s -X POST -o /dev/null -w ''%{http_code}'' http://${{ env.PROXY_IP }}:9090/solana)" != "200" ]];
-            do echo  "Proxy is not ready yet. Waiting 5 seconds...";
-            sleep 5;
-          done
       - name: Run docker container
         run: |
           docker run -i -e PROXY_IP=${{env.PROXY_IP}} \
@@ -179,6 +172,13 @@ jobs:
           -e PROXY_URL="http://${{env.PROXY_IP}}:9090/solana" \
           -e NETWORK_NAME=${{env.NETWORK_NAME}} \
           -d --name=${{ env.CONTAINER }} ${{ env.NEON_TEST_IMAGE }} /bin/bash
+      - name: Wait until proxy is ready
+        timeout-minutes: 5
+        run: |
+          while [[ "$(curl -s -X POST -o /dev/null -w ''%{http_code}'' http://${{ env.PROXY_IP }}:9090/solana)" != "200" ]];
+            do echo  "Proxy is not ready yet. Waiting 5 seconds...";
+            sleep 5;
+          done
       - name: Run OpenZeppelin tests
         run: |
           docker exec -i ${{ env.CONTAINER }} ./clickfile.py run oz \
