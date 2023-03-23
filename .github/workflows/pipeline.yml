@@ -224,6 +224,13 @@ jobs:
       PROXY_IP: ${{ needs.prepare-infrastructure.outputs.proxy_ip }}
     steps:
       - uses: actions/checkout@v3
+      - name: Wait until proxy is ready
+        timeout-minutes: 5
+        run: |
+          while [[ "$(curl -s -X POST -o /dev/null -w ''%{http_code}'' http://${{ env.PROXY_IP }}:9090/solana)" != "200" ]];
+            do echo  "Proxy is not ready yet. Waiting 5 seconds...";
+            sleep 5;
+          done
       - name: Run basic tests
         run: python3 ./.github/workflows/deploy.py basic_tests --run_number=${GITHUB_RUN_NUMBER}
       - name: remove container
