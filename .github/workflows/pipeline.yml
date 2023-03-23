@@ -156,6 +156,7 @@ jobs:
       SOLANA_IP: ${{ needs.prepare-infrastructure.outputs.solana_ip }}
       PROXY_IP: ${{ needs.prepare-infrastructure.outputs.proxy_ip }}
       CONTAINER: oz-${{ github.run_id }}
+      NETWORK_NAME: aws_custom
     steps:
       - uses: actions/checkout@v3
       - name: Pull docker image
@@ -176,15 +177,14 @@ jobs:
           -e FAUCET_URL="http://${{env.PROXY_IP}}:3333/request_neon" \
           -e SOLANA_URL="http://${{env.SOLANA_IP}}:8899" \
           -e PROXY_URL="http://${{env.PROXY_IP}}:9090/solana" \
-          -e NETWORK_NAME="aws_custom" \
+          -e NETWORK_NAME=${{env.NETWORK_NAME}} \
           -d --name=${{ env.CONTAINER }} ${{ env.NEON_TEST_IMAGE }} /bin/bash
       - name: Run OpenZeppelin tests
         run: |
           docker exec -i ${{ env.CONTAINER }} ./clickfile.py run oz \
             --network ${{ env.NETWORK_NAME }} \
             --jobs 8 \
-            --users 10 \
-            --amount 20000
+            --users 10
       - name: Print OpenZeppelin report
         run: |
           docker exec -i ${{ env.CONTAINER }} ./clickfile.py ozreport
