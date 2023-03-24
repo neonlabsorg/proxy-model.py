@@ -15,7 +15,7 @@ from typing import Type, Dict, Union, Optional
 from proxy.common_neon.web3 import NeonWeb3
 from proxy.common_neon.config import Config
 from proxy.common_neon.solana_interactor import SolInteractor
-from proxy.common_neon.solana_tx import SolTx, SolAccount, SolSig, SolPubKey, Commitment
+from proxy.common_neon.solana_tx import SolTx, SolAccount, SolSig, SolPubKey, SolCommit
 
 
 @dataclass(frozen=True)
@@ -165,7 +165,7 @@ class SolClient(SolInteractor):
         super().__init__(config, config.solana_url)
 
     def send_tx(self, tx: SolTx, signer: SolAccount) -> Optional[SolSig]:
-        recent_resp = self.get_recent_block_hash(Commitment.Finalized)
+        recent_resp = self.get_recent_block_hash(SolCommit.Finalized)
 
         tx.recent_block_hash = recent_resp.block_hash
         tx.sign(signer)
@@ -179,7 +179,7 @@ class SolClient(SolInteractor):
         print(f'-> solana tx sig: {tx_sig}')
 
         valid_block_height = recent_resp.last_valid_block_height
-        confirm_set = Commitment.upper_set(Commitment.Confirmed)
+        confirm_set = SolCommit.upper_set(SolCommit.Confirmed)
 
         elapsed_time = 0.0
         confirm_timeout = 32 * 0.4
@@ -193,7 +193,7 @@ class SolClient(SolInteractor):
             time.sleep(confirm_check_delay)
             elapsed_time += confirm_check_delay
 
-        tx_receipt = self.get_tx_receipt_list([tx_sig], Commitment.Confirmed)
+        tx_receipt = self.get_tx_receipt_list([tx_sig], SolCommit.Confirmed)
         print(f'-> solana receipt: {tx_receipt}')
 
         return SolSig.from_string(tx_sig)

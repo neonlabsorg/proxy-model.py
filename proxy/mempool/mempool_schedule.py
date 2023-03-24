@@ -395,11 +395,12 @@ class MPTxSchedule:
 
         sender_pool.cancel_process_tx(tx, tx.neon_tx_exec_cfg)
         self._tx_dict.cancel_process_tx(tx)
-        self._set_sender_tx_cnt(sender_pool, tx.neon_tx_exec_cfg.state_tx_cnt)
 
         # the sender pool was removed from the execution queue and from the paused set
         #   and now should be included into the execution queue
         self._schedule_sender_pool(sender_pool)
+
+        self._set_sender_tx_cnt(sender_pool, tx.neon_tx_exec_cfg.state_tx_cnt)
         return True
 
     def get_paused_sender_list(self) -> List[str]:

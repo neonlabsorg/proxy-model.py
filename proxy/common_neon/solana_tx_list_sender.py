@@ -12,7 +12,7 @@ from ..common_neon.errors import CUBudgetExceededError, InvalidIxDataError, Requ
 from ..common_neon.errors import CommitLevelError, NodeBehindError, NoMoreRetriesError, BlockedAccountsError
 from ..common_neon.errors import RescheduleError, WrongStrategyError
 from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.solana_tx import SolTx, SolBlockHash, SolTxReceipt, SolAccount, Commitment
+from ..common_neon.solana_tx import SolTx, SolBlockHash, SolTxReceipt, SolAccount, SolCommit
 from ..common_neon.solana_tx_error_parser import SolTxErrorParser, SolTxError
 from ..common_neon.utils import str_enum
 
@@ -74,7 +74,7 @@ class SolTxSendState:
 
 class SolTxListSender:
     _one_block_time = 0.4
-    _commitment_set = Commitment.upper_set(Commitment.Confirmed)
+    _commitment_set = SolCommit.upper_set(SolCommit.Confirmed)
     _big_block_height = 2 ** 64 - 1
     _big_block_slot = 2 ** 64 - 1
 
@@ -169,7 +169,7 @@ class SolTxListSender:
 
     def _validate_commit_level(self) -> None:
         commit_level = self._config.commit_level
-        if commit_level == Commitment.Confirmed:
+        if commit_level == SolCommit.Confirmed:
             return
 
         # find minimal block slot
@@ -180,7 +180,7 @@ class SolTxListSender:
                 min_block_slot = min(min_block_slot, tx_block_slot)
 
         min_block_status = self._solana.get_block_status(min_block_slot)
-        if Commitment.level(min_block_status.commitment) < Commitment.level(commit_level):
+        if SolCommit.level(min_block_status.commitment) < SolCommit.level(commit_level):
             raise CommitLevelError(commit_level, min_block_status.commitment)
 
     def _fmt_stat(self) -> str:
@@ -364,7 +364,7 @@ class SolTxListSender:
         self._get_tx_receipt_list(tx_sig_list, tx_list)
 
     def _get_tx_receipt_list(self, tx_sig_list: Optional[List[str]], tx_list: List[SolTx]) -> None:
-        tx_receipt_list = self._solana.get_tx_receipt_list(tx_sig_list, Commitment.Confirmed)
+        tx_receipt_list = self._solana.get_tx_receipt_list(tx_sig_list, SolCommit.Confirmed)
         for tx, tx_receipt in zip(tx_list, tx_receipt_list):
             self._add_tx_state(tx, tx_receipt, SolTxSendState.Status.NoReceiptError)
 

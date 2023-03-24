@@ -21,7 +21,7 @@ class SimpleNeonTxStrategy(BaseNeonTxStrategy):
     def __init__(self, ctx: NeonTxSendCtx):
         super().__init__(ctx)
 
-    def execute(self) -> NeonTxResultInfo:
+    def _execute(self) -> NeonTxResultInfo:
         assert self.is_valid()
 
         self._send_tx_list([self.name], self._build_tx_list())

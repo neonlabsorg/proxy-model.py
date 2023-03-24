@@ -1,70 +1,85 @@
 from __future__ import annotations
 
+from typing import Dict, Any
 
-class EthereumError(Exception):
+
+class EthereumError(BaseException):
     def __init__(self, message: str, code=-32000, data=None):
-        self.code = code
-        self.message = message
-        self.data = data
+        super().__init__(message, code, data)
+        self._code = code
+        self._msg = message
+        self._data = data
 
-    def get_error(self):
-        error = {'code': self.code, 'message': self.message}
-        if self.data:
-            error['data'] = self.data
+    def get_error(self) -> Dict[str, Any]:
+        error = {'code': self._code, 'message': self._msg}
+        if self._data:
+            error['data'] = self._data
         return error
+
+    def __str__(self) -> str:
+        return self._msg
 
 
 class InvalidParamError(EthereumError):
-    def __init__(self, message, data=None):
-        EthereumError.__init__(self, message=message, code=-32602, data=data)
+    def __init__(self, message: str, code=-32602, data=None):
+        EthereumError.__init__(self, message=message, code=code, data=data)
 
 
-class ALTError(RuntimeError):
+class ALTError(BaseException):
     pass
 
 
-class RescheduleError(RuntimeError):
+class RescheduleError(BaseException):
     pass
 
 
 class BadResourceError(RescheduleError):
-    def __init__(self, msg: str):
-        super().__init__(msg)
+    pass
 
 
 class BlockedAccountsError(RescheduleError):
-    def __init__(self):
-        super().__init__('Blocked accounts error')
+    pass
+
+    def __str__(self) -> str:
+        return 'Blocked accounts error'
 
 
 class NodeBehindError(RescheduleError):
     def __init__(self, slots_behind: int):
-        super().__init__(f'The Solana node is behind by {slots_behind} from the Solana cluster')
+        super().__init__(slots_behind)
+        self._slots_behind = slots_behind
+
+    def __str__(self) -> str:
+        return f'The Solana node is behind by {self._slots_behind} from the Solana cluster'
 
 
 class SolanaUnavailableError(RescheduleError):
-    def __init__(self, msg: str):
-        super().__init__(msg)
+    pass
 
 
 class NoMoreRetriesError(RescheduleError):
-    def __init__(self):
-        super().__init__('The Neon transaction is too complicated. No more retries to complete the Neon transaction')
+    def __str__(self) -> str:
+        return 'The Neon transaction is too complicated. No more retries to complete the Neon transaction'
 
 
 class BlockHashNotFound(RescheduleError):
-    def __init__(self):
-        super().__init__('Blockhash not found')
+    def __str__(self) -> str:
+        return 'Blockhash not found'
 
 
 class CommitLevelError(RescheduleError):
     def __init__(self, base_level: str, level: str):
-        super().__init__(f'Current level {level} is less than {base_level}')
+        super().__init__(base_level, level)
+        self._base_level = base_level
+        self._level = level
+
+    def __str__(self) -> str:
+        return f"Current level '{self._level}' is less than '{self._base_level}'"
 
 
-class NonceTooLowError(RuntimeError):
+class NonceTooLowError(BaseException):
     def __init__(self, sender_address: str, tx_nonce: int, state_tx_cnt: int):
-        super().__init__(f'nonce too low: address {sender_address}, tx: {tx_nonce} state: {state_tx_cnt}')
+        super().__init__(sender_address, tx_nonce, state_tx_cnt)
         self._sender_address = sender_address
         self._tx_nonce = tx_nonce
         self._state_tx_cnt = state_tx_cnt
@@ -72,22 +87,24 @@ class NonceTooLowError(RuntimeError):
     def clone(self, sender_address) -> NonceTooLowError:
         return NonceTooLowError(sender_address, self._tx_nonce, self._state_tx_cnt)
 
+    def __str__(self) -> str:
+        return f'nonce too low: address {self._sender_address}, tx: {self._tx_nonce} state: {self._state_tx_cnt}'
 
-class WrongStrategyError(RuntimeError):
+
+class WrongStrategyError(BaseException):
     pass
 
 
 class CUBudgetExceededError(WrongStrategyError):
-    def __init__(self):
-        super().__init__('The Neon transaction is too complicated. Solana`s computing budget is exceeded')
+    def __str__(self) -> str:
+        return 'The Neon transaction is too complicated. Solana`s computing budget is exceeded'
 
 
 class InvalidIxDataError(WrongStrategyError):
-    def __init__(self):
-        super().__init__('Wrong instruction data')
+    def __str__(self) -> str:
+        return 'Wrong instruction data'
 
 
 class RequireResizeIterError(WrongStrategyError):
-    def __init__(self):
-        super().__init__('Transaction requires resize iterations')
-
+    def __str__(self) -> str:
+        return 'Transaction requires resize iterations'

@@ -28,7 +28,7 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
         super().complete_init()
         self._ctx.set_holder_usage(True)
 
-    def execute(self) -> NeonTxResultInfo:
+    def _execute(self) -> NeonTxResultInfo:
         assert self.is_valid()
 
         try:

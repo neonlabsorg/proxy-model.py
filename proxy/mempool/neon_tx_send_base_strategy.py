@@ -94,9 +94,11 @@ class BaseNeonTxStrategy(abc.ABC):
         for stage in self._prep_stage_list:
             stage.update_after_emulate()
 
-    @abc.abstractmethod
     def execute(self) -> NeonTxResultInfo:
-        pass
+        try:
+            return self._execute()
+        finally:
+            pass
 
     def _build_prep_tx_list(self) -> Generator[List[SolTx], None, None]:
         tx_list_list: List[List[SolTx]] = list()
@@ -167,6 +169,10 @@ class BaseNeonTxStrategy(abc.ABC):
         for sol_neon_ix in tx_receipt_info.iter_sol_neon_ix():
             return sol_neon_ix
         return None
+
+    @abc.abstractmethod
+    def _execute(self) -> NeonTxResultInfo:
+        pass
 
     @abc.abstractmethod
     def _build_tx(self) -> SolLegacyTx:

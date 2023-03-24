@@ -54,7 +54,7 @@ class MPExecutorOpResTask(MPExecutorBaseTask):
             OpResInit(self._config, self._solana).init_resource(resource)
             return MPOpResInitResult(code=MPOpResInitResultCode.Success)
         except RescheduleError as exc:
-            LOG.debug(f'Failed to init operator resource {resource}, got reschedule error: {str(exc)}')
+            LOG.debug(f'Rescheduling init of operator resource {resource}: {str(exc)}')
             return MPOpResInitResult(code=MPOpResInitResultCode.Reschedule)
         except BaseException as exc:
             LOG.error(f'Failed to init operator resource tx {resource}', exc_info=exc)

@@ -295,8 +295,10 @@ class MemPool:
     async def _reschedule_tx(self, tx: MPTxRequest):
         with logging_context(req_id=tx.req_id):
             LOG.debug(f'Tx {tx.sig} will be rescheduled in {self.reschedule_timeout_sec} sec')
-            await asyncio.sleep(self.reschedule_timeout_sec)
 
+        await asyncio.sleep(self.reschedule_timeout_sec)
+
+        with logging_context(req_id=tx.req_id):
             try:
                 if tx.neon_tx_exec_cfg.is_holder_used():
                     self._op_res_mng.update_resource(tx.sig)

@@ -25,8 +25,8 @@ _SoldersLegacyMsg = solders.message.Message
 _SolPktDataSize = 1280 - 40 - 8
 
 
-class Commitment:
-    Type = NewType("Commitment", str)
+class SolCommit:
+    Type = NewType('SolCommit', str)
 
     NotProcessed = Type('not-processed')
     Processed = Type('processed')
@@ -38,7 +38,7 @@ class Commitment:
 
     @staticmethod
     def level(commitment: Type) -> int:
-        for index, value in enumerate(Commitment.Order):
+        for index, value in enumerate(SolCommit.Order):
             if value == commitment:
                 return index
 
@@ -46,21 +46,21 @@ class Commitment:
 
     @staticmethod
     def upper_set(commitment: Type) -> Set[Type]:
-        level = Commitment.level(commitment)
-        return set(Commitment.Order[level:])
+        level = SolCommit.level(commitment)
+        return set(SolCommit.Order[level:])
 
     @staticmethod
     def lower_set(commitment: Type) -> Set[Type]:
-        level = Commitment.level(commitment)
-        return set(Commitment.Order[:level])
+        level = SolCommit.level(commitment)
+        return set(SolCommit.Order[:level])
 
     @staticmethod
     def to_solana(commitment: Type) -> Type:
-        if commitment == Commitment.NotProcessed:
-            return Commitment.Processed
-        elif commitment == Commitment.Safe:
-            return Commitment.Confirmed
-        elif commitment in {Commitment.Processed, Commitment.Confirmed, Commitment.Finalized}:
+        if commitment == SolCommit.NotProcessed:
+            return SolCommit.Processed
+        elif commitment == SolCommit.Safe:
+            return SolCommit.Confirmed
+        elif commitment in {SolCommit.Processed, SolCommit.Confirmed, SolCommit.Finalized}:
             return commitment
 
         assert False, 'Wrong commitment'
@@ -122,12 +122,7 @@ class SolTx(abc.ABC):
         return self
 
     def serialize(self) -> bytes:
-        assert self._is_signed, 'Transaction has not been signed'
-
-        result_list = self._sig_result_list()
-        for result in result_list:
-            assert result, 'Transaction has not been signed'
-
+        assert self._is_signed, 'transaction has not been signed'
         result = self._serialize()
         if len(result) > _SolPktDataSize:
             raise SolTxSizeError()
@@ -141,15 +136,6 @@ class SolTx(abc.ABC):
         tx = self._clone()
         self._is_cloned = True
         return tx
-
-    @property
-    def is_signed(self) -> bool:
-        return self._is_signed
-
-    @property
-    def sig(self) -> SolSig:
-        assert self._is_signed, 'Transaction has not been signed'
-        return self._sig()
 
     def _build_legacy_tx(self, recent_block_hash: Optional[SolBlockHash] = None,
                          ix_list: Optional[Sequence[SolTxIx]] = None) -> _SoldersLegacyTx:
@@ -184,16 +170,21 @@ class SolTx(abc.ABC):
             ix_list.append(SolTxIx(program_id, compiled_ix.data, acct_meta_list))
         return ix_list
 
+    @property
+    def is_signed(self) -> bool:
+        return self._is_signed
+
+    @property
+    def sig(self) -> SolSig:
+        assert self._is_signed, 'Transaction has not been signed'
+        return self._sig()
+
     @abc.abstractmethod
     def _serialize(self) -> bytes:
         pass
 
     @abc.abstractmethod
     def _sign(self, signer: SolAccount) -> None:
-        pass
-
-    @abc.abstractmethod
-    def _sig_result_list(self) -> List[bool]:
         pass
 
     @abc.abstractmethod

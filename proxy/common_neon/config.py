@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Optional
 
 from ..common_neon.environment_data import EVM_LOADER_ID
-from ..common_neon.solana_tx import SolPubKey, Commitment
+from ..common_neon.solana_tx import SolPubKey, SolCommit
 
 
 class Config:
@@ -58,7 +58,7 @@ class Config:
         self._hvac_mount = os.environ.get('HVAC_MOUNT', None)
         self._hvac_path = os.environ.get('HVAC_PATH', '')
         self._genesis_timestamp = self._env_int('GENESIS_BLOCK_TIMESTAMP', 0, 0)
-        self._commit_level = os.environ.get('COMMIT_LEVEL', Commitment.Confirmed)
+        self._commit_level = os.environ.get('COMMIT_LEVEL', SolCommit.Confirmed)
 
         pyth_mapping_account = os.environ.get('PYTH_MAPPING_ACCOUNT', None)
         if pyth_mapping_account is not None:
@@ -70,8 +70,8 @@ class Config:
         self._validate()
 
     def _validate(self) -> None:
-        self._commit_level = Commitment.Type(self._commit_level.lower())
-        assert Commitment.level(self._commit_level) >= Commitment.level(Commitment.Confirmed)
+        self._commit_level = SolCommit.Type(self._commit_level.lower())
+        assert SolCommit.level(self._commit_level) >= SolCommit.level(SolCommit.Confirmed)
 
         assert (self._operator_fee > 0) and (self._operator_fee < 1)
         assert (self._gas_price_suggested_pct >= 0) and (self._gas_price_suggested_pct < 1)
@@ -291,7 +291,7 @@ class Config:
         return self._genesis_timestamp
 
     @property
-    def commit_level(self) -> Commitment.Type:
+    def commit_level(self) -> SolCommit.Type:
         return self._commit_level
 
     def as_dict(self) -> dict:

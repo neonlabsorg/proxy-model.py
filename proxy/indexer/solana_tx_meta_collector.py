@@ -7,7 +7,7 @@ from typing import Optional, Dict, Iterator, List, Any
 
 from .solana_signatures_db import SolSigsDB
 from ..common_neon.config import Config
-from ..common_neon.solana_tx import Commitment
+from ..common_neon.solana_tx import SolCommit
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_neon_tx_receipt import SolTxMetaInfo, SolTxSigSlotInfo
 
@@ -119,7 +119,7 @@ class SolTxMetaCollector(ABC):
 
 class FinalizedSolTxMetaCollector(SolTxMetaCollector):
     def __init__(self, config: Config, solana: SolInteractor, tx_meta_dict: SolTxMetaDict, stop_slot: int):
-        super().__init__(config, solana, tx_meta_dict, commitment=Commitment.Finalized, is_finalized=True)
+        super().__init__(config, solana, tx_meta_dict, commitment=SolCommit.Finalized, is_finalized=True)
         LOG.debug(f'Finalized commitment: {self._commitment}')
         self._sigs_db = SolSigsDB()
         self._stop_slot = stop_slot
@@ -202,7 +202,7 @@ class FinalizedSolTxMetaCollector(SolTxMetaCollector):
 
 class ConfirmedSolTxMetaCollector(SolTxMetaCollector):
     def __init__(self, config: Config, solana: SolInteractor, tx_meta_dict: SolTxMetaDict):
-        super().__init__(config, solana, tx_meta_dict, commitment=Commitment.Confirmed, is_finalized=False)
+        super().__init__(config, solana, tx_meta_dict, commitment=SolCommit.Confirmed, is_finalized=False)
         LOG.debug(f'Confirmed commitment: {self._commitment}')
 
     def iter_tx_meta(self, start_slot: int, stop_slot: int) -> Iterator[SolTxMetaInfo]:

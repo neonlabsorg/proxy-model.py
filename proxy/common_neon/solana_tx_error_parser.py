@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Union, Optional, Any, Tuple
+from typing import Union, Optional, Any, Tuple, cast
 
 from ..common_neon.environment_data import EVM_LOADER_ID
 from ..common_neon.solana_tx import SolTxReceipt
@@ -13,16 +13,16 @@ from ..common_neon.utils import get_from_dict
 LOG = logging.getLogger(__name__)
 
 
-class SolTxError(RuntimeError):
+class SolTxError(BaseException):
     def __init__(self, receipt: SolTxReceipt):
-        self.result = receipt
+        super().__init__(receipt)
+
+        self._receipt = receipt
 
         log_list = SolTxErrorParser(receipt).get_log_list()
-        self.error = '. '.join([log for log in log_list if self._is_program_log(log)])
-        if not len(self.error):
-            self.error = json.dumps(receipt)
-
-        super().__init__(self.error)
+        self._error = '. '.join([log for log in log_list if self._is_program_log(log)])
+        if not len(self._error):
+            self._error = json.dumps(receipt)
 
     @staticmethod
     def _is_program_log(log: str) -> bool:
@@ -37,6 +37,17 @@ class SolTxError(RuntimeError):
             if log.startswith(prefix):
                 return True
         return False
+
+    @property
+    def receipt(self) -> SolTxReceipt:
+        return self._receipt
+
+    @property
+    def error_msg(self) -> str:
+        return self._error
+
+    def __str__(self) -> str:
+        return self._error
 
 
 class SolTxErrorParser:
@@ -73,7 +84,7 @@ class SolTxErrorParser:
         assert isinstance(receipt, dict) or isinstance(receipt, BaseException) or isinstance(receipt, str)
 
         if isinstance(receipt, SolTxError):
-            self._receipt = receipt.result
+            self._receipt = cast(SolTxError, receipt).receipt
         else:
             self._receipt = receipt
         self._log_list = []

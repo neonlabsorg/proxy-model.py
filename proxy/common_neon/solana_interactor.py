@@ -15,7 +15,7 @@ from ..common_neon.config import Config
 from ..common_neon.constants import NEON_ACCOUNT_TAG
 from ..common_neon.errors import SolanaUnavailableError
 from ..common_neon.layouts import ACCOUNT_INFO_LAYOUT
-from ..common_neon.solana_tx import SolTx, SolBlockHash, SolPubKey, Commitment
+from ..common_neon.solana_tx import SolTx, SolBlockHash, SolPubKey, SolCommit
 from ..common_neon.solana_tx_error_parser import SolTxErrorParser
 from ..common_neon.utils import SolBlockInfo
 from ..common_neon.layouts import HolderAccountInfo, AccountInfo, NeonAccountInfo, ALTAccountInfo
@@ -41,21 +41,21 @@ class SolSendResult:
 class SolSigStatus:
     sol_sig: str
     block_slot: Optional[int]
-    commitment: Commitment.Type
+    commitment: SolCommit.Type
 
     @staticmethod
     def init_empty(sol_sig: str) -> SolSigStatus:
-        return SolSigStatus(sol_sig=sol_sig, block_slot=None, commitment=Commitment.NotProcessed)
+        return SolSigStatus(sol_sig=sol_sig, block_slot=None, commitment=SolCommit.NotProcessed)
 
 
 @dataclass(frozen=True)
 class SolBlockStatus:
     block_slot: int
-    commitment: Commitment.Type
+    commitment: SolCommit.Type
 
     @staticmethod
     def init_empty(block_slot: int) -> SolBlockStatus:
-        return SolBlockStatus(block_slot=block_slot, commitment=Commitment.NotProcessed)
+        return SolBlockStatus(block_slot=block_slot, commitment=SolCommit.NotProcessed)
 
 
 class SolInteractor:
@@ -171,10 +171,10 @@ class SolInteractor:
         return status == 'ok'
 
     def get_sig_list_for_address(self, address: SolPubKey, before: Optional[str], limit: int,
-                                 commitment=Commitment.Confirmed) -> List[Dict[str, Any]]:
+                                 commitment=SolCommit.Confirmed) -> List[Dict[str, Any]]:
         opts = {
             'limit': limit,
-            'commitment': Commitment.to_solana(commitment)
+            'commitment': SolCommit.to_solana(commitment)
         }
 
         if before:
@@ -188,9 +188,9 @@ class SolInteractor:
 
         return response.get('result', list())
 
-    def get_block_slot(self, commitment=Commitment.Confirmed) -> int:
+    def get_block_slot(self, commitment=SolCommit.Confirmed) -> int:
         opts = {
-            'commitment': Commitment.to_solana(commitment)
+            'commitment': SolCommit.to_solana(commitment)
         }
         return self._send_rpc_request('getSlot', opts).get('result', 0)
 
@@ -203,10 +203,10 @@ class SolInteractor:
         return AccountInfo(address, account_tag, lamports, owner, data)
 
     def get_account_info(self, pubkey: SolPubKey, length: Optional[int] = None,
-                         commitment=Commitment.Confirmed) -> Optional[AccountInfo]:
+                         commitment=SolCommit.Confirmed) -> Optional[AccountInfo]:
         opts = {
             'encoding': 'base64',
-            'commitment': Commitment.to_solana(commitment),
+            'commitment': SolCommit.to_solana(commitment),
         }
 
         if length is not None:
@@ -229,10 +229,10 @@ class SolInteractor:
         return self._decode_account_info(pubkey, raw_account)
 
     def get_account_info_list(self, src_account_list: List[SolPubKey], length: Optional[int] = None,
-                              commitment=Commitment.Confirmed) -> List[Optional[AccountInfo]]:
+                              commitment=SolCommit.Confirmed) -> List[Optional[AccountInfo]]:
         opts = {
             'encoding': 'base64',
-            'commitment': Commitment.to_solana(commitment),
+            'commitment': SolCommit.to_solana(commitment),
         }
 
         if length is not None:
@@ -261,10 +261,10 @@ class SolInteractor:
 
     def get_program_account_info_list(self, program: SolPubKey, offset: int, length: int,
                                       data_offset: int, data: bytes,
-                                      commitment=Commitment.Confirmed) -> List[AccountInfo]:
+                                      commitment=SolCommit.Confirmed) -> List[AccountInfo]:
         opts = {
             'encoding': 'base64',
-            'commitment': Commitment.to_solana(commitment),
+            'commitment': SolCommit.to_solana(commitment),
             'dataSlice': {
                 'offset': offset,
                 'length': length
@@ -297,16 +297,16 @@ class SolInteractor:
             account_info_list.append(account_info)
         return account_info_list
 
-    def get_sol_balance(self, account: Union[str, SolPubKey], commitment=Commitment.Confirmed) -> int:
+    def get_sol_balance(self, account: Union[str, SolPubKey], commitment=SolCommit.Confirmed) -> int:
         opts = {
-            'commitment': Commitment.to_solana(commitment)
+            'commitment': SolCommit.to_solana(commitment)
         }
         return self._send_rpc_request('getBalance', str(account), opts).get('result', dict()).get('value', 0)
 
     def get_sol_balance_list(self, accounts_list: List[Union[str, SolPubKey]],
-                             commitment=Commitment.Confirmed) -> List[int]:
+                             commitment=SolCommit.Confirmed) -> List[int]:
         opts = {
-            'commitment': Commitment.to_solana(commitment)
+            'commitment': SolCommit.to_solana(commitment)
         }
         requests_list = list()
         for account in accounts_list:
@@ -321,7 +321,7 @@ class SolInteractor:
         return balances_list
 
     def get_neon_account_info(self, eth_account: Union[str, NeonAddress],
-                              commitment=Commitment.Confirmed) -> Optional[NeonAccountInfo]:
+                              commitment=SolCommit.Confirmed) -> Optional[NeonAccountInfo]:
         if isinstance(eth_account, str):
             eth_account = NeonAddress(eth_account)
         account_sol, nonce = neon_2program(eth_account)
@@ -331,7 +331,7 @@ class SolInteractor:
         return NeonAccountInfo.from_account_info(info)
 
     def get_neon_account_info_list(self, neon_account_list: List[Union[NeonAddress, str]],
-                                   commitment=Commitment.Confirmed) -> List[Optional[NeonAccountInfo]]:
+                                   commitment=SolCommit.Confirmed) -> List[Optional[NeonAccountInfo]]:
         requests_list = list()
         for neon_account in neon_account_list:
             account_sol, _nonce = neon_2program(neon_account)
@@ -358,9 +358,9 @@ class SolInteractor:
         return ALTAccountInfo.from_account_info(info)
 
     def get_multiple_rent_exempt_balances_for_size(self, size_list: List[int],
-                                                   commitment=Commitment.Confirmed) -> List[int]:
+                                                   commitment=SolCommit.Confirmed) -> List[int]:
         opts = {
-            'commitment': Commitment.to_solana(commitment)
+            'commitment': SolCommit.to_solana(commitment)
         }
         request_list = [[size, opts] for size in size_list]
         response_list = self._send_rpc_batch_request('getMinimumBalanceForRentExemption', request_list)
@@ -376,9 +376,9 @@ class SolInteractor:
             parent_block_slot=net_block.get('parentSlot', None)
         )
 
-    def get_block_info(self, block_slot: int, commitment=Commitment.Confirmed) -> SolBlockInfo:
+    def get_block_info(self, block_slot: int, commitment=SolCommit.Confirmed) -> SolBlockInfo:
         opts = {
-            'commitment': Commitment.to_solana(commitment),
+            'commitment': SolCommit.to_solana(commitment),
             'encoding': 'json',
             'transactionDetails': 'none',
             'rewards': False
@@ -391,13 +391,13 @@ class SolInteractor:
 
         return self._decode_block_info(block_slot, net_block)
 
-    def get_block_info_list(self, block_slot_list: List[int], commitment=Commitment.Confirmed) -> List[SolBlockInfo]:
+    def get_block_info_list(self, block_slot_list: List[int], commitment=SolCommit.Confirmed) -> List[SolBlockInfo]:
         block_list = list()
         if len(block_slot_list) == 0:
             return block_list
 
         opts = {
-            'commitment': Commitment.to_solana(commitment),
+            'commitment': SolCommit.to_solana(commitment),
             'encoding': 'json',
             'transactionDetails': 'none',
             'rewards': False
@@ -418,9 +418,9 @@ class SolInteractor:
             block_list.append(block)
         return block_list
 
-    def get_recent_block_slot(self, commitment=Commitment.Confirmed, default: Optional[int] = None) -> int:
+    def get_recent_block_slot(self, commitment=SolCommit.Confirmed, default: Optional[int] = None) -> int:
         opts = {
-            'commitment': Commitment.to_solana(commitment)
+            'commitment': SolCommit.to_solana(commitment)
         }
         response = self._send_rpc_request('getLatestBlockhash', opts)
         result = response.get('result', None)
@@ -431,9 +431,9 @@ class SolInteractor:
             raise RuntimeError('failed to get latest block hash')
         return result.get('context', dict()).get('slot', 0)
 
-    def get_recent_block_hash(self, commitment=Commitment.Finalized) -> SolRecentBlockHash:
+    def get_recent_block_hash(self, commitment=SolCommit.Finalized) -> SolRecentBlockHash:
         opts = {
-            'commitment': Commitment.to_solana(commitment)
+            'commitment': SolCommit.to_solana(commitment)
         }
         response = self._send_rpc_request('getLatestBlockhash', opts)
         result = response.get('result', None)
@@ -457,9 +457,9 @@ class SolInteractor:
         block = self._send_rpc_request('getBlock', block_slot, block_opts)
         return SolBlockHash.from_string(block.get('result', dict()).get('blockhash', None))
 
-    def get_block_height(self, block_slot: Optional[int] = None, commitment=Commitment.Confirmed) -> int:
+    def get_block_height(self, block_slot: Optional[int] = None, commitment=SolCommit.Confirmed) -> int:
         opts = {
-            'commitment': Commitment.to_solana(commitment)
+            'commitment': SolCommit.to_solana(commitment)
         }
         if block_slot is None:
             block_height_resp = self._send_rpc_request('getBlockHeight', opts)
@@ -472,7 +472,7 @@ class SolInteractor:
         opts = {
             'skipPreflight': skip_preflight,
             'encoding': 'base64',
-            'preflightCommitment': Commitment.Processed
+            'preflightCommitment': SolCommit.Processed
         }
 
         request_list = list()
@@ -514,7 +514,7 @@ class SolInteractor:
                           finalized_block_info: SolBlockInfo,
                           block_commitment: Dict[str, Any]) -> SolBlockStatus:
         if not finalized_block_info.is_empty():
-            return SolBlockStatus(block_slot, Commitment.Finalized)
+            return SolBlockStatus(block_slot, SolCommit.Finalized)
 
         result = block_commitment.get('result', None)
         if result is None:
@@ -528,17 +528,17 @@ class SolInteractor:
         total_stake = result.get('totalStake', 1)
 
         if (voted_stake * 100 / total_stake) > 66.67:
-            return SolBlockStatus(block_slot, Commitment.Safe)
+            return SolBlockStatus(block_slot, SolCommit.Safe)
 
-        return SolBlockStatus(block_slot, Commitment.Confirmed)
+        return SolBlockStatus(block_slot, SolCommit.Confirmed)
 
     def get_block_status(self, block_slot: int) -> SolBlockStatus:
-        finalized_block_info = self.get_block_info(block_slot, commitment=Commitment.Finalized)
+        finalized_block_info = self.get_block_info(block_slot, commitment=SolCommit.Finalized)
         response = self._send_rpc_request('getBlockCommitment', [block_slot])
         return self._get_block_status(block_slot, finalized_block_info, response)
 
     def check_confirm_of_tx_sig_list(self, tx_sig_list: List[str],
-                                     confirmed_set: Set[Commitment.Type],
+                                     confirmed_set: Set[SolCommit.Type],
                                      valid_block_height: int) -> bool:
         if len(tx_sig_list) == 0:
             return True
@@ -570,13 +570,13 @@ class SolInteractor:
         return True
 
     def get_tx_receipt_list(self, tx_sig_list: List[str],
-                            commitment: Commitment.Type) -> List[Optional[Dict[str, Any]]]:
+                            commitment: SolCommit.Type) -> List[Optional[Dict[str, Any]]]:
         if len(tx_sig_list) == 0:
             return list()
 
         opts = {
             'encoding': 'json',
-            'commitment': Commitment.to_solana(commitment),
+            'commitment': SolCommit.to_solana(commitment),
             'maxSupportedTransactionVersion': 0
         }
         request_list = [[tx_sig, opts] for tx_sig in tx_sig_list]

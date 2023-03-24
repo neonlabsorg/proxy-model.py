@@ -19,7 +19,7 @@ from ..common_neon.errors import EthereumError, InvalidParamError
 from ..common_neon.estimate import GasEstimate
 from ..common_neon.eth_proto import NeonTx
 from ..common_neon.keys_storage import KeyStorage
-from ..common_neon.solana_tx import Commitment
+from ..common_neon.solana_tx import SolCommit
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.transaction_validator import NeonTxValidator
 from ..common_neon.utils import SolBlockInfo, NeonTxReceiptInfo, NeonTxInfo, NeonTxResultInfo
@@ -227,11 +227,11 @@ class NeonRpcApiWorker:
 
         try:
             if tag == 'pending':
-                commitment = Commitment.Processed
+                commitment = SolCommit.Processed
             elif tag in {'finalized', 'safe'}:
-                commitment = Commitment.Finalized
+                commitment = SolCommit.Finalized
             else:
-                commitment = Commitment.Confirmed
+                commitment = SolCommit.Confirmed
 
             neon_account_info = self._solana.get_neon_account_info(NeonAddress(account), commitment)
             if neon_account_info is None:
@@ -524,21 +524,21 @@ class NeonRpcApiWorker:
             LOG.debug(f'Get transaction count. Account: {account}, tag: {tag}')
 
             pending_tx_nonce: Optional[int] = None
-            commitment = Commitment.Confirmed
+            commitment = SolCommit.Confirmed
             req_id = get_req_id_from_log()
 
             if tag == 'pending':
-                commitment = Commitment.Processed
+                commitment = SolCommit.Processed
 
                 pending_tx_nonce = self._mempool_client.get_pending_tx_nonce(req_id=req_id, sender=account)
                 LOG.debug(f'Pending tx count for: {account} - is: {pending_tx_nonce}')
             elif tag == 'latest':
-                commitment = Commitment.Processed
+                commitment = SolCommit.Processed
 
                 pending_tx_nonce = self._mempool_client.get_mempool_tx_nonce(req_id=req_id, sender=account)
                 LOG.debug(f'Mempool tx count for: {account} - is: {pending_tx_nonce}')
             elif tag in {'finalized', 'safe'}:
-                commitment = Commitment.Finalized
+                commitment = SolCommit.Finalized
 
             if pending_tx_nonce is None:
                 pending_tx_nonce = 0
