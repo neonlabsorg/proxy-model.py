@@ -3,7 +3,7 @@ import logging
 from typing import cast
 
 from ..common_neon.elf_params import ElfParams
-from ..common_neon.errors import RescheduleError, NonceTooLowError
+from ..common_neon.errors import RescheduleError, NonceTooLowError, BadResourceError
 
 from ..mempool.mempool_api import MPTxExecRequest, MPTxExecResult, MPTxExecResultCode
 from ..mempool.mempool_executor_task_base import MPExecutorBaseTask
@@ -21,6 +21,9 @@ class MPExecutorExecNeonTxTask(MPExecutorBaseTask):
         try:
             assert neon_tx_exec_cfg is not None
             self.execute_neon_tx_impl(mp_tx_req)
+        except BadResourceError as exc:
+            LOG.debug(f'Failed to execute tx {mp_tx_req.sig}, got bad resource error: {str(exc)}')
+            return MPTxExecResult(MPTxExecResultCode.BadResource, neon_tx_exec_cfg)
         except RescheduleError as exc:
             LOG.debug(f'Failed to execute tx {mp_tx_req.sig}, got reschedule error: {str(exc)}')
             return MPTxExecResult(MPTxExecResultCode.Reschedule, neon_tx_exec_cfg)

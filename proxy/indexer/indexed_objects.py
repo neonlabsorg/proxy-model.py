@@ -255,6 +255,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
         for event in reversed(neon_event_list):
             yield event
 
+    @property
     def len_neon_event_list(self) -> int:
         return len(self._neon_event_list)
 

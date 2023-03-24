@@ -21,6 +21,10 @@ class BaseNeonTxPrepStage(abc.ABC):
         self._ctx = ctx
 
     @abc.abstractmethod
+    def complete_init(self) -> None:
+        pass
+
+    @abc.abstractmethod
     def get_tx_name_list(self) -> List[str]:
         pass
 
@@ -69,11 +73,12 @@ class BaseNeonTxStrategy(abc.ABC):
             self._validation_error_msg = str(e)
             return False
 
-    def start(self) -> None:
+    def complete_init(self) -> None:
         assert self.is_valid()
 
         self._prep_tx_name_list.clear()
         for stage in self._prep_stage_list:
+            stage.complete_init()
             self._prep_tx_name_list.extend(stage.get_tx_name_list())
 
     def prep_before_emulate(self) -> bool:

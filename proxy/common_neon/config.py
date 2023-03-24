@@ -42,7 +42,7 @@ class Config:
         self._indexer_poll_cnt = self._env_int("INDEXER_POLL_COUNT", 1, 1000)
         self._indexer_log_skip_cnt = self._env_int("INDEXER_LOG_SKIP_COUNT", 1, 1000)
         self._indexer_check_msec = self._env_int('INDEXER_CHECK_MSEC', 50, 200)
-        self._max_account_cnt = self._env_int("MAX_ACCOUNT_COUNT", 20, 60)
+        self._max_tx_account_cnt = self._env_int("MAX_TX_ACCOUNT_COUNT", 20, 62)
         self._fuzz_fail_pct = self._env_int("FUZZ_FAIL_PCT", 0, 0)
         self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", 4, math.ceil(0.4 * 32))
         self._confirm_check_msec = self._env_int("CONFIRM_CHECK_MSEC", 10, 100)
@@ -227,8 +227,8 @@ class Config:
         return self._indexer_check_msec
 
     @property
-    def max_account_cnt(self) -> int:
-        return self._max_account_cnt
+    def max_tx_account_cnt(self) -> int:
+        return self._max_tx_account_cnt
 
     @property
     def fuzz_fail_pct(self) -> int:
@@ -329,7 +329,7 @@ class Config:
             'INDEXER_POLL_COUNT': self.indexer_poll_cnt,
             'INDEXER_LOG_SKIP_COUNT': self.indexer_log_skip_cnt,
             'INDEXER_CHECK_MSEC': self.indexer_check_msec,
-            'MAX_ACCOUNT_COUNT': self.max_account_cnt,
+            'MAX_TX_ACCOUNT_COUNT': self.max_tx_account_cnt,
             'FUZZ_FAIL_PCT': self.fuzz_fail_pct,
             'CONFIRM_TIMEOUT_SEC': self.confirm_timeout_sec,
             'CONFIRM_CHECK_MSEC': self.confirm_check_msec,

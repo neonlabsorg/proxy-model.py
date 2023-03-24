@@ -5,6 +5,7 @@ from ..common_neon.config import Config
 from ..common_neon.layouts import HolderAccountInfo
 from ..common_neon.neon_instruction import NeonIxBuilder
 from ..common_neon.solana_alt import ALTInfo
+from ..common_neon.solana_alt_limit import ALTLimit
 from ..common_neon.solana_alt_builder import ALTTxBuilder, ALTTxSet
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_tx import SolTx, SolAccountMeta, SolAccount, SolPubKey
@@ -33,7 +34,7 @@ class CancelTxExecutor:
         if str(holder_info.holder_account) in self._holder_account_set:
             return False
 
-        if len(holder_info.account_list) >= self._alt_builder.tx_account_cnt:
+        if len(holder_info.account_list) >= ALTLimit.max_tx_account_cnt:
             tx = self._build_alt_cancel_tx(holder_info)
         else:
             tx = self._build_cancel_tx(holder_info)

@@ -17,7 +17,9 @@ class NeonTxExecCfg:
         self._alt_address_dict: Dict[str, ALTAddress] = dict()
         self._account_dict: NeonAccountDict = dict()
         self._resize_iter_cnt = 0
+
         self._strategy_idx = 0
+        self._is_holder_used = False
         self._sol_tx_list_dict: Dict[str, List[SolTx]] = dict()
 
     @property
@@ -68,6 +70,12 @@ class NeonTxExecCfg:
 
     def set_strategy_idx(self, idx: int) -> None:
         self._strategy_idx = idx
+
+    def is_holder_used(self) -> bool:
+        return self._is_holder_used
+
+    def set_holder_usage(self, value: bool) -> None:
+        self._is_holder_used = value
 
     def pop_sol_tx_list(self, tx_name_list: List[str]) -> List[SolTx]:
         sol_tx_list: List[SolTx] = list()

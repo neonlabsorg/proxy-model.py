@@ -1,18 +1,18 @@
-import math
 import logging
+import math
+
 from typing import Dict, Any, List, Optional
 
-from ..common_neon.emulator_interactor import call_emulated, check_emulated_exit_status
-from ..common_neon.elf_params import ElfParams
-
+from ..common_neon.address import NeonAddress
 from ..common_neon.config import Config
+from ..common_neon.elf_params import ElfParams
+from ..common_neon.emulator_interactor import call_emulated, check_emulated_exit_status
 from ..common_neon.eth_proto import NeonTx
-from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.solana_alt_builder import ALTTxBuilder
 from ..common_neon.neon_instruction import NeonIxBuilder
+from ..common_neon.solana_alt_limit import ALTLimit
+from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_tx import SolAccount, SolPubKey, SolAccountMeta, SolBlockHash, SolTxSizeError
 from ..common_neon.solana_tx_legacy import SolLegacyTx
-from ..common_neon.address import NeonAddress
 
 
 LOG = logging.getLogger(__name__)
@@ -56,7 +56,8 @@ class _GasTxBuilder:
         tx.sign(self._signer)
         return tx
 
-    def neon_tx_len(self) -> int:
+    @property
+    def len_neon_tx(self) -> int:
         return len(self._neon_ix_builder.holder_msg)
 
 
@@ -128,7 +129,7 @@ class GasEstimate:
         except BaseException as exc:
             LOG.debug('Error during pack solana tx', exc_info=exc)
 
-        self._cached_tx_cost_size = self._holder_tx_cost(self._tx_builder.neon_tx_len())
+        self._cached_tx_cost_size = self._holder_tx_cost(self._tx_builder.len_neon_tx)
         return self._cached_tx_cost_size
 
     def _holder_tx_cost(self, neon_tx_len: int) -> int:
@@ -164,7 +165,7 @@ class GasEstimate:
 
         # ALT used by TransactionStepFromAccount, TransactionStepFromAccountNoChainId which have 6 fixed accounts
         acc_cnt = len(self._account_list) + 6
-        if acc_cnt > ALTTxBuilder.tx_account_cnt:
+        if acc_cnt > ALTLimit.max_tx_account_cnt:
             self._cached_alt_cost = 5000 * 12  # ALT ix: create + ceil(256/30) extend + deactivate + close
         else:
             self._cached_alt_cost = 0

@@ -6,7 +6,7 @@ import math
 
 from collections import deque
 from datetime import datetime
-from typing import Optional, List, Dict, Deque, Set, Union, cast
+from typing import Optional, List, Dict, Deque, Set
 
 from ..common_neon.address import NeonAddress, neon_2program, perm_account_seed, account_with_seed
 from ..common_neon.cancel_transaction_executor import CancelTxExecutor
@@ -312,17 +312,7 @@ class OpResMng:
 
         return res_used_time.ident
 
-    def disable_resource(self, ident_or_sig: Union[OpResIdent, str]) -> None:
-        if isinstance(ident_or_sig, str):
-            res_time: Optional[OpResUsedTime] = self._pop_used_resource(cast(str, ident_or_sig))
-            if res_time is None:
-                return
-            ident = res_time.ident
-        elif isinstance(ident_or_sig, OpResIdent):
-            ident = cast(OpResIdent, ident_or_sig)
-        else:
-            assert False, f'Wrong type {type(ident_or_sig)} of ident_or_sig'
-
+    def disable_resource(self, ident: OpResIdent) -> None:
         LOG.debug(f'Disable resource {ident}')
         self._checked_res_ident_set.discard(ident)
         self._disabled_res_ident_list.append(ident)

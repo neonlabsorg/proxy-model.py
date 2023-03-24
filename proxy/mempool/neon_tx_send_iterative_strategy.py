@@ -24,6 +24,10 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
         super().__init__(ctx)
         self._uniq_idx = 0
 
+    def complete_init(self) -> None:
+        super().complete_init()
+        self._ctx.set_holder_usage(True)
+
     def execute(self) -> NeonTxResultInfo:
         assert self.is_valid()
 

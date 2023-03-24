@@ -490,7 +490,7 @@ class TestMPSchedule(unittest.TestCase):
         schedule.set_sender_state_tx_cnt_list([MPSenderTxCntData(sender=tx.sender_address, state_tx_cnt=tx.nonce + 1)])
         _tx_is_been_processed()
 
-        schedule.reschedule_tx(tx)
+        schedule.cancel_tx(tx)
         _tx_is_been_scheduled()
 
         tx = schedule.acquire_tx()
@@ -589,7 +589,7 @@ class TestMPSenderTxPool(unittest.TestCase):
         tx = self._pool.acquire_tx()
         self.assertTrue(self._pool.is_processing())
         self._pool.done_tx(tx)
-        self.assertEqual(self._pool.queue_len, 4)
+        self.assertEqual(self._pool.len_tx_nonce_queue, 4)
 
     def test_drop_tx(self):
         tx = self._pool.acquire_tx()
@@ -597,25 +597,25 @@ class TestMPSenderTxPool(unittest.TestCase):
         with self.assertRaises(AssertionError) as context:
             self._pool.drop_tx(tx)
         self.assertTrue('cannot drop processing tx' in str(context.exception))
-        self.assertEqual(self._pool.queue_len, 5)
+        self.assertEqual(self._pool.len_tx_nonce_queue, 5)
 
         tx = self._pool._tx_nonce_queue[0]
         self._pool.drop_tx(tx)
-        self.assertEqual(self._pool.queue_len, 4)
+        self.assertEqual(self._pool.len_tx_nonce_queue, 4)
 
     def test_cancel_tx(self):
         tx = self._pool.acquire_tx()
         self.assertTrue(self._pool.is_processing())
         self._pool.cancel_process_tx(tx, tx.neon_tx_exec_cfg)
-        self.assertEqual(self._pool.queue_len, 5)
+        self.assertEqual(self._pool.len_tx_nonce_queue, 5)
 
     def test_take_out_txs_on_processing_pool(self):
         self._pool.acquire_tx()
         taken_out_tx_list = self._pool.take_out_tx_list()
-        self.assertEqual(self._pool.queue_len, 1)
+        self.assertEqual(self._pool.len_tx_nonce_queue, 1)
         self.assertEqual(len(taken_out_tx_list), 4)
 
     def test_take_out_txs_on_non_processing_pool(self):
         taken_out_tx_list = self._pool.take_out_tx_list()
-        self.assertEqual(self._pool.queue_len, 0)
+        self.assertEqual(self._pool.len_tx_nonce_queue, 0)
         self.assertEqual(len(taken_out_tx_list), 5)

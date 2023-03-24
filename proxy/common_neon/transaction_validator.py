@@ -193,7 +193,7 @@ class NeonTxValidator:
             len(emulator_json.get("token_accounts", [])) +
             len(emulator_json.get("solana_accounts", []))
         )
-        if account_cnt > self._config.max_account_cnt:
+        if account_cnt > self._config.max_tx_account_cnt:
             raise EthereumError(f"transaction requires too lot of accounts {account_cnt}")
 
     def raise_nonce_error(self, state_tx_cnt: int, tx_nonce: int):

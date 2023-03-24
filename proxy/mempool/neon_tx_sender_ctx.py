@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from .operator_resource_mng import OpResInfo
 
@@ -23,37 +23,32 @@ class NeonTxSendCtx:
         self._config = config
         self._neon_tx_exec_cfg = neon_tx_exec_cfg
         self._neon_tx = neon_tx
-        self._sender = '0x' + neon_tx.sender()
-        self._bin_neon_sig: bytes = neon_tx.hash_signed()
-        self._neon_sig = '0x' + self._bin_neon_sig.hex().lower()
         self._solana = solana
         self._resource = resource
-        self._ix_builder = NeonIxBuilder(resource.public_key)
-        self._neon_meta_dict: Dict[str, SolAccountMeta] = {}
 
+        self._ix_builder = NeonIxBuilder(resource.public_key)
         self._ix_builder.init_operator_neon(self._resource.neon_address)
         self._ix_builder.init_neon_tx(self._neon_tx)
         self._ix_builder.init_iterative(self._resource.holder)
 
+        self._neon_meta_dict: Dict[str, SolAccountMeta] = {}
         self._build_account_list(self._neon_tx_exec_cfg.account_dict)
 
         self._is_holder_completed = False
-
         self._decode_holder_account()
 
     def _decode_holder_account(self) -> None:
         holder_info = self._solana.get_holder_account_info(self._resource.holder)
         if holder_info is None:
             raise BadResourceError(f'Bad holder account {str(self._resource.holder)}')
-
-        if holder_info.tag == ACTIVE_HOLDER_TAG:
-            if holder_info.neon_tx_sig != self._neon_sig:
+        elif holder_info.tag == ACTIVE_HOLDER_TAG:
+            if holder_info.neon_tx_sig != '0x' + self.neon_sig.hex().lower():
                 raise BadResourceError(
                     f'Holder account {str(self._resource.holder)} has another neon tx: {holder_info.neon_tx_sig}'
                 )
             self._is_holder_completed = True
         elif holder_info.tag == FINALIZED_HOLDER_TAG:
-            pass
+            self._is_holder_completed = False
         elif holder_info.tag == HOLDER_TAG:
             holder_msg_len = len(self._ix_builder.holder_msg)
             self._is_holder_completed = (self._ix_builder.holder_msg == holder_info.neon_tx_data[:holder_msg_len])
@@ -89,6 +84,13 @@ class NeonTxSendCtx:
 
         self._ix_builder.init_neon_account_list(neon_meta_list)
 
+    def is_holder_completed(self) -> Optional[bool]:
+        return self._is_holder_completed
+
+    def set_holder_completed(self, value: bool) -> None:
+        self._is_holder_completed = value
+
+    @property
     def len_account_list(self) -> int:
         return len(self._neon_meta_dict)
 
@@ -104,12 +106,12 @@ class NeonTxSendCtx:
         return self._config
 
     @property
-    def bin_neon_sig(self) -> bytes:
-        return self._bin_neon_sig
+    def neon_sig(self) -> bytes:
+        return self._neon_tx.hash_signed()
 
     @property
     def sender(self) -> str:
-        return self._sender
+        return '0x' + self._neon_tx.sender()
 
     @property
     def neon_tx(self) -> NeonTx:
@@ -118,6 +120,10 @@ class NeonTxSendCtx:
     @property
     def signer(self) -> SolAccount:
         return self._resource.signer
+
+    @property
+    def holder(self) -> SolPubKey:
+        return self._resource.holder
 
     @property
     def ix_builder(self) -> NeonIxBuilder:
@@ -143,15 +149,8 @@ class NeonTxSendCtx:
         return self._neon_tx_exec_cfg.state_tx_cnt
 
     @property
-    def is_holder_completed(self) -> bool:
-        return self._is_holder_completed
-
-    @property
     def alt_address_list(self) -> List[ALTAddress]:
         return self._neon_tx_exec_cfg.alt_address_list
-
-    def set_holder_completed(self, value=True) -> None:
-        self._is_holder_completed = value
 
     def add_alt_address(self, alt_address: ALTAddress) -> None:
         self._neon_tx_exec_cfg.add_alt_address(alt_address)
@@ -162,6 +161,9 @@ class NeonTxSendCtx:
 
     def set_strategy_idx(self, idx: int) -> None:
         self._neon_tx_exec_cfg.set_strategy_idx(idx)
+
+    def set_holder_usage(self, value: bool) -> None:
+        self._neon_tx_exec_cfg.set_holder_usage(value)
 
     def pop_sol_tx_list(self, tx_name_list: List[str]) -> List[SolTx]:
         return self._neon_tx_exec_cfg.pop_sol_tx_list(tx_name_list)

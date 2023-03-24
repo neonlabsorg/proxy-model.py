@@ -249,7 +249,7 @@ class BaseTxStepIxDecoder(DummyIxDecoder):
         for event in self.state.sol_neon_ix.neon_tx_event_list:
             tx.add_neon_event(dataclasses.replace(
                 event,
-                total_gas_used=tx.len_neon_event_list(),
+                total_gas_used=tx.len_neon_event_list,
                 is_reverted=True,
                 is_hidden=True,
                 sol_sig=self.state.sol_neon_ix.sol_sig,

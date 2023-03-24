@@ -86,7 +86,7 @@ class MPSenderTxPool:
         return self._sender_address
 
     @property
-    def queue_len(self) -> int:
+    def len_tx_nonce_queue(self) -> int:
         return len(self._tx_nonce_queue)
 
     def add_tx(self, tx: MPTxRequest) -> None:
@@ -124,7 +124,7 @@ class MPSenderTxPool:
         return tx.gas_price if tx is not None else 0
 
     def is_empty(self) -> bool:
-        return self.queue_len == 0
+        return self.len_tx_nonce_queue == 0
 
     def is_processing(self) -> bool:
         return self._processing_tx is not None
@@ -158,7 +158,7 @@ class MPSenderTxPool:
         self._validate_processing_tx(tx)
 
         self._tx_nonce_queue.pop(self._top_index)
-        LOG.debug(f'Done tx {tx.sig}. There are {self.queue_len} txs left in {self.sender_address} pool')
+        LOG.debug(f'Done tx {tx.sig}. There are {self.len_tx_nonce_queue} txs left in {self.sender_address} pool')
         self._processing_tx = None
 
     def cancel_process_tx(self, tx: MPTxRequest, neon_tx_exec_cfg: NeonTxExecCfg) -> None:
@@ -171,7 +171,7 @@ class MPSenderTxPool:
     def take_out_tx_list(self) -> MPTxRequestList:
         is_processing = self.is_processing()
         LOG.debug(
-            f'Take out txs from sender pool: {self.sender_address}, count: {self.queue_len}, '
+            f'Take out txs from sender pool: {self.sender_address}, count: {self.len_tx_nonce_queue}, '
             f'processing: {is_processing}'
         )
         _from = 1 if is_processing else 0
@@ -182,7 +182,7 @@ class MPSenderTxPool:
         if self.is_processing():
             assert tx.sig != self._processing_tx.sig, f'cannot drop processing tx {tx.sig}'
         self._tx_nonce_queue.pop(tx)
-        LOG.debug(f'Drop tx {tx.sig}. There are {self.queue_len} txs left in {self.sender_address} pool')
+        LOG.debug(f'Drop tx {tx.sig}. There are {self.len_tx_nonce_queue} txs left in {self.sender_address} pool')
 
 
 class MPTxSchedule:
@@ -203,7 +203,7 @@ class MPTxSchedule:
         self._tx_dict.add(tx)
 
         # the first tx in the sender pool
-        if sender_pool.queue_len == 1:
+        if sender_pool.len_tx_nonce_queue == 1:
             self._sender_pool_dict[sender_pool.sender_address] = sender_pool
 
     def _remove_empty_sender_pool(self, sender_pool: MPSenderTxPool) -> None:
@@ -292,7 +292,7 @@ class MPTxSchedule:
                 return MPTxSendResult(code=MPTxSendResultCode.Underprice, state_tx_cnt=None)
 
         sender_pool = self._get_or_create_sender_pool(tx.sender_address)
-        LOG.debug(f'Got pool for sender {tx.sender_address} with {sender_pool.queue_len} txs')
+        LOG.debug(f'Got pool for sender {tx.sender_address} with {sender_pool.len_tx_nonce_queue} txs')
 
         if sender_pool.is_processing():
             top_tx = sender_pool.get_top_tx()
@@ -359,7 +359,7 @@ class MPTxSchedule:
 
     def get_pending_tx_count(self, sender_address: str) -> int:
         sender_pool = self._find_sender_pool(sender_address)
-        return 0 if sender_pool is None else sender_pool.queue_len
+        return 0 if sender_pool is None else sender_pool.len_tx_nonce_queue
 
     def get_pending_tx_nonce(self, sender_address: str) -> Optional[int]:
         sender_pool = self._find_sender_pool(sender_address)
@@ -390,7 +390,7 @@ class MPTxSchedule:
     def fail_tx(self, tx: MPTxRequest) -> None:
         self._done_tx(tx)
 
-    def reschedule_tx(self, tx: MPTxRequest) -> bool:
+    def cancel_tx(self, tx: MPTxRequest) -> bool:
         sender_pool = self._get_sender_pool(tx.sender_address)
 
         sender_pool.cancel_process_tx(tx, tx.neon_tx_exec_cfg)

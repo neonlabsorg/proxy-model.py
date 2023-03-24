@@ -62,7 +62,7 @@ class NeonTxSendStrategyExecutor:
                     continue
 
                 LOG.debug(f'Use strategy {Strategy.name}')
-                strategy.start()
+                strategy.complete_init()
                 self._ctx.set_strategy_idx(strategy_idx)
 
                 # Try `retry_on_fail` times to prepare Neon tx for execution

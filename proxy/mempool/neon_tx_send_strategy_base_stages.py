@@ -3,12 +3,15 @@ import logging
 
 from typing import List, Optional
 
+from ..common_neon.constants import ACTIVE_HOLDER_TAG, FINALIZED_HOLDER_TAG, HOLDER_TAG
+from ..common_neon.elf_params import ElfParams
+from ..common_neon.errors import BadResourceError
+from ..common_neon.solana_alt import ALTInfo
+from ..common_neon.solana_alt_limit import ALTLimit
+from ..common_neon.solana_alt_builder import ALTTxBuilder, ALTTxSet
 from ..common_neon.solana_tx import SolTx
 from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_tx_v0 import SolV0Tx
-from ..common_neon.solana_alt import ALTInfo
-from ..common_neon.solana_alt_builder import ALTTxBuilder, ALTTxSet
-from ..common_neon.elf_params import ElfParams
 
 from ..mempool.neon_tx_send_base_strategy import BaseNeonTxPrepStage
 from ..mempool.neon_tx_sender_ctx import NeonTxSendCtx
@@ -20,11 +23,14 @@ LOG = logging.getLogger(__name__)
 class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
     name = 'WriteHolderAccount'
 
+    def complete_init(self) -> None:
+        self._ctx.set_holder_usage(True)
+
     def get_tx_name_list(self) -> List[str]:
         return [self.name]
 
     def build_tx_list(self) -> List[List[SolTx]]:
-        if self._ctx.is_holder_completed:
+        if self._ctx.is_holder_completed():
             return list()
 
         builder = self._ctx.ix_builder
@@ -32,7 +38,7 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
         tx_list: List[SolTx] = list()
         holder_msg_offset = 0
         holder_msg = copy.copy(builder.holder_msg)
-        neon_tx_sig = self._ctx.bin_neon_sig
+        neon_tx_sig = self._ctx.neon_sig
 
         holder_msg_size = ElfParams().holder_msg_size
         while len(holder_msg):
@@ -47,7 +53,7 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
         return [tx_list]
 
     def update_after_emulate(self) -> None:
-        self._ctx.set_holder_completed()
+        self._ctx.set_holder_completed(True)
 
 
 class ALTNeonTxPrepStage(BaseNeonTxPrepStage):
@@ -57,6 +63,9 @@ class ALTNeonTxPrepStage(BaseNeonTxPrepStage):
         self._alt_info_list: List[ALTInfo] = list()
         self._alt_builder = ALTTxBuilder(self._ctx.solana, self._ctx.ix_builder, self._ctx.signer)
         self._alt_tx_set = ALTTxSet()
+
+    def complete_init(self) -> None:
+        pass
 
     def init_alt_info(self, legacy_tx: SolLegacyTx) -> bool:
         actual_alt_info = self._alt_builder.build_alt_info(legacy_tx)
@@ -74,10 +83,18 @@ class ALTNeonTxPrepStage(BaseNeonTxPrepStage):
             if actual_alt_info.remove_account_key_list(alt_info.account_key_list):
                 self._alt_info_list.append(alt_info)
 
-        if actual_alt_info.account_key_list_len > self._alt_builder.tx_account_cnt:
-            self._alt_tx_set = self._alt_builder.build_alt_tx_set(actual_alt_info)
-            self._actual_alt_info = actual_alt_info
-            self._alt_info_list.append(actual_alt_info)
+        if actual_alt_info.len_account_key_list < ALTLimit.max_tx_account_cnt:
+            return True
+
+        for alt_info in alt_info_list:
+            if actual_alt_info.len_account_key_list + alt_info.len_account_key_list < ALTLimit.max_alt_account_cnt:
+                alt_info.add_account_key_list(actual_alt_info.account_key_list)
+                actual_alt_info = alt_info
+                break
+
+        self._alt_tx_set = self._alt_builder.build_alt_tx_set(actual_alt_info)
+        self._actual_alt_info = actual_alt_info
+        self._alt_info_list.append(actual_alt_info)
 
         return True
 
@@ -120,10 +137,10 @@ def alt_strategy(cls):
             )
 
         def _validate_account_list_len(self) -> bool:
-            account_list_len = self._ctx.len_account_list() + 6
-            if account_list_len < ALTTxBuilder.tx_account_cnt:
+            account_list_len = self._ctx.len_account_list + 6
+            if account_list_len < ALTLimit.max_tx_account_cnt:
                 self._validation_error_msg = (
-                    f'Number of accounts {account_list_len} less than {ALTTxBuilder.tx_account_cnt}'
+                    f'Number of accounts {account_list_len} less than {ALTLimit.max_tx_account_cnt}'
                 )
                 return False
             return True
