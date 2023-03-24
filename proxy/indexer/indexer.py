@@ -64,11 +64,11 @@ class Indexer(IndexerBase):
         self._last_finalized_block_slot = 0
         self._neon_block_dict = NeonIndexedBlockDict()
 
-        sol_neon_ix_decoder_list: List[Type[DummyIxDecoder]] = []
+        sol_neon_ix_decoder_list: List[Type[DummyIxDecoder]] = list()
         sol_neon_ix_decoder_list.extend(get_neon_ix_decoder_list())
         sol_neon_ix_decoder_list.extend(get_neon_ix_decoder_deprecated_list())
 
-        self._sol_neon_ix_decoder_dict: Dict[int, Type[DummyIxDecoder]] = {}
+        self._sol_neon_ix_decoder_dict: Dict[int, Type[DummyIxDecoder]] = dict()
         for decoder in sol_neon_ix_decoder_list:
             ix_code = decoder.ix_code()
             assert ix_code not in self._sol_neon_ix_decoder_dict
@@ -86,17 +86,19 @@ class Indexer(IndexerBase):
             return
 
         if self._cancel_tx_executor is None:
-            signer = SolAccount.from_secret_key(secret_list[0])
+            signer = SolAccount.from_seed(secret_list[0])
             self._cancel_tx_executor = CancelTxExecutor(self._config, self._solana, signer)
 
-        self._op_account_set: Set[str] = {str(SolAccount.from_secret_key(k).public_key) for k in secret_list}
+        self._op_account_set: Set[str] = {str(SolAccount.from_seed(k).pubkey()) for k in secret_list}
 
     def _cancel_old_neon_txs(self, state: SolNeonTxDecoderState, sol_tx_meta: SolTxMetaInfo) -> None:
         if self._cancel_tx_executor is None:
             return
 
         for tx in state.neon_block.iter_neon_tx():
-            if (tx.storage_account != '') and (state.stop_block_slot - tx.block_slot > self._config.cancel_timeout):
+            if tx.storage_account == '':
+                continue
+            if state.stop_block_slot - tx.last_block_slot > self._config.cancel_timeout:
                 self._cancel_neon_tx(tx, sol_tx_meta)
 
         try:
@@ -112,7 +114,7 @@ class Indexer(IndexerBase):
             return True
 
         # We've already sent Cancel and are waiting for receipt
-        if tx.status != NeonIndexedTxInfo.Status.IN_PROGRESS:
+        if tx.status != NeonIndexedTxInfo.Status.InProgress:
             return True
 
         if not tx.blocked_account_cnt:
@@ -120,7 +122,7 @@ class Indexer(IndexerBase):
             return False
 
         holder_account = tx.storage_account
-        holder_info = self._solana.get_holder_account_info(SolPubKey(holder_account))
+        holder_info = self._solana.get_holder_account_info(SolPubKey.from_string(holder_account))
         if not holder_info:
             LOG.warning(f'holder {holder_account} for neon tx {tx.neon_tx.sig} is empty')
             return False
@@ -144,7 +146,7 @@ class Indexer(IndexerBase):
             return False
 
         LOG.debug(f'Neon tx is blocked: storage {holder_account}, {tx.neon_tx}, {holder_info.account_list}')
-        tx.set_status(NeonIndexedTxInfo.Status.CANCELED, sol_tx_meta.block_slot)
+        tx.set_status(NeonIndexedTxInfo.Status.Canceled, sol_tx_meta.block_slot)
         return True
 
     def _save_checkpoint(self) -> None:
@@ -164,8 +166,10 @@ class Indexer(IndexerBase):
         try:
             neon_block.set_finalized(is_finalized)
             if not neon_block.is_completed:
+                neon_block.fill_log_info_list()
                 self._db.submit_block(neon_block)
-                neon_block.complete_block(self._config, self._op_account_set)
+                neon_block.calc_stat(self._config, self._op_account_set)
+                neon_block.complete_block(self._config)
             elif is_finalized:
                 # the confirmed block becomes finalized
                 self._db.finalize_block(neon_block)
@@ -249,8 +253,8 @@ class Indexer(IndexerBase):
         state.set_neon_block(neon_block)
         return neon_block
 
-    def _run_sol_tx_collector(self, state: SolNeonTxDecoderState) -> None:
-        stop_block_slot = self._solana.get_block_slot(state.commitment)
+    def _run_sol_tx_collector(self, state: SolNeonTxDecoderState, slot_processing_delay: int) -> None:
+        stop_block_slot = self._solana.get_block_slot(state.commitment) - slot_processing_delay
         state.set_stop_block_slot(stop_block_slot)
         if stop_block_slot < state.start_block_slot:
             return
@@ -266,10 +270,16 @@ class Indexer(IndexerBase):
 
             for sol_neon_ix in state.iter_sol_neon_ix():
                 with logging_context(sol_neon_ix=sol_neon_ix.req_id):
-                    if is_error:
-                        LOG.debug('failed tx')
+                    neon_block.add_sol_neon_ix(sol_neon_ix)
                     SolNeonIxDecoder = self._sol_neon_ix_decoder_dict.get(sol_neon_ix.program_ix, DummyIxDecoder)
-                    SolNeonIxDecoder(state).execute()
+                    sol_neon_ix_decoder = SolNeonIxDecoder(state)
+                    if is_error:
+                        if hasattr(sol_neon_ix_decoder, 'decode_failed_neon_tx_event_list'):
+                            sol_neon_ix_decoder.decode_failed_neon_tx_event_list()
+                        # LOG.debug('failed tx')
+                        continue
+
+                    sol_neon_ix_decoder.execute()
 
         sol_tx_meta = state.end_range
         with logging_context(ident=sol_tx_meta.req_id):
@@ -300,7 +310,7 @@ class Indexer(IndexerBase):
 
         try:
             state = SolNeonTxDecoderState(self._finalized_sol_tx_collector, start_block_slot, finalized_neon_block)
-            self._run_sol_tx_collector(state)
+            self._run_sol_tx_collector(state, 0)
         except SolHistoryNotFound as err:
             LOG.debug(f'skip parsing of finalized history: {str(err)}')
             return
@@ -313,7 +323,7 @@ class Indexer(IndexerBase):
         if (finalized_block_slot - state.stop_block_slot) < 3:
             state.shift_to_collector(self._confirmed_sol_tx_collector)
             try:
-                self._run_sol_tx_collector(state)
+                self._run_sol_tx_collector(state, self._config.slot_processing_delay)
             except SolHistoryNotFound as err:
                 LOG.debug(f'skip parsing of confirmed history: {str(err)}')
             else:

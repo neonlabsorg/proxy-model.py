@@ -7,6 +7,7 @@ import subprocess
 import pathlib
 import requests
 import json
+import typing as tp
 from urllib.parse import urlparse
 from python_terraform import Terraform
 from paramiko import SSHClient
@@ -47,7 +48,7 @@ UNISWAP_V2_CORE_IMAGE = f'neonlabsorg/uniswap-v2-core:{UNISWAP_V2_CORE_COMMIT}'
 
 FAUCET_COMMIT = 'latest'
 
-FTS_NAME = "neonlabsorg/full_test_suite:develop"
+NEON_TESTS_IMAGE = "neonlabsorg/neon_tests:latest"
 
 CONTAINERS = ['proxy', 'solana', 'neon_test_invoke_program_loader',
               'dbcreation', 'faucet', 'airdropper', 'indexer']
@@ -61,6 +62,10 @@ def docker_compose(args: str):
     command = f'docker-compose {args}'
     click.echo(f"run command: {command}")
     out = subprocess.run(command, shell=True)
+    click.echo("return code: " + str(out.returncode))
+    if out.returncode != 0:
+        raise RuntimeError(f"Command {command} failed. Err: {out.stderr}")
+
     return out
 
 
@@ -97,11 +102,11 @@ def build_docker_image(neon_evm_tag, proxy_tag, head_ref_branch, skip_pull):
     neon_test_invoke_program_image = "neonlabsorg/neon_test_invoke_program:develop"
     if not skip_pull:
         click.echo('pull docker images...')
-        out = docker_client.pull(neon_evm_image)
-        click.echo(out)
+        out = docker_client.pull(neon_evm_image, stream=True, decode=True)
+        process_output(out)
 
-        out = docker_client.pull(neon_test_invoke_program_image)
-        click.echo(out)
+        out = docker_client.pull(neon_test_invoke_program_image, stream=True, decode=True)
+        process_output(out)
     else:
         click.echo('skip pulling of docker images')
 
@@ -110,25 +115,18 @@ def build_docker_image(neon_evm_tag, proxy_tag, head_ref_branch, skip_pull):
                  "PROXY_LOG_CFG": "log_cfg.json"}
 
     click.echo("Start build")
+
     output = docker_client.build(
         tag=f"{IMAGE_NAME}:{proxy_tag}", buildargs=buildargs, path="./", decode=True, network_mode='host')
-    for line in output:
-        if list(line.keys())[0] in ('stream', 'error', 'status'):
-            value = list(line.values())[0].strip()
-            if value:
-                if "progress" in line.keys():
-                    value += line['progress']
-            click.echo(value)
+    process_output(output)
 
 
 @cli.command(name="publish_image")
 @click.option('--proxy_tag')
 def publish_image(proxy_tag):
     docker_client.login(username=DOCKER_USERNAME, password=DOCKER_PASSWORD)
-    out = docker_client.push(f"{IMAGE_NAME}:{proxy_tag}")
-    if "error" in out:
-        raise RuntimeError(
-            f"Push {IMAGE_NAME}:{proxy_tag} finished with error: {out}")
+    out = docker_client.push(f"{IMAGE_NAME}:{proxy_tag}", decode=True, stream=True)
+    process_output(out)
 
 
 @cli.command(name="finalize_image")
@@ -150,16 +148,11 @@ def finalize_image(head_ref_branch, github_ref, proxy_tag):
 
     click.echo(f"The tag for publishing: {tag}")
     docker_client.login(username=DOCKER_USERNAME, password=DOCKER_PASSWORD)
-    out = docker_client.pull(f"{IMAGE_NAME}:{proxy_tag}")
-    if "error" in out:
-        raise RuntimeError(
-            f"Pull {IMAGE_NAME}:{proxy_tag} finished with error: {out}")
-
+    out = docker_client.pull(f"{IMAGE_NAME}:{proxy_tag}", decode=True, stream=True)
+    process_output(out)
     docker_client.tag(f"{IMAGE_NAME}:{proxy_tag}", f"{IMAGE_NAME}:{tag}")
-    out = docker_client.push(f"{IMAGE_NAME}:{tag}")
-    if "error" in out:
-        raise RuntimeError(
-            f"Push {IMAGE_NAME}:{tag} finished with error: {out}")
+    out = docker_client.push(f"{IMAGE_NAME}:{tag}", decode=True, stream=True)
+    process_output(out)
 
 
 @cli.command(name="terraform_infrastructure")
@@ -190,6 +183,21 @@ def terraform_build_infrastructure(head_ref_branch, github_ref_name, proxy_tag, 
     if return_code != 0:
         print("Terraform infrastructure is not built correctly")
         sys.exit(1)
+    output = terraform.output(json=True)
+    click.echo(f"output: {output}")
+    proxy_ip = output["proxy_ip"]["value"]
+    solana_ip = output["solana_ip"]["value"]
+    infra = dict(solana_ip=solana_ip, proxy_ip=proxy_ip)
+    set_github_env(infra)
+
+
+def set_github_env(envs: tp.Dict, upper=True) -> None:
+    """Set environment for github action"""
+    path = os.getenv("GITHUB_ENV", str())
+    if os.path.exists(path):
+        with open(path, "a") as env_file:
+            for key, value in envs.items():
+                env_file.write(f"\n{key.upper() if upper else key}={str(value)}")
 
 
 @cli.command(name="destroy_terraform")
@@ -204,47 +212,14 @@ def destroy_terraform(proxy_tag, run_number):
     terraform.destroy()
 
 
-@cli.command(name="openzeppelin")
-@click.option('--run_number')
-def openzeppelin_test(run_number):
-    container_name = f'fts_{run_number}'
-    fts_threshold = 2370
-    os.environ["FTS_CONTAINER_NAME"] = container_name
-    os.environ["FTS_IMAGE"] = FTS_NAME
-    os.environ["FTS_USERS_NUMBER"] = '15'
-    os.environ["FTS_JOBS_NUMBER"] = '8'
-    os.environ["NETWORK_NAME"] = f'full-test-suite-{run_number}'
-    os.environ["NETWORK_ID"] = '111'
-    os.environ["REQUEST_AMOUNT"] = '20000'
-    os.environ["USE_FAUCET"] = 'true'
-
-    output = terraform.output(json=True)
-    click.echo(f"output: {output}")
-    os.environ["PROXY_IP"] = output["proxy_ip"]["value"]
-    os.environ["SOLANA_IP"] = output["solana_ip"]["value"]
-    proxy_ip = os.environ.get("PROXY_IP")
-    solana_ip = os.environ.get("SOLANA_IP")
-
-    os.environ["PROXY_URL"] = f"http://{proxy_ip}:9090/solana"
-    os.environ["FAUCET_URL"] = f"http://{proxy_ip}:3333/request_neon"
-    os.environ["SOLANA_URL"] = f"http://{solana_ip}:8899"
-
-    click.echo(f"Env: {os.environ}")
-    click.echo(f"Running tests....")
-
-    docker_compose("-f docker-compose/docker-compose-full-test-suite.yml pull")
-    fts_result = docker_compose(
-        "-f docker-compose/docker-compose-full-test-suite.yml up")
-    click.echo(fts_result)
-    command = f'docker cp {container_name}:/opt/allure-reports.tar.gz ./'
-    click.echo(f"run command: {command}")
-    subprocess.run(command, shell=True)
-
-    dump_docker_logs(container_name)
+@cli.command(name="get_container_logs")
+def get_all_containers_logs():
     home_path = os.environ.get("HOME")
     artifact_logs = "./logs"
     ssh_key = f"{home_path}/.ssh/ci-stands"
     os.mkdir(artifact_logs)
+    proxy_ip = os.environ.get("PROXY_IP")
+    solana_ip = os.environ.get("SOLANA_IP")
 
     subprocess.run(
         f'ssh-keyscan -H {solana_ip} >> {home_path}/.ssh/known_hosts', shell=True)
@@ -262,33 +237,19 @@ def openzeppelin_test(run_number):
     services = ["postgres", "dbcreation", "indexer", "proxy", "faucet"]
     for service in services:
         upload_remote_logs(ssh_client, service, artifact_logs)
-    dump_docker_logs(container_name)
-    docker_compose(
-        "-f docker-compose/docker-compose-full-test-suite.yml rm -f")
-    check_tests_results(fts_threshold, f"{container_name}.log")
-
-
-def check_tests_results(fts_threshold, log_file):
-    passing_test_count = 0
-    with open(log_file, "r") as file:
-        while True:
-            line = file.readline()
-            if not line:
-                break
-            if re.match(r".*Passing - ", line):
-                passing_test_count = int(line.split('-')[1].strip())
-                break
-    if passing_test_count < fts_threshold:
-        raise RuntimeError(
-            f"Tests failed: Passing - {passing_test_count}\n Threshold - {fts_threshold}")
 
 
 def upload_remote_logs(ssh_client, service, artifact_logs):
     scp_client = SCPClient(transport=ssh_client.get_transport())
     click.echo(f"Upload logs for service: {service}")
     ssh_client.exec_command(f"touch /tmp/{service}.log.bz2")
-    ssh_client.exec_command(
+    stdin, stdout, stderr = ssh_client.exec_command(
         f'sudo docker logs {service} 2>&1 | pbzip2 -f > /tmp/{service}.log.bz2')
+    print(stdout.read())
+    print(stderr.read())
+    stdin, stdout, stderr = ssh_client.exec_command(f'ls -lh /tmp/{service}.log.bz2')
+    print(stdout.read())
+    print(stderr.read())
     scp_client.get(f'/tmp/{service}.log.bz2', artifact_logs)
 
 
@@ -467,6 +428,49 @@ def send_notification(url, build_url):
         f"\n<{build_url}|View build details>"
     )
     requests.post(url=url, data=json.dumps(tpl))
+
+
+def process_output(output):
+    for line in output:
+        if line:
+            errors = set()
+            try:
+                if "status" in line:
+                    click.echo(line["status"])
+
+                elif "stream" in line:
+                    stream = re.sub("^\n", "", line["stream"])
+                    stream = re.sub("\n$", "", stream)
+                    stream = re.sub("\n(\x1B\[0m)$", "\\1", stream)
+                    if stream:
+                        click.echo(stream)
+
+                elif "aux" in line:
+                    if "Digest" in line["aux"]:
+                        click.echo("digest: {}".format(line["aux"]["Digest"]))
+
+                    if "ID" in line["aux"]:
+                        click.echo("ID: {}".format(line["aux"]["ID"]))
+
+                else:
+                    click.echo("not recognized (1): {}".format(line))
+
+                if "error" in line:
+                    errors.add(line["error"])
+
+                if "errorDetail" in line:
+                    errors.add(line["errorDetail"]["message"])
+
+                    if "code" in line:
+                        error_code = line["errorDetail"]["code"]
+                        errors.add("Error code: {}".format(error_code))
+
+            except ValueError as e:
+                click.echo("not recognized (2): {}".format(line))
+
+            if errors:
+                message = "problem executing Docker: {}".format(". ".join(errors))
+                raise SystemError(message)
 
 
 if __name__ == "__main__":

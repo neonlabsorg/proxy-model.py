@@ -1,4 +1,4 @@
-from typing import Optional, List, Iterator
+from typing import Optional, Iterator, List, Dict, Any
 
 from ..common_neon.utils import NeonTxReceiptInfo
 
@@ -49,8 +49,8 @@ class IndexerDB:
                 if neon_block.is_finalized:
                     self._finalize_block(cursor, neon_block)
                 self._neon_txs_db.set_tx_list(cursor, neon_block.iter_done_neon_tx())
-                self._sol_neon_txs_db.set_tx_list(cursor, neon_block.iter_done_neon_tx())
                 self._neon_tx_logs_db.set_tx_list(cursor, neon_block.iter_done_neon_tx())
+                self._sol_neon_txs_db.set_tx_list(cursor, neon_block.iter_sol_neon_ix())
                 self._sol_tx_costs_db.set_cost_list(cursor, neon_block.iter_sol_tx_cost())
 
         if self.get_starting_block().block_slot == 0:
@@ -139,8 +139,9 @@ class IndexerDB:
         self._min_receipt_block_slot = block_slot
         self._constants_db['min_receipt_block_slot'] = block_slot
 
-    def get_logs(self, from_block, to_block, addresses, topics, block_hash):
-        return self._neon_tx_logs_db.get_logs(from_block, to_block, addresses, topics, block_hash)
+    def get_log_list(self, from_block: Optional[int], to_block: Optional[int],
+                     address_list: List[str], topic_list: List[List[str]]) -> List[Dict[str, Any]]:
+        return self._neon_tx_logs_db.get_log_list(from_block, to_block, address_list, topic_list)
 
     def get_tx_list_by_block_slot(self, block_slot: int) -> List[NeonTxReceiptInfo]:
         return self._neon_txs_db.get_tx_list_by_block_slot(block_slot)

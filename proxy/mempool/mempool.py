@@ -5,7 +5,7 @@ import logging
 from typing import List, Tuple, Optional, Any, Dict, cast, Iterator, Union
 
 from .executor_mng import MPExecutorMng
-from .mempool_api import MPGasPriceResult
+from .mempool_api import MPResult, MPGasPriceResult
 from .mempool_api import MPRequest, MPRequestType, MPTask, MPTxRequestList
 from .mempool_api import MPTxExecResult, MPTxExecResultCode, MPTxRequest, MPTxExecRequest
 from .mempool_api import MPTxSendResult, MPTxSendResultCode
@@ -24,7 +24,6 @@ from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.elf_params import ElfParams
 from ..common_neon.errors import EthereumError
 from ..common_neon.eth_proto import NeonTx
-from ..common_neon.data import Result
 from ..common_neon.utils.json_logger import logging_context
 
 from ..statistic.data import NeonTxBeginData, NeonTxEndData
@@ -32,6 +31,7 @@ from ..statistic.proxy_client import ProxyStatClient
 
 
 LOG = logging.getLogger(__name__)
+
 
 class MPTxEndCode(enum.Enum):
     Unspecified = enum.auto()
@@ -48,7 +48,7 @@ class MemPool:
     def __init__(self, config: Config, stat_client: ProxyStatClient, op_res_mng: OpResMng, executor_mng: MPExecutorMng):
         capacity = config.mempool_capacity
         LOG.info(f"Init mempool schedule with capacity: {capacity}")
-        LOG.info(f"Config: {config}")
+        LOG.info(f"Config: {config.as_dict()}")
         self._tx_schedule = MPTxSchedule(capacity)
         self._schedule_cond = asyncio.Condition()
         self._processing_task_list: List[MPTask] = []
@@ -277,9 +277,7 @@ class MemPool:
         elif mp_tx_res.code == MPTxExecResultCode.Done:
             self._on_done_tx(tx)
             return MPTxEndCode.Done
-        else:
-            assert False, f'Unknown result code {mp_tx_res.code}'
-        return MPTxEndCode.Unspecified  # skip task
+        assert False, f'Unknown result code {mp_tx_res.code}'
 
     def _on_reschedule_tx(self, tx: MPTxRequest) -> None:
         LOG.debug(f"Got reschedule status for tx {tx.sig}.")
@@ -307,13 +305,19 @@ class MemPool:
         self._reschedule_tx_impl(tx)
 
     def _on_done_tx(self, tx: MPTxRequest):
-        self._op_res_mng.release_resource(tx.sig)
+        resource = self._op_res_mng.release_resource(tx.sig)
+        if resource is not None:
+            alt_address_list = tx.neon_tx_exec_cfg.alt_address_list
+            self._free_alt_queue_task_loop.add_alt_address_list(alt_address_list, resource.private_key)
         self._tx_schedule.done_tx(tx)
         self._completed_tx_dict.add(tx.sig, tx.neon_tx, None)
         LOG.debug(f"Request {tx.sig} is done")
 
     def _on_fail_tx(self, tx: MPTxRequest, exc: Optional[BaseException]):
-        self._op_res_mng.release_resource(tx.sig)
+        resource = self._op_res_mng.release_resource(tx.sig)
+        if resource is not None:
+            alt_address_list = tx.neon_tx_exec_cfg.alt_address_list
+            self._free_alt_queue_task_loop.add_alt_address_list(alt_address_list, resource.private_key)
         self._tx_schedule.fail_tx(tx)
         self._completed_tx_dict.add(tx.sig, tx.neon_tx, exc)
         LOG.debug(f"Request {tx.sig} is failed - dropped away")
@@ -329,22 +333,22 @@ class MemPool:
     def _create_kick_tx_schedule_task(self):
         asyncio.get_event_loop().create_task(self._kick_tx_schedule())
 
-    def suspend_processing(self) -> Result:
+    def suspend_processing(self) -> MPResult:
         if not self._is_active:
             LOG.warning("No need to suspend mempool, already suspended")
-            return Result()
+            return MPResult()
         self._is_active = False
         LOG.info("Transaction processing suspended")
-        return Result()
+        return MPResult()
 
-    def resume_processing(self) -> Result:
+    def resume_processing(self) -> MPResult:
         if self._is_active:
             LOG.warning("No need to resume mempool, not suspended")
-            return Result()
+            return MPResult()
         self._is_active = True
         LOG.info("Transaction processing resumed")
         self._create_kick_tx_schedule_task()
-        return Result()
+        return MPResult()
 
     def is_active(self) -> bool:
         return self._is_active

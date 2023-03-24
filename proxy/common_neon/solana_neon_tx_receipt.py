@@ -214,6 +214,7 @@ class SolIxMetaInfo:
 
     neon_tx_sig: str
     neon_gas_used: int
+    neon_total_gas_used: int
 
     neon_tx_return: Optional[NeonLogTxReturn]
     neon_tx_event_list: List[NeonLogTxEvent]
@@ -237,8 +238,10 @@ class SolIxMetaInfo:
             neon_tx_sig = '0x' + log_info.neon_tx_sig.neon_sig.hex()
 
         neon_ix_gas_usage = 0
+        neon_ix_total_gas_usage = 0
         if log_info.neon_tx_ix is not None:
             neon_ix_gas_usage = log_info.neon_tx_ix.gas_used
+            neon_ix_total_gas_usage = log_info.neon_tx_ix.total_gas_used
 
         status = SolIxMetaInfo.Status.UNKNOWN
         if log_list.status == _SolIxLogList.Status.FAILED:
@@ -262,6 +265,7 @@ class SolIxMetaInfo:
 
             neon_tx_sig=neon_tx_sig,
             neon_gas_used=neon_ix_gas_usage,
+            neon_total_gas_used=neon_ix_total_gas_usage,
             neon_tx_return=log_info.neon_tx_return,
             neon_tx_event_list=log_info.neon_tx_event_list
         )
@@ -275,7 +279,7 @@ class SolTxCostInfo:
     sol_spent: int
 
     _str: str
-    _hash: int
+    _calculated_stat: bool
 
     @staticmethod
     def from_tx_meta(tx_meta: SolTxMetaInfo) -> SolTxCostInfo:
@@ -288,7 +292,7 @@ class SolTxCostInfo:
             operator=msg['accountKeys'][0],
             sol_spent=(meta['preBalances'][0] - meta['postBalances'][0]),
             _str='',
-            _hash=0
+            _calculated_stat=False,
         )
 
     def __str__(self) -> str:
@@ -297,11 +301,12 @@ class SolTxCostInfo:
             object.__setattr__(self, '_str', _str)
         return self._str
 
-    def __hash__(self) -> int:
-        if self._hash == 0:
-            _hash = hash(self.sol_sig)
-            object.__setattr__(self, '_hash', _hash)
-        return self._hash
+    def set_calculated_stat(self) -> None:
+        object.__setattr__(self, '_calculated_stat', True)
+
+    @property
+    def is_calculated_stat(self) -> bool:
+        return self._calculated_stat
 
 
 @dataclass(frozen=True)
@@ -315,7 +320,7 @@ class SolNeonIxReceiptInfo(SolIxMetaInfo):
     sol_sig: str
     block_slot: int
 
-    program_ix: Optional[int]
+    program_ix: int
     ix_data: bytes
 
     neon_step_cnt: int
@@ -325,7 +330,6 @@ class SolNeonIxReceiptInfo(SolIxMetaInfo):
     ident: Union[Tuple[str, int, int, int], Tuple[str, int, int]]
 
     _str: str
-    _hash: int
     _account_list: List[int]
     _account_key_list: List[str]
 
@@ -343,8 +347,6 @@ class SolNeonIxReceiptInfo(SolIxMetaInfo):
             ident = tx_meta.sol_sig, tx_meta.block_slot, ix_meta.idx
         else:
             ident = tx_meta.sol_sig, tx_meta.block_slot, ix_meta.idx, cast(int, ix_meta.inner_idx)
-
-        _hash = hash(ident)
 
         ix_data = SolNeonIxReceiptInfo._decode_ix_data(ix_meta.ix)
 
@@ -373,12 +375,12 @@ class SolNeonIxReceiptInfo(SolIxMetaInfo):
 
             neon_tx_sig=ix_meta.neon_tx_sig,
             neon_gas_used=ix_meta.neon_gas_used,
+            neon_total_gas_used=ix_meta.neon_total_gas_used,
             neon_tx_return=ix_meta.neon_tx_return,
             neon_tx_event_list=ix_meta.neon_tx_event_list,
             neon_step_cnt=0,
 
             _str='',
-            _hash=0,
             _account_list=_account_list,
             _account_key_list=_account_key_list,
         )
@@ -389,23 +391,18 @@ class SolNeonIxReceiptInfo(SolIxMetaInfo):
             object.__setattr__(self, '_str', _str)
         return self._str
 
-    def __hash__(self) -> int:
-        if self._hash == 0:
-            _hash = hash(self.ident)
-            object.__setattr__(self, '_hash', _hash)
-        return self._hash
-
     def __eq__(self, other: SolNeonIxReceiptInfo) -> bool:
         return self.ident == other.ident
 
     @staticmethod
     def _decode_ix_data(ix: Dict[str, Any]) -> _SolIxData:
+        ix_data = ix.get('data', None)
         try:
-            ix_data = base58.b58decode(ix['data'])
+            ix_data = base58.b58decode(ix_data)
             return _SolIxData(program_ix=int(ix_data[0]), ix_data=ix_data)
         except BaseException as exc:
             LOG.warning(f'Fail to get a program instruction', exc_info=exc)
-            return _SolIxData(program_ix=None, ix_data=b'')
+            return _SolIxData(program_ix=int(ix_data[0]), ix_data=b'')
 
     def set_neon_step_cnt(self, value: int) -> None:
         assert self.neon_step_cnt == 0
@@ -539,6 +536,10 @@ class SolTxReceiptInfo(SolTxMetaInfo):
 
         return self._account_key_list[program_idx]
 
+    def _has_ix_data(self, ix: Dict[str, Any]) -> bool:
+        ix_data = ix.get('data', None)
+        return (ix_data is not None) and (len(ix_data) > 1)
+
     def _is_neon_program(self, ix: Dict[str, Any]) -> bool:
         return self._get_program_key(ix) == EVM_LOADER_ID
 
@@ -567,7 +568,7 @@ class SolTxReceiptInfo(SolTxMetaInfo):
 
     def iter_sol_neon_ix(self) -> Iterator[SolNeonIxReceiptInfo]:
         for ix_idx, ix in enumerate(self._ix_list):
-            if self._is_neon_program(ix):
+            if self._is_neon_program(ix) and self._has_ix_data(ix):
                 log_list = self._get_log_list(ix_idx, None)
                 if log_list is not None:
                     ix_meta = SolIxMetaInfo.from_log_list(ix, ix_idx, None, log_list)
@@ -575,7 +576,7 @@ class SolTxReceiptInfo(SolTxMetaInfo):
 
             inner_ix_list = self._get_inner_ix_list(ix_idx)
             for inner_idx, inner_ix in enumerate(inner_ix_list):
-                if self._is_neon_program(inner_ix):
+                if self._is_neon_program(inner_ix) and self._has_ix_data(inner_ix):
                     log_list = self._get_log_list(ix_idx, inner_idx)
                     if log_list is not None:
                         ix_meta = SolIxMetaInfo.from_log_list(inner_ix, ix_idx, inner_idx, log_list)

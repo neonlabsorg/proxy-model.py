@@ -1,8 +1,8 @@
 import logging
-from typing import List, Optional, Callable, cast
+from typing import List, Optional, Callable, Dict, cast
 
 from ..common_neon.constants import ADDRESS_LOOKUP_TABLE_ID
-from ..common_neon.layouts import ACCOUNT_LOOKUP_TABLE_LAYOUT, ALTAccountInfo
+from ..common_neon.layouts import ACCOUNT_LOOKUP_TABLE_LAYOUT, ALTAccountInfo, AccountInfo
 from ..common_neon.neon_instruction import NeonIxBuilder
 from ..common_neon.solana_tx import SolAccount, SolPubKey, SolTxIx, SolTx
 from ..common_neon.solana_tx_legacy import SolLegacyTx
@@ -28,46 +28,70 @@ class MPExecutorFreeALTQueueTask(MPExecutorBaseTask):
     def _get_block_height(self) -> int:
         return self._solana.get_block_height(commitment=self._config.finalized_commitment)
 
+    def _decode_alt_info(self, account_info: Optional[AccountInfo], secret: bytes) -> Optional[MPALTInfo]:
+        try:
+            if account_info is None:
+                return None
+
+            alt_info = ALTAccountInfo.from_account_info(account_info)
+
+            block_height = self._solana.get_block_height(
+                block_slot=(
+                    alt_info.last_extended_slot if alt_info.deactivation_slot is None else
+                    alt_info.deactivation_slot
+                ),
+                commitment=self._config.finalized_commitment
+            )
+
+            mp_alt_info = MPALTInfo(
+                last_extended_slot=alt_info.last_extended_slot,
+                deactivation_slot=alt_info.deactivation_slot,
+                block_height=block_height,
+                table_account=str(account_info.address),
+                operator_key=secret
+            )
+
+            return mp_alt_info
+        except BaseException as exc:
+            LOG.error('Cannot decode ALT', exc_info=exc)
+        return None
+
     def get_alt_list(self, mp_req: MPGetALTList) -> MPALTListResult:
-        alt_info_list: List[MPALTInfo] = []
+        mp_alt_info_dict: Dict[str, MPALTInfo] = dict()
+
+        for alt_address in mp_req.alt_address_list:
+            account_info = self._solana.get_account_info(
+                SolPubKey.from_string(alt_address.table_account),
+                length=ACCOUNT_LOOKUP_TABLE_LAYOUT.sizeof(),
+                commitment=self._config.finalized_commitment
+            )
+
+            mp_alt_info = self._decode_alt_info(account_info, alt_address.secret)
+            if mp_alt_info is not None:
+                mp_alt_info_dict[alt_address.table_account] = mp_alt_info
 
         for secret in mp_req.secret_list:
-            operator_account = SolAccount.from_secret_key(secret)
+            operator_account = SolAccount.from_seed(secret)
 
             account_info_list = self._solana.get_program_account_info_list(
                 program=ADDRESS_LOOKUP_TABLE_ID,
                 offset=0,
                 length=ACCOUNT_LOOKUP_TABLE_LAYOUT.sizeof(),
                 data_offset=self._auth_offset,
-                data=bytes(operator_account.public_key)
+                data=bytes(operator_account.pubkey()),
+                commitment=self._config.finalized_commitment
             )
 
             for account_info in account_info_list:
-                try:
-                    alt_info = ALTAccountInfo.from_account_info(account_info)
+                if str(account_info.address) in mp_alt_info_dict:
+                    continue
 
-                    block_height = self._solana.get_block_height(
-                        block_slot=(
-                            alt_info.last_extended_slot if alt_info.deactivation_slot is None else
-                            alt_info.deactivation_slot
-                        ),
-                        commitment=self._config.finalized_commitment
-                    )
-
-                    mp_alt_info = MPALTInfo(
-                        last_extended_slot=alt_info.last_extended_slot,
-                        deactivation_slot=alt_info.deactivation_slot,
-                        block_height=block_height,
-                        table_account=str(account_info.address),
-                        operator_key=secret
-                    )
-
-                    alt_info_list.append(mp_alt_info)
-                except BaseException as exc:
-                    LOG.error('Cannot decode ALT', exc_info=exc)
+                mp_alt_info = self._decode_alt_info(account_info, secret)
+                if mp_alt_info is not None:
+                    mp_alt_info_dict[mp_alt_info.table_account] = mp_alt_info
 
         block_height = self._get_block_height()
-        return MPALTListResult(block_height=block_height, alt_info_list=alt_info_list)
+        return MPALTListResult(block_height=block_height, alt_info_list=list(mp_alt_info_dict.values()))
 
     def _free_alt_list(self, alt_info_list: List[MPALTInfo], name: str,
                        make_ix: Callable[[NeonIxBuilder, SolPubKey], SolTxIx]) -> MPALTListResult:
@@ -82,7 +106,7 @@ class MPExecutorFreeALTQueueTask(MPExecutorBaseTask):
                 LOG.debug('Failed to execute.', exc_info=exc)
             tx_list.clear()
 
-        tx_list: List[SolTx] = []
+        tx_list: List[SolTx] = list()
         signer: Optional[SolAccount] = None
 
         alt_info_list = sorted(alt_info_list, key=lambda a: a.operator_key)
@@ -92,16 +116,19 @@ class MPExecutorFreeALTQueueTask(MPExecutorBaseTask):
         for alt_info in alt_info_list:
             operator_key = alt_info.operator_key
 
-            if (signer is not None) and (signer.secret_key != operator_key):
+            if (signer is not None) and (signer.secret() != operator_key):
                 _send_tx_list()
 
             if len(tx_list) == 0:
-                signer = SolAccount.from_secret_key(operator_key)
-                ix_builder = NeonIxBuilder(signer.public_key)
+                signer = SolAccount.from_seed(operator_key)
+                ix_builder = NeonIxBuilder(signer.pubkey())
                 block_height = self._get_block_height()
 
             alt_info.block_height = block_height
-            tx = SolLegacyTx(name=name, instructions=[make_ix(ix_builder, SolPubKey(alt_info.table_account))])
+            tx = SolLegacyTx(
+                name=name,
+                instructions=[make_ix(ix_builder, SolPubKey.from_string(alt_info.table_account))]
+            )
             tx_list.append(tx)
 
         _send_tx_list()

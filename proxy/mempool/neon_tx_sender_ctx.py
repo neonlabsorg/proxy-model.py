@@ -1,5 +1,5 @@
 import logging
-from typing import Dict
+from typing import Dict, List
 
 from .operator_resource_mng import OpResInfo
 
@@ -11,6 +11,7 @@ from ..common_neon.eth_proto import NeonTx
 from ..common_neon.neon_instruction import NeonIxBuilder
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_tx import SolPubKey, SolAccountMeta, SolAccount
+from ..common_neon.solana_alt import ALTAddress
 
 
 LOG = logging.getLogger(__name__)
@@ -62,25 +63,25 @@ class NeonTxSendCtx:
 
     def _add_meta(self, pubkey: SolPubKey, is_writable: bool) -> None:
         key = str(pubkey)
-        if key in self._neon_meta_dict:
-            self._neon_meta_dict[key].is_writable |= is_writable
-        else:
-            self._neon_meta_dict[key] = SolAccountMeta(pubkey=pubkey, is_signer=False, is_writable=is_writable)
+        meta = self._neon_meta_dict.get(key, None)
+        if meta is not None:
+            is_writable |= meta.is_writable
+        self._neon_meta_dict[key] = SolAccountMeta(pubkey=pubkey, is_signer=False, is_writable=is_writable)
 
     def _build_account_list(self, emulated_account_dict: NeonAccountDict) -> None:
         self._neon_meta_dict.clear()
 
         # Parse information from the emulator output
         for account_desc in emulated_account_dict['accounts']:
-            self._add_meta(SolPubKey(account_desc['account']), True)
+            self._add_meta(SolPubKey.from_string(account_desc['account']), True)
 
         for account_desc in emulated_account_dict['solana_accounts']:
-            self._add_meta(SolPubKey(account_desc['pubkey']), account_desc['is_writable'])
+            self._add_meta(SolPubKey.from_string(account_desc['pubkey']), account_desc['is_writable'])
 
         neon_meta_list = list(self._neon_meta_dict.values())
         LOG.debug(
             f'metas ({len(neon_meta_list)}): ' +
-            ', '.join([f'{m.pubkey, m.is_signer, m.is_writable}' for m in neon_meta_list])
+            ', '.join([f'{str(m.pubkey), m.is_signer, m.is_writable}' for m in neon_meta_list])
         )
 
         contract = self._neon_tx.contract()
@@ -149,5 +150,14 @@ class NeonTxSendCtx:
     def is_holder_completed(self) -> bool:
         return self._is_holder_completed
 
+    @property
+    def alt_address_list(self) -> List[ALTAddress]:
+        return self._neon_tx_exec_cfg.alt_address_list
+
     def set_holder_completed(self, value=True) -> None:
         self._is_holder_completed = value
+
+    def add_alt_address(self, alt_address: ALTAddress) -> None:
+        self._neon_tx_exec_cfg.add_alt_address(alt_address)
+
+
