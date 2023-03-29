@@ -8,6 +8,7 @@ from enum import IntEnum
 from typing import Any, Optional, List, Dict
 
 from ..common_neon.data import NeonTxExecCfg
+from ..common_neon.utils import str_fmt_object
 from ..common_neon.eth_proto import NeonTx
 from ..common_neon.solana_tx import SolPubKey
 
@@ -40,6 +41,9 @@ class MPRequest:
     req_id: str
     type: MPRequestType = MPRequestType.Unspecified
 
+    def __str__(self) -> str:
+        return str_fmt_object(self)
+
 
 @dataclass
 class MPTxRequest(MPRequest):
@@ -55,7 +59,7 @@ class MPTxRequest(MPRequest):
 
         self.gas_price = self.neon_tx.gasPrice
         if self.sender_address is None:
-            self.sender_address = "0x" + self.neon_tx.sender()
+            self.sender_address = self.neon_tx.hex_sender
         if self.start_time == 0:
             self.start_time = time.time_ns()
 
@@ -64,7 +68,7 @@ class MPTxRequest(MPRequest):
         return self.neon_tx.nonce
 
     def has_chain_id(self) -> bool:
-        return self.neon_tx.hasChainId()
+        return self.neon_tx.has_chain_id()
 
 
 @dataclass(frozen=True)
@@ -225,12 +229,16 @@ class MPTxExecResultCode(IntEnum):
     Reschedule = 1
     Failed = 2
     BadResource = 3
+    NonceTooHigh = 4
 
 
 @dataclass(frozen=True)
 class MPTxExecResult:
     code: MPTxExecResultCode
     data: Any
+
+    def __str__(self) -> str:
+        return str_fmt_object(self)
 
 
 class MPTxSendResultCode(IntEnum):

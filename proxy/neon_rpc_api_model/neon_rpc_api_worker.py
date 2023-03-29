@@ -672,11 +672,11 @@ class NeonRpcApiWorker:
                     result[k] = v
             return result
 
-        neon_sig = '0x' + neon_tx.hash_signed().hex()
-        LOG.debug(f"sendRawTransaction {neon_sig}: {_readable_tx(neon_tx)}")
+        neon_tx_sig = neon_tx.hex_tx_sig
+        LOG.debug(f'sendRawTransaction {neon_tx_sig}: {_readable_tx(neon_tx)}')
 
         try:
-            neon_tx_receipt: NeonTxReceiptInfo = self._db.get_tx_by_neon_sig(neon_sig)
+            neon_tx_receipt: NeonTxReceiptInfo = self._db.get_tx_by_neon_sig(neon_tx_sig)
             if neon_tx_receipt is not None:
                 raise EthereumError(message='already known')
 
@@ -685,11 +685,11 @@ class NeonRpcApiWorker:
             neon_tx_exec_cfg = neon_tx_validator.precheck()
 
             result: MPTxSendResult = self._mempool_client.send_raw_transaction(
-                req_id=get_req_id_from_log(), neon_sig=neon_sig, neon_tx=neon_tx, neon_tx_exec_cfg=neon_tx_exec_cfg
+                req_id=get_req_id_from_log(), neon_sig=neon_tx_sig, neon_tx=neon_tx, neon_tx_exec_cfg=neon_tx_exec_cfg
             )
 
             if result.code in (MPTxSendResultCode.Success, MPTxSendResultCode.AlreadyKnown):
-                return neon_sig
+                return neon_tx_sig
             elif result.code == MPTxSendResultCode.Underprice:
                 raise EthereumError(message='replacement transaction underpriced')
             elif result.code == MPTxSendResultCode.NonceTooLow:
@@ -798,13 +798,14 @@ class NeonRpcApiWorker:
         try:
             signed_tx = NeonAccount().sign_transaction(tx, account.private)
             raw_tx = signed_tx.rawTransaction.hex()
+            neon_tx = NeonTx.from_string(bytearray.fromhex(raw_tx[2:]))
 
-            tx['from'] = sender
-            tx['to'] = NeonTx.from_string(bytearray.fromhex(raw_tx[2:])).toAddress.hex()
-            tx['hash'] = signed_tx.hash.hex()
-            tx['r'] = hex(signed_tx.r)
-            tx['s'] = hex(signed_tx.s)
-            tx['v'] = hex(signed_tx.v)
+            tx['from'] = neon_tx.hex_sender
+            tx['to'] = neon_tx.hex_to_address
+            tx['hash'] = neon_tx.hex_tx_sig
+            tx['r'] = hex(neon_tx.r)
+            tx['s'] = hex(neon_tx.s)
+            tx['v'] = hex(neon_tx.v)
 
             return {
                 'raw': raw_tx,

@@ -1,4 +1,5 @@
 import math
+import logging
 
 from typing import Optional, List, Any, Iterator
 
@@ -7,7 +8,12 @@ from ..indexer.base_db import BaseDB
 from ..common_neon.config import Config
 
 
+LOG = logging.getLogger(__name__)
+
+
 class SolBlocksDB(BaseDB):
+    _one_block_sec = 0.4
+
     def __init__(self, config: Config):
         super().__init__(
             table_name='solana_blocks',
@@ -57,17 +63,17 @@ class SolBlocksDB(BaseDB):
             value_list = cursor.fetchone()
 
         if value_list is None:
-            self.warning(f'Failed to get nearest blocks for block {block_slot}. Calculate based on genesis')
-            return math.ceil(block_slot * 0.4) + self._config.genesis_timestamp
+            LOG.warning(f'Failed to get nearest blocks for block {block_slot}. Calculate based on genesis')
+            return math.ceil(block_slot * self._one_block_sec) + self._config.genesis_timestamp
 
         nearest_block_slot = value_list[0]
         if nearest_block_slot is not None:
             nearest_block_time = value_list[1]
-            return nearest_block_time + math.ceil((block_slot - nearest_block_slot) * 0.4)
+            return nearest_block_time + math.ceil((block_slot - nearest_block_slot) * self._one_block_sec)
 
         nearest_block_slot = value_list[2]
         nearest_block_time = value_list[3]
-        return nearest_block_time - math.ceil((nearest_block_slot - block_slot) * 0.4)
+        return nearest_block_time - math.ceil((nearest_block_slot - block_slot) * self._one_block_sec)
 
     def _check_block_time(self, block_slot: int, block_time: Optional[int]) -> int:
         return block_time or self._generate_fake_block_time(block_slot)

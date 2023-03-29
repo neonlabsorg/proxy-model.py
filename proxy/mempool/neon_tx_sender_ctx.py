@@ -4,9 +4,7 @@ from typing import Dict, List, Optional
 from .operator_resource_mng import OpResInfo
 
 from ..common_neon.config import Config
-from ..common_neon.constants import ACTIVE_HOLDER_TAG, FINALIZED_HOLDER_TAG, HOLDER_TAG
 from ..common_neon.data import NeonTxExecCfg, NeonAccountDict, NeonEmulatedResult
-from ..common_neon.errors import BadResourceError
 from ..common_neon.eth_proto import NeonTx
 from ..common_neon.neon_instruction import NeonIxBuilder
 from ..common_neon.solana_interactor import SolInteractor
@@ -31,29 +29,10 @@ class NeonTxSendCtx:
         self._ix_builder.init_neon_tx(self._neon_tx)
         self._ix_builder.init_iterative(self._resource.holder)
 
-        self._neon_meta_dict: Dict[str, SolAccountMeta] = {}
+        self._neon_meta_dict: Dict[str, SolAccountMeta] = dict()
         self._build_account_list(self._neon_tx_exec_cfg.account_dict)
 
-        self._is_holder_completed = False
-        self._decode_holder_account()
-
-    def _decode_holder_account(self) -> None:
-        holder_info = self._solana.get_holder_account_info(self._resource.holder)
-        if holder_info is None:
-            raise BadResourceError(f'Bad holder account {str(self._resource.holder)}')
-        elif holder_info.tag == ACTIVE_HOLDER_TAG:
-            if holder_info.neon_tx_sig != '0x' + self.neon_sig.hex().lower():
-                raise BadResourceError(
-                    f'Holder account {str(self._resource.holder)} has another neon tx: {holder_info.neon_tx_sig}'
-                )
-            self._is_holder_completed = True
-        elif holder_info.tag == FINALIZED_HOLDER_TAG:
-            self._is_holder_completed = False
-        elif holder_info.tag == HOLDER_TAG:
-            holder_msg_len = len(self._ix_builder.holder_msg)
-            self._is_holder_completed = (self._ix_builder.holder_msg == holder_info.neon_tx_data[:holder_msg_len])
-        else:
-            raise BadResourceError(f'Holder account has bad tag: {holder_info.tag}')
+        self._is_holder_completed = None
 
     def _add_meta(self, pubkey: SolPubKey, is_writable: bool) -> None:
         key = str(pubkey)
@@ -78,9 +57,9 @@ class NeonTxSendCtx:
             ', '.join([f'{str(m.pubkey), m.is_signer, m.is_writable}' for m in neon_meta_list])
         )
 
-        contract = self._neon_tx.contract()
+        contract = self._neon_tx.hex_contract
         if contract is not None:
-            LOG.debug(f'contract 0x{contract}: {len(neon_meta_list) + 6} accounts')
+            LOG.debug(f'contract {contract}: {len(neon_meta_list) + 6} accounts')
 
         self._ix_builder.init_neon_account_list(neon_meta_list)
 
@@ -104,14 +83,6 @@ class NeonTxSendCtx:
     @property
     def config(self) -> Config:
         return self._config
-
-    @property
-    def neon_sig(self) -> bytes:
-        return self._neon_tx.hash_signed()
-
-    @property
-    def sender(self) -> str:
-        return '0x' + self._neon_tx.sender()
 
     @property
     def neon_tx(self) -> NeonTx:
@@ -161,6 +132,16 @@ class NeonTxSendCtx:
 
     def set_strategy_idx(self, idx: int) -> None:
         self._neon_tx_exec_cfg.set_strategy_idx(idx)
+
+    @property
+    def sol_tx_cnt(self) -> int:
+        return self._neon_tx_exec_cfg.sol_tx_cnt
+
+    def has_completed_receipt(self) -> bool:
+        return self._neon_tx_exec_cfg.has_completed_receipt()
+
+    def set_completed_receipt(self, value: bool) -> None:
+        self._neon_tx_exec_cfg.set_completed_receipt(value)
 
     def set_holder_usage(self, value: bool) -> None:
         self._neon_tx_exec_cfg.set_holder_usage(value)

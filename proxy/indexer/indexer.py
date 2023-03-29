@@ -346,7 +346,6 @@ class Indexer(IndexerBase):
         with logging_context(ident='stat'):
             self._counted_logger.print(
                 self._config,
-                LOG.debug,
                 list_value_dict={
                     'receipts processing ms': state.process_time_ms,
                     'processed neon blocks': state.neon_block_cnt,

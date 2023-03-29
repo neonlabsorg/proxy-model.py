@@ -94,11 +94,16 @@ class BaseNeonTxStrategy(abc.ABC):
         for stage in self._prep_stage_list:
             stage.update_after_emulate()
 
+    def has_completed_receipt(self) -> bool:
+        return self._sol_tx_list_sender.has_completed_receipt()
+
+    @abc.abstractmethod
     def execute(self) -> NeonTxResultInfo:
-        try:
-            return self._execute()
-        finally:
-            pass
+        pass
+
+    @abc.abstractmethod
+    def cancel(self) -> None:
+        pass
 
     def _build_prep_tx_list(self) -> Generator[List[SolTx], None, None]:
         tx_list_list: List[List[SolTx]] = list()
@@ -123,7 +128,7 @@ class BaseNeonTxStrategy(abc.ABC):
         return True
 
     def _validate_tx_has_chainid(self) -> bool:
-        if self._ctx.neon_tx.hasChainId():
+        if self._ctx.neon_tx.has_chain_id():
             return True
 
         self._validation_error_msg = 'Transaction without chain-id'
@@ -169,10 +174,6 @@ class BaseNeonTxStrategy(abc.ABC):
         for sol_neon_ix in tx_receipt_info.iter_sol_neon_ix():
             return sol_neon_ix
         return None
-
-    @abc.abstractmethod
-    def _execute(self) -> NeonTxResultInfo:
-        pass
 
     @abc.abstractmethod
     def _build_tx(self) -> SolLegacyTx:

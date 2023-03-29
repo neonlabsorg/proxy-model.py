@@ -88,23 +88,3 @@ docker-compose -f docker-compose-test.yml -f docker-compose-test.override.yml up
 
 # Remove unused
 docker rm -f solana
-
-
-# Wait for proxy
-export PROXY_URL=http:\/\/localhost:9090\/solana
-CHECK_COMMAND='curl $PROXY_URL -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"eth_blockNumber\",\"params\":[]}" 2> /dev/null | grep -cF "\"result\""'
-MAX_COUNT=500
-CURRENT_ATTEMPT=1
-while [[ $CURRENT_ATTEMPT -lt $MAX_COUNT ]]
-do
-  echo "proxy attempt: $CURRENT_ATTEMPT" 1>&2
-  CHECK_COMMAND_RESULT=$(eval $CHECK_COMMAND)
-  echo $CHECK_COMMAND_RESULT >> /tmp/output.txt
-  if [[ "$CHECK_COMMAND_RESULT" == "1" ]]; then
-    echo 'proxy is up' 1>&2
-    break
-  fi
-
-  ((CURRENT_ATTEMPT=CURRENT_ATTEMPT+1))
-  sleep 2
-done;

@@ -2,7 +2,7 @@ import logging
 
 from typing import List, Generator
 
-from ..common_neon.errors import NoMoreRetriesError, RescheduleError
+from ..common_neon.errors import NoMoreRetriesError
 from ..common_neon.solana_tx import SolTx
 from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_tx_list_sender import SolTxSendState
@@ -20,35 +20,30 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
     name = 'TxStepFromData'
     _cancel_name = 'CancelWithHash'
 
-    def __init__(self, ctx: NeonTxSendCtx) -> None:
-        super().__init__(ctx)
-        self._uniq_idx = 0
-
     def complete_init(self) -> None:
         super().complete_init()
         self._ctx.set_holder_usage(True)
 
-    def _execute(self) -> NeonTxResultInfo:
+    def execute(self) -> NeonTxResultInfo:
+        self._sol_tx_list_sender.clear()
+
         assert self.is_valid()
 
-        try:
-            self._send_tx_list([self.name], self._build_execute_tx_list())
+        self._send_tx_list([self.name], self._build_execute_tx_list())
 
-            # Not enough iterations, try `retry_on_fail` times to complete the Neon Tx
-            retry_on_fail = self._ctx.config.retry_on_fail
-            for retry in range(retry_on_fail):
-                neon_tx_res = self._decode_neon_tx_result()
-                if neon_tx_res.is_valid():
-                    return neon_tx_res
+        # Not enough iterations, try `retry_on_fail` times to complete the Neon Tx
+        retry_on_fail = self._ctx.config.retry_on_fail
+        for retry in range(retry_on_fail):
+            neon_tx_res = self._decode_neon_tx_result()
+            if neon_tx_res.is_valid():
+                return neon_tx_res
 
-                self._send_tx_list([], self._build_complete_tx_list())
+            self._send_tx_list([], self._build_complete_tx_list())
 
-            raise NoMoreRetriesError()
-        except RescheduleError:
-            raise
-        except BaseException:
-            self._send_tx_list([self._cancel_name], self._build_cancel_tx_list())
-            raise
+        raise NoMoreRetriesError()
+
+    def cancel(self) -> None:
+        self._send_tx_list([self._cancel_name], self._build_cancel_tx_list())
 
     def _build_execute_tx_list(self) -> Generator[List[SolTx], None, None]:
         LOG.debug(
@@ -89,8 +84,9 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
         return self._validate_tx_has_chainid()
 
     def _build_tx(self) -> SolLegacyTx:
-        self._uniq_idx += 1
-        return self._build_cu_tx(self._ctx.ix_builder.make_tx_step_from_data_ix(self._evm_step_cnt, self._uniq_idx))
+        uniq_idx = self._ctx.sol_tx_cnt
+        builder = self._ctx.ix_builder
+        return self._build_cu_tx(builder.make_tx_step_from_data_ix(self._evm_step_cnt, uniq_idx))
 
     def _decode_neon_tx_result(self) -> NeonTxResultInfo:
         neon_tx_res = NeonTxResultInfo()

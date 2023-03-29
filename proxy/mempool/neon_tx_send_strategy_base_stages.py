@@ -26,6 +26,35 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
     def complete_init(self) -> None:
         self._ctx.set_holder_usage(True)
 
+        if self._ctx.is_holder_completed() is not None:
+            return
+
+        is_holder_completed = self._is_holder_completed()
+        self._ctx.set_holder_completed(is_holder_completed)
+
+    def _is_holder_completed(self) -> bool:
+        solana = self._ctx.solana
+        holder = self._ctx.holder
+        builder = self._ctx.ix_builder
+
+        holder_info = solana.get_holder_account_info(holder)
+        if holder_info is None:
+            raise BadResourceError(f'Bad holder account {str(holder)}')
+
+        elif holder_info.tag == ACTIVE_HOLDER_TAG:
+            if holder_info.neon_tx_sig != self._ctx.neon_tx.hex_tx_sig:
+                raise BadResourceError(f'Holder account {str(holder)} has another neon tx: {holder_info.neon_tx_sig}')
+            return True
+
+        elif holder_info.tag == FINALIZED_HOLDER_TAG:
+            return False
+
+        elif holder_info.tag == HOLDER_TAG:
+            holder_msg_len = len(builder.holder_msg)
+            return builder.holder_msg == holder_info.neon_tx_data[:holder_msg_len]
+
+        raise BadResourceError(f'Holder account has bad tag: {holder_info.tag}')
+
     def get_tx_name_list(self) -> List[str]:
         return [self.name]
 
@@ -38,14 +67,13 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
         tx_list: List[SolTx] = list()
         holder_msg_offset = 0
         holder_msg = copy.copy(builder.holder_msg)
-        neon_tx_sig = self._ctx.neon_sig
 
         holder_msg_size = ElfParams().holder_msg_size
         while len(holder_msg):
             (holder_msg_part, holder_msg) = (holder_msg[:holder_msg_size], holder_msg[holder_msg_size:])
             tx = SolLegacyTx(
                 name='WriteHolderAccount',
-                ix_list=[builder.make_write_ix(neon_tx_sig, holder_msg_offset, holder_msg_part)]
+                ix_list=[builder.make_write_ix(holder_msg_offset, holder_msg_part)]
             )
             tx_list.append(tx)
             holder_msg_offset += holder_msg_size
@@ -137,10 +165,10 @@ def alt_strategy(cls):
             )
 
         def _validate_account_list_len(self) -> bool:
-            account_list_len = self._ctx.len_account_list + 6
-            if account_list_len < ALTLimit.max_tx_account_cnt:
+            len_account_list = self._ctx.len_account_list + 6
+            if len_account_list < ALTLimit.max_tx_account_cnt:
                 self._validation_error_msg = (
-                    f'Number of accounts {account_list_len} less than {ALTLimit.max_tx_account_cnt}'
+                    f'Number of accounts {len_account_list} less than {ALTLimit.max_tx_account_cnt}'
                 )
                 return False
             return True

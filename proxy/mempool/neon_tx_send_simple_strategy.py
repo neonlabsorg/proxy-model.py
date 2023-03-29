@@ -18,10 +18,9 @@ LOG = logging.getLogger(__name__)
 class SimpleNeonTxStrategy(BaseNeonTxStrategy):
     name = 'TxExecFromData'
 
-    def __init__(self, ctx: NeonTxSendCtx):
-        super().__init__(ctx)
+    def execute(self) -> NeonTxResultInfo:
+        self._sol_tx_list_sender.clear()
 
-    def _execute(self) -> NeonTxResultInfo:
         assert self.is_valid()
 
         self._send_tx_list([self.name], self._build_tx_list())
@@ -35,13 +34,18 @@ class SimpleNeonTxStrategy(BaseNeonTxStrategy):
             if ret is not None:
                 neon_tx_res.set_result(status=ret.status, gas_used=ret.gas_used)
                 LOG.debug(f'Set Neon tx result: {neon_tx_res}')
+
         elif tx_state.status == status.LogTruncatedError:
             neon_tx_res.set_lost_result(gas_used=1)  # unknown gas
             LOG.debug(f'Set truncated Neon tx result: {neon_tx_res}')
+
         else:
             raise SolTxError(tx_state.receipt)
 
         return neon_tx_res
+
+    def cancel(self) -> None:
+        LOG.error('canceling of simple Neon tx')
 
     def _build_tx_list(self) -> Generator[List[SolLegacyTx], None, None]:
         yield [self._build_tx()]

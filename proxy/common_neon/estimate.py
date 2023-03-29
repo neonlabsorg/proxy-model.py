@@ -89,8 +89,8 @@ class GasEstimate:
         self._cached_overhead_cost: Optional[int] = None
         self._cached_alt_cost: Optional[int] = None
 
-        self._account_list: List[SolAccountMeta] = []
-        self.emulator_json = {}
+        self._account_list: List[SolAccountMeta] = list()
+        self.emulator_json = dict()
 
     def execute(self):
         emulator_json = call_emulated(self._config, self._contract or "deploy", self._sender, self._data, self._value)

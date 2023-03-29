@@ -441,7 +441,7 @@ class TestMPSchedule(unittest.TestCase):
         acct0, acct1, acct2 = acct_list[0].address.lower(), acct_list[1].address.lower(), acct_list[2].address.lower()
         awaiting_dict = {acct0: 2, acct1: 2, acct2: 3}
 
-        for sender_addr, tx_list in schedule.get_taking_out_tx_list_iter():
+        for sender_addr, tx_list in schedule.taking_out_tx_list_iter:
             self.assertEqual(awaiting_dict[sender_addr], len(tx_list))
 
         self.assertEqual(schedule.get_pending_tx_count(acct0), 0)
@@ -454,7 +454,7 @@ class TestMPSchedule(unittest.TestCase):
 
             tx_pool = schedule._find_sender_pool(req.sender_address)
             self.assertIsNotNone(tx_pool)
-            self.assertEqual(tx_pool.get_top_tx().sig, req.sig)
+            self.assertEqual(tx_pool.top_tx.sig, req.sig)
             self.assertEqual(len(schedule._sender_pool_queue), 1)
             self.assertIn(tx_pool, schedule._sender_pool_queue)
 

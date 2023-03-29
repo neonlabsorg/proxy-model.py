@@ -9,6 +9,9 @@ from ..common_neon.solana_tx import SolPubKey, SolCommit
 
 
 class Config:
+    _one_block_sec = 0.4
+    _min_finalize_sec = _one_block_sec * 32
+
     def __init__(self):
         self._solana_url = os.environ.get("SOLANA_URL", "http://localhost:8899")
         self._pp_solana_url = os.environ.get("PP_SOLANA_URL", self._solana_url)
@@ -44,7 +47,7 @@ class Config:
         self._indexer_check_msec = self._env_int('INDEXER_CHECK_MSEC', 50, 200)
         self._max_tx_account_cnt = self._env_int("MAX_TX_ACCOUNT_COUNT", 20, 62)
         self._fuzz_fail_pct = self._env_int("FUZZ_FAIL_PCT", 0, 0)
-        self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", 4, math.ceil(0.4 * 32))
+        self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", 4, math.ceil(self._min_finalize_sec))
         self._confirm_check_msec = self._env_int("CONFIRM_CHECK_MSEC", 10, 100)
         self._max_evm_step_cnt_emulate = self._env_int("MAX_EVM_STEP_COUNT_TO_EMULATE", 1000, 500000)
         self._neon_cli_timeout = self._env_decimal("NEON_CLI_TIMEOUT", "2.5")

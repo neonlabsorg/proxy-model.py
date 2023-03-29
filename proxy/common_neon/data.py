@@ -4,6 +4,7 @@ from typing import Dict, Any, List
 
 from .solana_alt import ALTAddress
 from .solana_tx import SolTx
+from .utils import str_fmt_object
 
 
 NeonEmulatedResult = Dict[str, Any]
@@ -19,8 +20,13 @@ class NeonTxExecCfg:
         self._resize_iter_cnt = 0
 
         self._strategy_idx = 0
+        self._sol_tx_cnt = 0
+        self._has_completed_receipt = False
         self._is_holder_used = False
         self._sol_tx_list_dict: Dict[str, List[SolTx]] = dict()
+
+    def __str__(self) -> str:
+        return str_fmt_object(self)
 
     @property
     def state_tx_cnt(self) -> int:
@@ -68,8 +74,19 @@ class NeonTxExecCfg:
     def strategy_idx(self) -> int:
         return self._strategy_idx
 
+    @property
+    def sol_tx_cnt(self) -> int:
+        self._sol_tx_cnt += 1
+        return self._sol_tx_cnt
+
     def set_strategy_idx(self, idx: int) -> None:
         self._strategy_idx = idx
+
+    def has_completed_receipt(self) -> bool:
+        return self._has_completed_receipt
+
+    def set_completed_receipt(self, value: bool) -> None:
+        self._has_completed_receipt = value
 
     def is_holder_used(self) -> bool:
         return self._is_holder_used

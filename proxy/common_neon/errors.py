@@ -78,21 +78,41 @@ class CommitLevelError(RescheduleError):
 
 
 class NonceTooLowError(BaseException):
-    def __init__(self, sender_address: str, tx_nonce: int, state_tx_cnt: int):
-        super().__init__(sender_address, tx_nonce, state_tx_cnt)
-        self._sender_address = sender_address
+    _empty_sender = '?'
+
+    def __init__(self, sender: str, tx_nonce: int, state_tx_cnt: int):
+        super().__init__(sender, tx_nonce, state_tx_cnt)
+        self._sender = sender
         self._tx_nonce = tx_nonce
         self._state_tx_cnt = state_tx_cnt
 
-    def clone(self, sender_address) -> NonceTooLowError:
-        return NonceTooLowError(sender_address, self._tx_nonce, self._state_tx_cnt)
+    @staticmethod
+    def init_no_sender(tx_nonce: int, state_tx_cnt: int):
+        return NonceTooLowError(NonceTooLowError._empty_sender, tx_nonce, state_tx_cnt)
+
+    def has_sender(self) -> bool:
+        return self._sender != self._empty_sender
+
+    def init_sender(self, sender: str) -> NonceTooLowError:
+        return NonceTooLowError(sender, self._tx_nonce, self._state_tx_cnt)
 
     def __str__(self) -> str:
-        return f'nonce too low: address {self._sender_address}, tx: {self._tx_nonce} state: {self._state_tx_cnt}'
+        return f'nonce too low: address {self._sender}, tx: {self._tx_nonce} state: {self._state_tx_cnt}'
+
+
+class NonceTooHighError(BaseException):
+    def __str__(self) -> str:
+        return 'tx nonce is too high for execution'
+
+
+class BigTxError(BaseException):
+    def __str__(self) -> str:
+        return 'transaction is too big for execution'
 
 
 class WrongStrategyError(BaseException):
-    pass
+    def __str__(self) -> str:
+        return 'execution strategy is unsuitable'
 
 
 class CUBudgetExceededError(WrongStrategyError):

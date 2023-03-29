@@ -19,14 +19,10 @@ class CliBase:
     def _hide_solana_url(self, cmd: List[str]) -> str:
         return ' '.join([item.replace(self._config.solana_url, 'XXXX') for item in cmd])
 
-    def run_cli(self, cmd: List[str], data: str = None, **kwargs) -> str:
+    def run_cli(self, cmd: List[str], **kwargs) -> str:
         LOG.debug(f'Calling: {self._hide_solana_url(cmd)}')
 
-        if not data:
-            data = ''
-        LOG.debug(f'data: {data}, len: {len(data)}')
-
-        result = subprocess.run(cmd, input=data, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
+        result = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
         if result.stderr is not None:
             print(result.stderr, file=sys.stderr)
         output = result.stdout
@@ -44,7 +40,6 @@ class SolanaCli(CliBase):
             ]
             cmd.extend(list(args))
 
-            LOG.debug(f'Calling: {self._hide_solana_url(cmd)}')
             return self.run_cli(cmd, universal_newlines=True)
         except subprocess.CalledProcessError as err:
             LOG.error(f'ERR: solana error {str(err)}')
@@ -89,6 +84,7 @@ class NeonCli(CliBase):
                 raise subprocess.CalledProcessError(result.returncode, cmd, stderr=output["error"])
 
             return output.get('value', '')
+
         except subprocess.CalledProcessError as err:
             LOG.error(f'ERR: neon-cli error {str(err)}')
             raise

@@ -61,7 +61,7 @@ class SolBlockStatus:
 class SolInteractor:
     def __init__(self, config: Config, solana_url: str) -> None:
         self._config = config
-        self._request_counter = itertools.count()
+        self._request_cnt = itertools.count()
         self._endpoint_uri = solana_url
         self._session = requests.sessions.Session()
 
@@ -74,7 +74,7 @@ class SolInteractor:
         raw_response.raise_for_status()
         return raw_response
 
-    def _send_post_request(self, request) -> requests.Response:
+    def _send_post_request(self, request: Union[List[Dict[str, Any]], Dict[str, Any]]) -> requests.Response:
         """This method is used to make retries to send request to Solana"""
 
         retry = 0
@@ -82,6 +82,7 @@ class SolInteractor:
             try:
                 retry += 1
                 return self._simple_send_post_request(request)
+
             except requests.exceptions.RequestException as exc:
                 # Hide the Solana URL
                 str_err = str(exc).replace(self._endpoint_uri, 'XXXXX')
@@ -100,10 +101,10 @@ class SolInteractor:
             except BaseException as exc:
                 str_err = str(exc).replace(self._endpoint_uri, 'XXXXX')
                 LOG.error(f'Unknown exception on send request to Solana: {str_err}')
-                raise
+                raise SolanaUnavailableError(str_err)
 
     def _build_rpc_request(self, method: str, *param_list: Any) -> Dict[str, Any]:
-        request_id = next(self._request_counter) + 1
+        request_id = next(self._request_cnt) + 1
 
         return {
             'jsonrpc': '2.0',
@@ -336,7 +337,7 @@ class SolInteractor:
         for neon_account in neon_account_list:
             account_sol, _nonce = neon_2program(neon_account)
             requests_list.append(account_sol)
-        responses_list = self.get_account_info_list(requests_list, commitment)
+        responses_list = self.get_account_info_list(requests_list, commitment=commitment)
         accounts_list = list()
         for account_sol, info in zip(requests_list, responses_list):
             if (info is None) or (len(info.data) < ACCOUNT_INFO_LAYOUT.sizeof()) or (info.tag != NEON_ACCOUNT_TAG):
@@ -534,11 +535,11 @@ class SolInteractor:
 
     def get_block_status(self, block_slot: int) -> SolBlockStatus:
         finalized_block_info = self.get_block_info(block_slot, commitment=SolCommit.Finalized)
-        response = self._send_rpc_request('getBlockCommitment', [block_slot])
+        response = self._send_rpc_request('getBlockCommitment', block_slot)
         return self._get_block_status(block_slot, finalized_block_info, response)
 
     def check_confirm_of_tx_sig_list(self, tx_sig_list: List[str],
-                                     confirmed_set: Set[SolCommit.Type],
+                                     commit_set: Set[SolCommit.Type],
                                      valid_block_height: int) -> bool:
         if len(tx_sig_list) == 0:
             return True
@@ -565,7 +566,7 @@ class SolInteractor:
             for status in status_list:
                 if not status:
                     return False
-                elif status.get('confirmationStatus', '') not in confirmed_set:
+                elif status.get('confirmationStatus', '') not in commit_set:
                     return False
         return True
 

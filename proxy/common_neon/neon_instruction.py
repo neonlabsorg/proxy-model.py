@@ -72,8 +72,8 @@ class NeonIxBuilder:
         self._msg = rlp_encode(self._neon_tx)
         self._holder_msg = self._msg
 
-        keccak_result = self._neon_tx.hash_signed()
-        treasury_pool_index = int().from_bytes(keccak_result[:4], "little") % ElfParams().treasury_pool_max
+        neon_tx_sig = self._neon_tx.tx_sig
+        treasury_pool_index = int().from_bytes(neon_tx_sig[:4], "little") % ElfParams().treasury_pool_max
         self._treasury_pool_index_buf = treasury_pool_index.to_bytes(4, 'little')
         self._treasury_pool_address = SolPubKey.find_program_address(
             [b'treasury_pool', self._treasury_pool_index_buf],
@@ -144,10 +144,10 @@ class NeonIxBuilder:
                 SolAccountMeta(pubkey=pda_account, is_signer=False, is_writable=True),
             ])
 
-    def make_write_ix(self, neon_tx_sig: bytes, offset: int, data: bytes) -> SolTxIx:
+    def make_write_ix(self, offset: int, data: bytes) -> SolTxIx:
         ix_data = b"".join([
             EvmInstruction.HolderWrite.value,
-            neon_tx_sig,
+            self._neon_tx.tx_sig,
             offset.to_bytes(8, byteorder='little'),
             data
         ])

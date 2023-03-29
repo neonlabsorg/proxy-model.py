@@ -35,13 +35,15 @@ LOG = logging.getLogger(__name__)
 
 
 class MemPool:
+    _one_block_sec = 0.4
     check_task_timeout_sec = 0.01
-    reschedule_timeout_sec = 2
+    reschedule_timeout_sec = _one_block_sec * 3
 
     def __init__(self, config: Config, stat_client: ProxyStatClient, op_res_mng: OpResMng, executor_mng: MPExecutorMng):
         capacity = config.mempool_capacity
         LOG.info(f'Init mempool schedule with capacity: {capacity}')
         LOG.info(f'Config: {config.as_dict()}')
+
         self._tx_schedule = MPTxSchedule(capacity)
         self._schedule_cond = asyncio.Condition()
         self._processing_task_list: List[MPTask] = list()
@@ -94,9 +96,11 @@ class MemPool:
                 self._stat_client.commit_tx_add()
             LOG.debug(f'Got tx {tx.sig} and scheduled request')
             return result
+
         except BaseException as exc:
             LOG.error(f'Failed to schedule tx {tx.sig}', exc_info=exc)
             return MPTxSendResult(code=MPTxSendResultCode.Unspecified, state_tx_cnt=None)
+
         finally:
             await self._kick_tx_schedule()
 
@@ -135,6 +139,7 @@ class MemPool:
 
             if tx is None:
                 return NeonTxBeginCode.Failed
+
         except BaseException as exc:
             LOG.error('Failed to get tx for execution', exc_info=exc)
             return NeonTxBeginCode.Failed
@@ -144,6 +149,7 @@ class MemPool:
                 mp_task = self._executor_mng.submit_mp_request(tx)
                 self._processing_task_list.append(mp_task)
                 return code
+
             except BaseException as exc:
                 LOG.error(f'Failed to enqueue to execute {tx.sig}', exc_info=exc)
                 self._on_reschedule_tx(tx)
@@ -204,9 +210,11 @@ class MemPool:
 
                     if stat.has_value():
                         self._stat_client.commit_tx_begin(stat)
+
             except asyncio.exceptions.CancelledError:
                 LOG.debug('Normal exit')
                 break
+
             except BaseException as exc:
                 LOG.error('Fail on process schedule', exc_info=exc)
 
@@ -239,6 +247,7 @@ class MemPool:
             if mp_task.mp_request.type != MPRequestType.SendTransaction:
                 LOG.error(f'Got unexpected request: {mp_task.mp_request}')
                 return NeonTxEndCode.Unspecified  # skip task
+
         except BaseException as exc:
             LOG.error('Exception on checking type of request', exc_info=exc)
             return NeonTxEndCode.Unspecified  # skip task
@@ -252,6 +261,7 @@ class MemPool:
 
             mp_result = mp_task.aio_task.result()
             return self._process_mp_tx_result(tx, mp_result)
+
         except BaseException as exc:
             LOG.error(f'Exception on the result processing of tx {tx.sig}', exc_info=exc)
         return NeonTxEndCode.Unspecified  # skip task
@@ -260,7 +270,8 @@ class MemPool:
         assert isinstance(mp_res, MPTxExecResult), f'Wrong type of tx result processing {tx.sig}: {mp_res}'
 
         mp_tx_res = cast(MPTxExecResult, mp_res)
-        log_fn = LOG.warning if mp_tx_res.code != MPTxExecResultCode.Done else LOG.debug
+        good_code_set = {MPTxExecResultCode.Done, MPTxExecResultCode.Reschedule}
+        log_fn = LOG.warning if mp_tx_res.code not in good_code_set else LOG.debug
         log_fn(f'For tx {tx.sig} got result: {mp_tx_res}, time: {(time.time_ns() - tx.start_time) / (10 ** 6)}')
 
         if isinstance(mp_tx_res.data, NeonTxExecCfg):
@@ -268,6 +279,8 @@ class MemPool:
 
         if mp_tx_res.code == MPTxExecResultCode.BadResource:
             return self._on_bad_resource(tx)
+        elif mp_tx_res.code == MPTxExecResultCode.NonceTooHigh:
+            return self._on_cancel_tx(tx)
         elif mp_tx_res.code == MPTxExecResultCode.Reschedule:
             return self._on_reschedule_tx(tx)
         elif mp_tx_res.code == MPTxExecResultCode.Failed:
@@ -285,10 +298,16 @@ class MemPool:
         self._tx_schedule.cancel_tx(tx)
         return NeonTxEndCode.Canceled
 
+    def _on_cancel_tx(self, tx: MPTxRequest) -> NeonTxEndCode:
+        self._release_resource(tx)
+        self._tx_schedule.cancel_tx(tx)
+        return NeonTxEndCode.Canceled
+
     def _on_reschedule_tx(self, tx: MPTxRequest) -> NeonTxEndCode:
         LOG.debug(f'Got reschedule status for tx {tx.sig}')
         asyncio.get_event_loop().create_task(self._reschedule_tx(tx))
-        if tx.neon_tx_exec_cfg.is_holder_used():
+        cfg = tx.neon_tx_exec_cfg
+        if cfg.is_holder_used() or cfg.has_completed_receipt():
             return NeonTxEndCode.Rescheduled
         return NeonTxEndCode.Canceled
 
@@ -300,7 +319,8 @@ class MemPool:
 
         with logging_context(req_id=tx.req_id):
             try:
-                if tx.neon_tx_exec_cfg.is_holder_used():
+                cfg = tx.neon_tx_exec_cfg
+                if cfg.is_holder_used() or cfg.has_completed_receipt():
                     self._op_res_mng.update_resource(tx.sig)
                     self._rescheduled_tx_queue.append(tx)
                 else:
@@ -366,7 +386,7 @@ class MemPool:
         return self._is_active
 
     def get_taking_out_tx_list_iter(self) -> Iterator[Tuple[str, MPTxRequestList]]:
-        return self._tx_schedule.get_taking_out_tx_list_iter()
+        return self._tx_schedule.taking_out_tx_list_iter
 
     def take_in_tx_list(self, sender_addr: str, mp_tx_request_list: MPTxRequestList):
         self._tx_schedule.take_in_tx_list(sender_addr, mp_tx_request_list)
