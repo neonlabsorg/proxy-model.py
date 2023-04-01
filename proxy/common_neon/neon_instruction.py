@@ -128,13 +128,13 @@ class NeonIxBuilder:
             data=EvmInstruction.HolderCreate.value,
         )
 
-    def make_create_neon_account_ix(self, eth_address: NeonAddress) -> SolTxIx:
-        if isinstance(eth_address, str):
-            eth_address = NeonAddress(eth_address)
-        pda_account, nonce = neon_2program(eth_address)
-        LOG.debug(f'Create eth account: {str(eth_address)}, sol account: {pda_account}, nonce: {nonce}')
+    def make_create_neon_account_ix(self, neon_address: NeonAddress) -> SolTxIx:
+        if isinstance(neon_address, str):
+            neon_address = NeonAddress(neon_address)
+        pda_account, nonce = neon_2program(neon_address)
+        LOG.debug(f'Create neon account: {str(neon_address)}, sol account: {pda_account}, nonce: {nonce}')
 
-        data = create_account_layout(bytes(eth_address))
+        data = create_account_layout(bytes(neon_address))
         return SolTxIx(
             program_id=self._evm_program_id,
             data=data,

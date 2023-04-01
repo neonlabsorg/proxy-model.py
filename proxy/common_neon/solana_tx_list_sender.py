@@ -424,10 +424,6 @@ class SolTxListSender:
             return self._DecodeResult(status.CUBudgetExceededError, CUBudgetExceededError())
         elif tx_error_parser.check_if_require_resize_iter():
             return self._DecodeResult(status.RequireResizeIterError, RequireResizeIterError())
-        elif tx_error_parser.check_if_error():
-            LOG.debug(f'unknown error receipt {str(tx.sig)}: {tx_receipt}')
-            # no exception: will be converted to DEFAULT EXCEPTION
-            return self._DecodeResult(status.UnknownError, None)
 
         state_tx_cnt, tx_nonce = tx_error_parser.get_nonce_error()
         if state_tx_cnt is not None:
@@ -436,6 +432,10 @@ class SolTxListSender:
         elif tx_error_parser.check_if_log_truncated():
             # no exception: by default this is a good receipt
             return self._DecodeResult(status.LogTruncatedError, None)
+        elif tx_error_parser.check_if_error():
+            LOG.debug(f'unknown error receipt {str(tx.sig)}: {tx_receipt}')
+            # no exception: will be converted to DEFAULT EXCEPTION
+            return self._DecodeResult(status.UnknownError, None)
 
         return self._DecodeResult(status.GoodReceipt, None)
 

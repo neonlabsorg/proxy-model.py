@@ -89,21 +89,7 @@ class NeonLogTxSig:
 
 
 @dataclass(frozen=True)
-class SolLogBPFCycleUsage:
-    max_bpf_cycle_cnt: int
-    used_bpf_cycle_cnt: int
-
-
-@dataclass(frozen=True)
-class SolLogHeapUsage:
-    heap_size: int
-
-
-@dataclass(frozen=True)
 class NeonLogInfo:
-    sol_bpf_cycle_usage: Optional[SolLogBPFCycleUsage]
-    sol_heap_usage: Optional[SolLogHeapUsage]
-
     neon_tx_sig: Optional[NeonLogTxSig]
     neon_tx_ix: Optional[NeonLogTxIx]
     neon_tx_return: Optional[NeonLogTxReturn]
@@ -112,22 +98,6 @@ class NeonLogInfo:
 
 class _NeonLogDecoder:
     _re_data = re.compile(r'^Program data: (.+)$')
-    _bpf_cycle_cnt_re = re.compile(f'^Program {EVM_LOADER_ID}' + r' consumed (\d+) of (\d+) compute units$')
-    _heap_size_re = re.compile(r'^Program log: Total memory occupied: (\d+)$')
-
-    def _decode_bpf_cycle_usage(self, line: str) -> Optional[SolLogBPFCycleUsage]:
-        match = self._bpf_cycle_cnt_re.match(line)
-        if match is None:
-            return None
-
-        return SolLogBPFCycleUsage(used_bpf_cycle_cnt=int(match[1]), max_bpf_cycle_cnt=int(match[2]))
-
-    def _decode_heap_usage(self, line: str) -> Optional[SolLogHeapUsage]:
-        match = self._heap_size_re.match(line)
-        if match is None:
-            return None
-
-        return SolLogHeapUsage(heap_size=int(match[1]))
 
     def _decode_mnemonic(self, line: str) -> Tuple[str, List[str]]:
         match = self._re_data.match(line)
@@ -298,23 +268,12 @@ class _NeonLogDecoder:
     def decode_neon_log(self, log_iter: Iterator[str]) -> NeonLogInfo:
         """Extracts Neon transaction result information"""
 
-        sol_bpf_cycle_usage: Optional[SolLogBPFCycleUsage] = None
-        sol_heap_usage: Optional[SolLogHeapUsage] = None
         neon_tx_sig: Optional[NeonLogTxSig] = None
         neon_tx_ix: Optional[NeonLogTxIx] = None
         neon_tx_return: Optional[NeonLogTxReturn] = None
         neon_tx_event_list: List[NeonLogTxEvent] = list()
 
         for line in log_iter:
-            if sol_bpf_cycle_usage is None:
-                sol_bpf_cycle_usage = self._decode_bpf_cycle_usage(line)
-                if sol_bpf_cycle_usage is not None:
-                    continue
-            elif sol_heap_usage is None:
-                sol_heap_usage = self._decode_heap_usage(line)
-                if sol_heap_usage is not None:
-                    continue
-
             name, data_list = self._decode_mnemonic(line)
             if len(name) == 0:
                 continue
@@ -348,8 +307,6 @@ class _NeonLogDecoder:
                     LOG.warning('GAS is already exist!')
 
         return NeonLogInfo(
-            sol_bpf_cycle_usage=sol_bpf_cycle_usage,
-            sol_heap_usage=sol_heap_usage,
             neon_tx_sig=neon_tx_sig,
             neon_tx_ix=neon_tx_ix,
             neon_tx_return=neon_tx_return,

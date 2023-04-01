@@ -136,7 +136,7 @@ class OpResInit:
         elif holder_info.tag == ACTIVE_HOLDER_TAG:
             LOG.debug(f"Cancel transaction in {str(resource.holder)} for resource {resource}")
             self._unlock_storage_account(resource)
-        elif holder_info.tag not in (FINALIZED_HOLDER_TAG, HOLDER_TAG):
+        elif holder_info.tag not in {FINALIZED_HOLDER_TAG, HOLDER_TAG}:
             LOG.debug(f"Wrong tag {holder_info.tag} of {holder_address} for resource {resource}")
             self._recreate_holder(builder, resource, size)
         else:

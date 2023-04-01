@@ -1,7 +1,6 @@
 import json
 import struct
 import logging
-import types
 from typing import Union, Dict, Any, Tuple
 
 from eth_account.signers.local import LocalAccount as NeonAccount
@@ -10,8 +9,7 @@ from spl.token.client import Token
 from spl.token.constants import TOKEN_PROGRAM_ID
 
 from solana.rpc.types import TxOpts
-from solana.transaction import Transaction, Keypair
-from solana.rpc.commitment import Confirmed, Commitment
+from solana.rpc.commitment import Confirmed
 
 from solcx import install_solc
 
@@ -27,16 +25,6 @@ from solcx import compile_source
 
 
 LOG = logging.getLogger(__name__)
-
-
-def r_create_associated_token_account_args(
-    self,
-    owner: SolPubKey,
-    skip_confirmation: bool,
-    commitment: Commitment,
-) -> Tuple[SolPubKey, Transaction, Keypair, TxOpts]:
-    pubkey, tx, payer, _ = self._orig_create_associated_token_account_args(owner, skip_confirmation, commitment)
-    return pubkey, tx, payer, TxOpts(skip_preflight=True, skip_confirmation=skip_confirmation)
 
 
 # Standard interface of ERC20 contract to generate ABI for wrapper
@@ -101,13 +89,6 @@ class ERC20Wrapper:
         self.admin = admin
         self.mint_authority = mint_authority
         self.evm_loader_id = evm_loader_id
-
-        if hasattr(token, '_orig_create_associated_token_account_args'):
-            return
-
-        # skip_preflight = True
-        token._orig_create_associated_token_account_args = token._create_associated_token_account_args
-        token._create_associated_token_account_args = types.MethodType(r_create_associated_token_account_args, token)
 
     def get_auth_account_address(self, neon_account_address: str) -> SolPubKey:
         neon_account_addressbytes = bytes(12) + bytes.fromhex(neon_account_address[2:])
