@@ -122,16 +122,9 @@ class SolTxListSender:
         tx_sig_list = [str(tx.sig) for tx in tx_list]
         self._get_tx_receipt_list(tx_sig_list, tx_list)
 
-        # Try to block accounts
-        status = SolTxSendState.Status
-        tx_state_list = self._tx_state_list_dict.get(status.BlockedAccountError, list())
-        for tx_state in tx_state_list:
-            tx = tx_state.tx
-            if not tx.is_cloned():
-                self._add_tx_state(tx.clone(), None, status.NoReceiptError)
-                break
+        if not self._get_tx_list_for_lock_account():
+            self._get_tx_list_for_send()
 
-        self._get_tx_list_for_send()
         return self._send()
 
     @property
@@ -150,13 +143,29 @@ class SolTxListSender:
         self._tx_state_dict.clear()
         self._tx_state_list_dict.clear()
 
+    def _get_tx_list_for_lock_account(self) -> bool:
+        if self.has_completed_receipt():
+            return False
+
+        status = SolTxSendState.Status
+        tx_state_list = self._tx_state_list_dict.get(status.BlockedAccountError, list())
+        for tx_state in tx_state_list:
+            tx = tx_state.tx
+            if not tx.is_cloned():
+                self._tx_list.append(tx.clone())
+                return True
+
+        return False
+
     def _send(self) -> bool:
         try:
             self._send_impl()
             self._validate_commit_level()
             return True  # always True, because we send txs
+
         except (WrongStrategyError, RescheduleError):
             raise
+
         except (BaseException,):
             self._validate_commit_level()
             raise
@@ -347,9 +356,8 @@ class SolTxListSender:
 
         # The first few txs failed on blocked accounts, but the subsequent tx successfully locked the accounts.
         if tx_status == tx_status.BlockedAccountError:
-            for completed_status in self._completed_tx_status_set:
-                if completed_status in self._tx_state_list_dict:
-                    return True
+            if self.has_completed_receipt():
+                return True
 
         tx_state = tx_state_list[0]
         error = tx_state.error or SolTxError(tx_state.receipt)

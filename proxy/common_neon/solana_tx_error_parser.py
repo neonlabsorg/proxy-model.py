@@ -79,11 +79,18 @@ class SolTxError(BaseException):
                 level_msg = self._get_level_msg(ix_log_state.level, status)
 
             elif isinstance(ix_log_rec, str):
+                if ix_log_rec.startswith('Program data:'):
+                    continue
+
                 for prefix in ['Program log: ', 'Program failed to complete: ']:
                     if not ix_log_rec.startswith(prefix):
                         continue
 
                     log_msg = f'{level_msg} {ix_log_rec[len(prefix):]}'
+                    log_msg_list.append(log_msg)
+                    break
+                else:
+                    log_msg = f'{level_msg} {ix_log_rec}'
                     log_msg_list.append(log_msg)
         return status
 
