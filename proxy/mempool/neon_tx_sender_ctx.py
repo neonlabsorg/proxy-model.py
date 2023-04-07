@@ -34,15 +34,12 @@ class NeonTxSendCtx:
 
         self._is_holder_completed = None
 
-    # def _add_meta(self, pubkey: SolPubKey, is_writable: bool) -> None:
-    def _add_meta(self, pubkey: SolPubKey, _: bool) -> None:
+    def _add_meta(self, pubkey: SolPubKey, is_writable: bool) -> None:
         key = str(pubkey)
-        # TODO: fix after implement of account re-blocking
-        # meta = self._neon_meta_dict.get(key, None)
-        # if meta is not None:
-        #     is_writable |= meta.is_writable
-        # self._neon_meta_dict[key] = SolAccountMeta(pubkey=pubkey, is_signer=False, is_writable=is_writable)
-        self._neon_meta_dict[key] = SolAccountMeta(pubkey=pubkey, is_signer=False, is_writable=True)
+        meta = self._neon_meta_dict.get(key, None)
+        if meta is not None:
+            is_writable |= meta.is_writable
+        self._neon_meta_dict[key] = SolAccountMeta(pubkey=pubkey, is_signer=False, is_writable=is_writable)
 
     def _build_account_list(self, emulated_account_dict: NeonAccountDict) -> None:
         self._neon_meta_dict.clear()

@@ -26,7 +26,6 @@ class SolTxSendState:
         # Good receipts
         WaitForReceipt = enum.auto()
         GoodReceipt = enum.auto()
-        LogTruncatedError = enum.auto()
 
         # Skipped errors
         AccountAlreadyExistsError = enum.auto()
@@ -81,7 +80,6 @@ class SolTxListSender:
     _completed_tx_status_set = {
         SolTxSendState.Status.WaitForReceipt,
         SolTxSendState.Status.GoodReceipt,
-        SolTxSendState.Status.LogTruncatedError,
         SolTxSendState.Status.AccountAlreadyExistsError,
         SolTxSendState.Status.AlreadyFinalizedError,
     }
@@ -264,10 +262,10 @@ class SolTxListSender:
                 self._tx_state_dict.pop(tx_sig, None)
                 if tx.recent_block_hash in self._bad_block_hash_set:
                     tx.recent_block_hash = None
-                    LOG.debug(f'Flash block hash: {tx.recent_block_hash}')
+                    LOG.debug(f'Flash bad block hash: {tx.recent_block_hash} for tx {str(tx.sig)}')
 
             if tx.recent_block_hash is not None:
-                LOG.debug(f'Block hash {tx.recent_block_hash} is not None')
+                LOG.debug(f'Skip signing, tx {str(tx.sig)} has block hash {tx.recent_block_hash}')
                 continue
 
             # Fuzz testing of bad blockhash
@@ -441,9 +439,6 @@ class SolTxListSender:
         if state_tx_cnt is not None:
             # sender is unknown - should be replaced on upper stack level
             return self._DecodeResult(status.BadNonceError, NonceTooLowError.init_no_sender(tx_nonce, state_tx_cnt))
-        elif tx_error_parser.check_if_log_truncated():
-            # no exception: by default this is a good receipt
-            return self._DecodeResult(status.LogTruncatedError, None)
         elif tx_error_parser.check_if_error():
             LOG.debug(f'unknown error receipt {str(tx.sig)}: {tx_receipt}')
             # no exception: will be converted to DEFAULT EXCEPTION
