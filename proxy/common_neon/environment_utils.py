@@ -90,14 +90,16 @@ class NeonCli(CliBase):
                 LOG.debug(log)
 
             if 'error' in output:
-                LOG.error(f'ERR: neon-cli error value f{output["error"]}')
-                raise subprocess.CalledProcessError(result.returncode, cmd, stderr=output["error"])
+                error = output.get('error')
+                LOG.error(f'ERR: neon-cli error value f{error}')
+                raise EthereumError(message=error)
 
             return output.get('value', '')
 
         except subprocess.CalledProcessError as err:
-            LOG.error(f'ERR: neon-cli error {str(err)}')
-            raise
+            msg = str(err)
+            LOG.error(f'ERR: neon-cli error {msg}')
+            raise EthereumError(message=msg)
 
     @property
     def _emulator_logging_level(self):

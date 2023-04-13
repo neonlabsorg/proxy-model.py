@@ -44,14 +44,6 @@ def check_emulated_exit_status(result: Dict[str, Any]):
         reason = result.get('exit_reason')
         if isinstance(reason, str):
             raise EthereumError(code=3, message=f'execution finished with error: {reason}')
-        elif isinstance(reason, dict):
-            error = None
-            if 'Error' in reason:
-                error = reason.get('Error')
-            if (not error) and ('Fatal' in reason):
-                error = reason.get('Fatal')
-            if error:
-                raise EthereumError(code=3, message=f'execution finished with error: {str(error)}')
         raise EthereumError(code=3, message=exit_status)
 
 
@@ -104,6 +96,3 @@ def emulator(config: Config, contract: str, sender: str, data: Optional[str], va
 
     except subprocess.TimeoutExpired:
         raise NoMoreRetriesError()
-
-    except subprocess.CalledProcessError as err:
-        raise EthereumError(message='Unknown error')
