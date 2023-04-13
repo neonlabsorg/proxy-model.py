@@ -1,5 +1,4 @@
 import json
-import threading
 import subprocess
 import sys
 from typing import List
@@ -7,6 +6,7 @@ from typing import List
 import logging
 
 from ..common_neon.config import Config
+from ..common_neon.errors import EthereumError
 
 
 LOG = logging.getLogger(__name__)
@@ -72,10 +72,20 @@ class NeonCli(CliBase):
             if data is None:
                 data = ""
 
-            result = subprocess.run(cmd, input=data, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                    universal_newlines=True, timeout=self._config.neon_cli_timeout)
+            result = subprocess.run(
+                cmd, input=data, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                universal_newlines=True, timeout=self._config.neon_cli_timeout
+            )
 
-            output = json.loads(result.stdout)
+            try:
+                output = json.loads(result.stdout)
+            except json.decoder.JSONDecodeError:
+                msg = result.stdout
+                if len(msg) == 0:
+                    msg = result.stderr
+                LOG.warning(msg)
+                raise EthereumError(message=msg)
+
             for log in output.get('logs', []):
                 LOG.debug(log)
 
