@@ -1,3 +1,4 @@
+import re
 import subprocess
 import logging
 from typing import Optional, Dict, Any
@@ -77,6 +78,22 @@ def decode_revert_message(data: str) -> Optional[str]:
     return message
 
 
+class ConvertEVMInsufficientBalanceParser:
+    _re = re.compile('EVM Error. Insufficient balance for transfer, account = 0x([0-9a-fA-F]+), required = (\d+)')
+
+    def execute(self, msg: str) -> str:
+        match = self._re.match(msg)
+        if match is None:
+            return msg
+        sender = match.group(1)
+        amount = match.group(2)
+        return f'insufficient funds for transfer: address {sender} want {amount}'
+
+
+def convert_evm_error(msg: str) -> str:
+    return ConvertEVMInsufficientBalanceParser().execute(msg)
+
+
 def emulator(config: Config, contract: str, sender: str, data: Optional[str], value: Optional[str]):
     value = value or ""
     neon_token_mint = ElfParams().neon_token_mint
@@ -96,3 +113,10 @@ def emulator(config: Config, contract: str, sender: str, data: Optional[str], va
 
     except subprocess.TimeoutExpired:
         raise NoMoreRetriesError()
+
+    except subprocess.CalledProcessError as err:
+        msg = str(err.stderr)
+        LOG.error(f'ERR: neon-cli error {msg}')
+        msg = convert_evm_error(msg)
+        raise EthereumError(message=msg)
+

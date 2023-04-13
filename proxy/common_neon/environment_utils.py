@@ -6,7 +6,6 @@ from typing import List
 import logging
 
 from ..common_neon.config import Config
-from ..common_neon.errors import EthereumError
 
 
 LOG = logging.getLogger(__name__)
@@ -80,11 +79,13 @@ class NeonCli(CliBase):
             try:
                 output = json.loads(result.stdout)
             except json.decoder.JSONDecodeError:
-                msg = result.stdout
-                if len(msg) == 0:
-                    msg = result.stderr
-                LOG.warning(msg)
-                raise EthereumError(message=msg)
+                LOG.warning(f'STDERR: {result.stderr}')
+                LOG.warning(f'STDOUT: {result.stdout}')
+
+                error = result.stderr
+                if len(error) == 0:
+                    error = result.stdout
+                raise subprocess.CalledProcessError(result.returncode, cmd, stderr=error)
 
             for log in output.get('logs', []):
                 LOG.debug(log)
@@ -92,14 +93,13 @@ class NeonCli(CliBase):
             if 'error' in output:
                 error = output.get('error')
                 LOG.error(f'ERR: neon-cli error value f{error}')
-                raise EthereumError(message=error)
+                raise subprocess.CalledProcessError(result.returncode, cmd, stderr=error)
 
             return output.get('value', '')
 
         except subprocess.CalledProcessError as err:
-            msg = str(err)
-            LOG.error(f'ERR: neon-cli error {msg}')
-            raise EthereumError(message=msg)
+            LOG.error(f'ERR: neon-cli error {str(err)}')
+            raise
 
     @property
     def _emulator_logging_level(self):
