@@ -100,6 +100,7 @@ class ALTNeonTxPrepStage(BaseNeonTxPrepStage):
         self._ctx.set_holder_usage(True)  # using of the operator key for ALTs
 
     def init_alt_info(self, legacy_tx: SolLegacyTx) -> bool:
+        self._alt_info_dict.clear()
         actual_alt_info = self._alt_builder.build_alt_info(legacy_tx)
 
         alt_info_list = self._filter_alt_info_list(actual_alt_info)
@@ -114,8 +115,6 @@ class ALTNeonTxPrepStage(BaseNeonTxPrepStage):
         return True
 
     def _filter_alt_info_list(self, actual_alt_info: ALTInfo) -> List[ALTInfo]:
-        self._alt_info_dict.clear()
-
         alt_info_list: List[ALTInfo] = list()
         for alt_address in self._ctx.alt_address_list:
             alt_info = ALTInfo(alt_address)
