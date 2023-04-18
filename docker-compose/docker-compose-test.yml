@@ -171,8 +171,8 @@ services:
       solana:
         condition: service_healthy
 
-  airdropper:
-    container_name: airdropper
+  gas_tank:
+    container_name: gas_tank
     image: neonlabsorg/proxy:${REVISION}
     environment:
       POSTGRES_DB: neon-db
@@ -189,7 +189,7 @@ services:
       PYTH_MAPPING_ACCOUNT: ${CI_PYTH_MAPPING_ACCOUNT:-AFmdnt9ng1uVxqCmqwQJDAYC5cKTkw8gJKSM5PnzuF6z}
       MAX_CONFIDENCE_INTERVAL: 0.1
     hostname: airdropper
-    entrypoint: ./run-airdropper.sh
+    entrypoint: ./run-gas-tank.sh
     networks:
       - net
     depends_on:

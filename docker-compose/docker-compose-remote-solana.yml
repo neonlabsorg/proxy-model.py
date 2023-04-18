@@ -129,8 +129,8 @@ services:
       - net
     entrypoint: ./run-test-faucet.sh
 
-  airdropper:
-    container_name: airdropper
+  gas_tank:
+    container_name: gas_tank
     image: neonlabsorg/proxy:${REVISION}
     environment:
       POSTGRES_DB: neon-db
@@ -147,7 +147,7 @@ services:
       PYTH_MAPPING_ACCOUNT: ${CI_PYTH_MAPPING_ACCOUNT:-BmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2}
       MAX_CONFIDENCE_INTERVAL: 0.01
     hostname: airdropper
-    entrypoint: ./run-airdropper.sh
+    entrypoint: ./run-gas-tank.sh
     networks:
       - net
     depends_on:

@@ -169,14 +169,14 @@ class SolClient(SolInteractor):
 
         tx.recent_block_hash = recent_resp.block_hash
         tx.sign(signer)
-        print(f'-> send solana tx: {tx}')
+        print(f'-> send solana tx {tx.name}: {tx.sig}')
         sent_resp = self.send_tx_list([tx], skip_preflight=False)[0]
         if sent_resp.result is None:
             print(f'-> fail to send tx: {sent_resp.error}')
             return None
 
         tx_sig = sent_resp.result
-        print(f'-> solana tx sig: {tx_sig}')
+        print(f'-> success send solana tx {tx.name}: {tx_sig}')
 
         valid_block_height = recent_resp.last_valid_block_height
         confirm_set = SolCommit.upper_set(SolCommit.Confirmed)

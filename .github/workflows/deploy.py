@@ -51,7 +51,7 @@ FAUCET_COMMIT = 'latest'
 NEON_TESTS_IMAGE = "neonlabsorg/neon_tests:latest"
 
 CONTAINERS = ['proxy', 'solana', 'neon_test_invoke_program_loader',
-              'dbcreation', 'faucet', 'airdropper', 'indexer']
+              'dbcreation', 'faucet', 'gas_tank', 'indexer']
 
 docker_client = docker.APIClient()
 terraform = Terraform(working_dir=pathlib.Path(
