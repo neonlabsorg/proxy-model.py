@@ -157,7 +157,7 @@ class NeonTxValidator:
         if self._estimated_gas <= self._tx_gas_limit:
             return
 
-        message = 'intrinsic gas too low'
+        message = 'gas limit reached'
         raise EthereumError(f"{message}: have {self._tx_gas_limit} want {self._estimated_gas}")
 
     def _prevalidate_underpriced_tx_wo_chainid(self):
