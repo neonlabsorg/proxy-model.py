@@ -69,8 +69,10 @@ class NeonTxValidator:
         self._prevalidate_underpriced_tx_wo_chainid()
 
     def prevalidate_emulator(self, emulator_json: Dict[str, Any]):
-        check_emulated_exit_status(emulator_json)
-        self._prevalidate_gas_usage(emulator_json)
+        if not self._config.accept_reverted_tx_into_mempool:
+            check_emulated_exit_status(emulator_json)
+            self._prevalidate_gas_usage(emulator_json)
+
         self._prevalidate_account_sizes(emulator_json)
         self._prevalidate_account_cnt(emulator_json)
 
@@ -155,7 +157,7 @@ class NeonTxValidator:
         if self._estimated_gas <= self._tx_gas_limit:
             return
 
-        message = 'gas limit reached'
+        message = 'intrinsic gas too low'
         raise EthereumError(f"{message}: have {self._tx_gas_limit} want {self._estimated_gas}")
 
     def _prevalidate_underpriced_tx_wo_chainid(self):
