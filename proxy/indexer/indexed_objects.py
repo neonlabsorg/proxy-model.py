@@ -282,7 +282,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
                 is_hidden = True
             else:
                 if event.is_start_event_type():
-                    if (reverted_level != -1) and (event.event_level < reverted_level):
+                    if event.event_level == reverted_level:
                         reverted_level = -1
                 elif event.is_exit_event_type():
                     if (event.event_type == NeonLogTxEvent.Type.ExitRevert) and (reverted_level == -1):
