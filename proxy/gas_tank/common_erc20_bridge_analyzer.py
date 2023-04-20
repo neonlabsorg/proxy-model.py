@@ -1,8 +1,10 @@
 import logging
-from typing import Set, Union
+from typing import Set, Union, Optional
 
-from .gas_tank import GasTankState, GasTankNeonTxAnalyzer, GasTankTxInfo
 from ..common_neon.address import NeonAddress
+
+from .gas_tank_types import GasTankNeonTxAnalyzer, GasTankTxInfo
+
 
 LOG = logging.getLogger(__name__)
 
@@ -22,9 +24,9 @@ class CommonERC20BridgeAnalyzer(GasTankNeonTxAnalyzer):
         else:
             self._has_token_whitelist = len(self._token_whitelist) > 0
 
-    def process(self, neon_tx: GasTankTxInfo, state: GasTankState) -> bool:
+    def process(self, neon_tx: GasTankTxInfo) -> Optional[NeonAddress]:
         if not self._has_token_whitelist:
-            return False
+            return None
 
         call_data = bytes.fromhex(neon_tx.neon_tx.calldata[2:])
         LOG.debug(f'callData: {call_data.hex()}')
@@ -37,12 +39,13 @@ class CommonERC20BridgeAnalyzer(GasTankNeonTxAnalyzer):
                 continue
 
             token_id = event['address']
-            if token_id not in self._token_whitelist:
+            if isinstance(self._token_whitelist, bool):
+                pass
+            elif token_id not in self._token_whitelist:
                 continue
 
             to = NeonAddress(bytes.fromhex(event['topics'][2][2:])[12:])
             amount = int.from_bytes(bytes.fromhex(event['data'][2:]), 'big')
             LOG.info(f'Common ERC20 bridge transfer: {amount} of {token_id} token to {to}')
-            state.allow_gas_less_tx(to)
-            return True
-        return False
+            return to
+        return None

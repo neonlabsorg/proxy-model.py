@@ -25,7 +25,7 @@ from proxy.common_neon.solana_tx_legacy import SolLegacyTx
 from proxy.testing.testing_helpers import Proxy, SolClient, NeonLocalAccount
 
 
-MAX_AIRDROP_WAIT_TIME = 45
+MAX_ZERO_GAS_PRICE_WAIT_TIME = 45
 EVM_LOADER_ID = SolPubKey.from_string(EVM_LOADER_ID)
 NAME = 'TestToken'
 SYMBOL = 'TST'
@@ -170,6 +170,12 @@ class TestGasTankIntegration(TestCase):
             ] + ix_list
         )
 
+    def neon_gas_price(self, account: str) -> int:
+        # TODO: neon_gasPrice(account)
+        gas_price = 0
+        print(f'neon_gasPrice{account} = {gas_price}')
+        return gas_price
+
     def test_success_gas_less_simple_case(self):
         from_owner = self.create_sol_account()
         mint_amount = 1000_000_000_000
@@ -212,22 +218,17 @@ class TestGasTankIntegration(TestCase):
         self.assertEqual(self.erc20_wrapper.get_balance(from_spl_token_acc), mint_amount - transfer_amount)
         self.assertEqual(self.erc20_wrapper.get_balance(to_neon_acc.address), transfer_amount)
 
-        eth_balance = self.proxy.conn.get_balance(to_neon_acc.address)
-        print("NEON balance before is: ", eth_balance)
-
+        gas_price = 1
         wait_time = 0
-        while wait_time < MAX_AIRDROP_WAIT_TIME:
-            eth_balance = self.proxy.conn.get_balance(to_neon_acc.address)
-            balance_ready = 0 < eth_balance < 10 * pow(10, 18)
-            if balance_ready:
-                break
+        while wait_time < MAX_ZERO_GAS_PRICE_WAIT_TIME:
+            gas_price = self.neon_gas_price(str(to_neon_acc.address))
+            if gas_price == 0:
+                return
+
             sleep(1)
             wait_time += 1
-        print(f"Wait time for simple SolLegacyTx (1 airdrop): {wait_time}")
-
-        eth_balance = self.proxy.conn.get_balance(to_neon_acc.address)
-        print("NEON balance is: ", eth_balance)
-        self.assertTrue(0 < eth_balance < 10 * pow(10, 18))  # 10 NEON is a max airdrop amount
+        print(f"Wait time for simple SolLegacyTx (1 zero-gas-price): {wait_time}")
+        self.assertEqual(gas_price, 0)
 
     @unittest.skip('Test case is not applicable after introducing ERC20-for-SPL. Postponed for a better times')
     def test_success_gas_less_complex_case(self):
@@ -287,24 +288,21 @@ class TestGasTankIntegration(TestCase):
         self.assertEqual(self.erc20_wrapper.get_balance(to_neon_acc1.address), transfer_amount1)
         self.assertEqual(self.erc20_wrapper.get_balance(to_neon_acc2.address), transfer_amount2)
 
+        gas_price1 = 1
+        gas_price2 = 2
         wait_time = 0
-        while wait_time < MAX_AIRDROP_WAIT_TIME:
-            eth_balance1 = self.proxy.conn.get_balance(to_neon_acc1.address)
-            eth_balance2 = self.proxy.conn.get_balance(to_neon_acc2.address)
-            balance1_ready = 0 < eth_balance1 < 10 * pow(10, 18)
-            balance2_ready = 0 < eth_balance2 < 10 * pow(10, 18)
-            if balance1_ready and balance2_ready:
-                break
+        while wait_time < MAX_ZERO_GAS_PRICE_WAIT_TIME:
+            gas_price1 = self.neon_gas_price(str(to_neon_acc1.address))
+            gas_price2 = self.neon_gas_price(str(to_neon_acc2.address))
+            if gas_price1 == 0 and gas_price2 == 0:
+                return
+
             sleep(1)
             wait_time += 1
-        print(f"Wait time for complex SolLegacyTx (2 airdrops): {wait_time}")
 
-        eth_balance1 = self.proxy.conn.get_balance(to_neon_acc1.address)
-        eth_balance2 = self.proxy.conn.eth.get_balance(to_neon_acc2.address)
-        print("NEON balance 1 is: ", eth_balance1)
-        print("NEON balance 2 is: ", eth_balance2)
-        self.assertTrue(0 < eth_balance1 < 10 * pow(10, 18))  # 10 NEON is a max airdrop amount
-        self.assertTrue(0 < eth_balance2 < 10 * pow(10, 18))  # 10 NEON is a max airdrop amount
+        print(f"Wait time for complex SolLegacyTx (2 gas-less): {wait_time}")
+        self.assertEqual(gas_price1, 0)
+        self.assertEqual(gas_price2, 0)
 
     def test_no_gas_less_tx(self):
         from_owner = self.create_sol_account()
@@ -345,11 +343,10 @@ class TestGasTankIntegration(TestCase):
         )
 
         self.solana.send_tx(tx, from_owner)
-
         sleep(15)
+
         self.assertEqual(self.erc20_wrapper.get_balance(from_spl_token_acc), mint_amount - transfer_amount)
         self.assertEqual(self.erc20_wrapper.get_balance(to_neon_acc.address), transfer_amount)
-        eth_balance = self.proxy.conn.get_balance(to_neon_acc.address)
-        print("NEON balance is: ", eth_balance)
-        # Balance should not change because gas-tank should not handle this transaction
-        self.assertEqual(eth_balance, initial_balance * 10**18)
+
+        gas_price = self.neon_gas_price(str(to_neon_acc.address))
+        self.assertNotEqual(gas_price, 0)

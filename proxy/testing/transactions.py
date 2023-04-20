@@ -6,7 +6,7 @@ evm_loader_addr = EVM_LOADER_ID
 neon_pass_erc20_wrapper = '0x04b27acb0013a31822ec1624c1a3066b023e3a93'
 neon_pass_whitelist = [neon_pass_erc20_wrapper]
 
-neon_pass_gas_tank_address = '0x4136faa9cae6c9afde37045a255b087f2ccfee75'
+neon_pass_gas_less_account = '0x4136faa9cae6c9afde37045a255b087f2ccfee75'
 
 # Solana transaction for simple case gas-less tx
 neon_pass_tx = {
@@ -258,6 +258,8 @@ neon_pass_tx = {
     }
 }
 
+wormhole_gas_less_account = '0x4136faa9cae6c9afde37045a255b087f2ccfee75'
+
 write_wormhole_redeem_tx = {
     'blockTime': 1675925799,
     'meta': {
@@ -276,9 +278,17 @@ write_wormhole_redeem_tx = {
             'Program eeLSJgWzzxrqKv1UxtRVVH8FX3qCQWUs9QuAjJpETGU consumed 3322 of 200000 compute units',
             'Program eeLSJgWzzxrqKv1UxtRVVH8FX3qCQWUs9QuAjJpETGU success'
         ],
-        'postBalances': [87604395320, 1825413120, 1141440],
+        'postBalances': [
+            87604395320,
+            1825413120,
+            1141440
+        ],
         'postTokenBalances': [],
-        'preBalances': [87604400320, 1825413120, 1141440],
+        'preBalances': [
+            87604400320,
+            1825413120,
+            1141440
+        ],
         'preTokenBalances': [],
         'rewards': [],
         'status': {'Ok': None}
@@ -403,9 +413,29 @@ execute_wormhole_redeem_tx = {
         ],
         'postTokenBalances': [],
         'preBalances': [
-            87604395320, 67943520, 122113200, 20963520, 0, 20963520, 201304080, 1517280, 401490880, 1385040,
-            1825413120, 1385040, 22146720, 1, 1, 1141440, 1517280, 1517280, 1517280, 1517280, 1746960,
-            1517280, 1517280
+            87604395320,
+            67943520,
+            122113200,
+            20963520,
+            0,
+            20963520,
+            201304080,
+            1517280,
+            401490880,
+            1385040,
+            1825413120,
+            1385040,
+            22146720,
+            1,
+            1,
+            1141440,
+            1517280,
+            1517280,
+            1517280,
+            1517280,
+            1746960,
+            1517280,
+            1517280
         ],
         'preTokenBalances': [],
         'rewards': [],

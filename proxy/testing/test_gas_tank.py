@@ -1,37 +1,22 @@
 import unittest
-import time
-import itertools
 
-from flask import request, Response
-from unittest.mock import Mock, MagicMock, patch, ANY
-from decimal import Decimal
-from typing import Optional, Set
+from unittest.mock import patch
+from typing import Optional
 
 from ..common_neon.config import Config
 from ..common_neon.solana_tx import SolPubKey
 from ..common_neon.solana_interactor import SolInteractor
+from ..common_neon.address import NeonAddress
 
-from ..gas_tank import GasTank, AIRDROP_AMOUNT_SOL
+from ..gas_tank import GasTank
 from ..gas_tank.portal_analyzer import PortalTxAnalyzer
 from ..gas_tank.neon_pass_analyzer import NeonPassAnalyzer
+from ..gas_tank.gas_less_accounts_db import GasLessAccountsDB
 
 from ..indexer.sql_dict import SQLDict
 
-from ..testing.mock_server import MockServer
-from ..testing.transactions import neon_pass_tx, neon_pass_whitelist, evm_loader_addr, neon_pass_gas_tank_address
-from ..testing.transactions import write_wormhole_redeem_tx, execute_wormhole_redeem_tx
-
-
-class MockFaucet(MockServer):
-    def __init__(self, port):
-        super().__init__(port)
-        self.request_neon_in_galans_mock = MagicMock()
-        self.request_neon_in_galans_mock.side_effect = itertools.repeat({})
-        self.add_url_rule("/request_neon_in_galans", callback=self.request_neon_in_galans, methods=['POST'])
-
-    def request_neon_in_galans(self):
-        req = request.get_json()
-        return self.request_neon_in_galans_mock(req)
+from ..testing.transactions import neon_pass_tx, neon_pass_whitelist, evm_loader_addr, neon_pass_gas_less_account
+from ..testing.transactions import write_wormhole_redeem_tx, execute_wormhole_redeem_tx, wormhole_gas_less_account
 
 
 class FakeConfig(Config):
@@ -50,18 +35,14 @@ class FakeConfig(Config):
 
 
 class TestGasTank(unittest.TestCase):
-    address: str
-    faucet_port: int
-
     @classmethod
     def create_gas_tank(cls, start_slot: str):
         config = FakeConfig(start_slot)
         neon_pass_analyzer = NeonPassAnalyzer(config, neon_pass_whitelist)
-        portal_tx_analyzer = PortalTxAnalyzer(True)
+        # portal_tx_analyzer = PortalTxAnalyzer(True)
         return GasTank(
             config=config,
-            faucet_url=f'http://{cls.address}:{cls.faucet_port}',
-            sol_tx_analyzer_list=[neon_pass_analyzer],
+            sol_tx_analyzer_dict={neon_pass_analyzer.name: neon_pass_analyzer},
             neon_tx_analyzer_dict={}
         )
 
@@ -70,183 +51,36 @@ class TestGasTank(unittest.TestCase):
     @patch.object(SolInteractor, 'get_block_slot')
     def setUpClass(cls, mock_get_slot, mock_dict_get) -> None:
         print("testing indexer in gas-tank mode")
-        cls.address = 'localhost'
-        cls.faucet_port = 3333
         cls.evm_loader_id = evm_loader_addr
-        cls.gas_tank = gas_tank = cls.create_gas_tank('0')
+        cls.gas_tank = cls.create_gas_tank('0')
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
-        gas_tank.always_reload_price = True
-
-        cls.mock_pyth_client = mock_pyth_client = Mock()
-        mock_pyth_client.get_price = MagicMock()
-        mock_pyth_client.update_mapping = MagicMock()
-        gas_tank.pyth_client = mock_pyth_client
-
-        cls.mock_airdrop_ready = mock_airdrop_ready = Mock()
-        mock_airdrop_ready.register_airdrop = MagicMock()
-        mock_airdrop_ready.is_airdrop_ready = MagicMock()
-        gas_tank.airdrop_ready = mock_airdrop_ready
-
-        cls.mock_failed_attempts = mock_failed_attempts = Mock()
-        mock_failed_attempts.airdrop_failed = MagicMock()
-        gas_tank.failed_attempts = mock_failed_attempts
-
-    def setUp(self) -> None:
-        print(f"\n\n{self._testMethodName}\n{self._testMethodDoc}")
-        self.faucet = MockFaucet(self.faucet_port)
-        self.faucet.start()
-        self.gas_tank.last_update_pyth_mapping = None
-        time.sleep(0.2)
-
-    def tearDown(self) -> None:
-        self.faucet.shutdown_server()
-        self.faucet.join()
-        self.gas_tank.airdrop_scheduled.clear()
-        self.mock_airdrop_ready.is_airdrop_ready.reset_mock()
-        self.mock_airdrop_ready.register_airdrop.reset_mock()
-        self.mock_pyth_client.get_price.reset_mock()
-        self.mock_pyth_client.update_mapping.reset_mock()
-        self.mock_failed_attempts.airdrop_failed.reset_mock()
-
-    def test_failed_process_trx_with_one_airdrop_price_provider_error(self):
-        """
-        Should not airdrop to new address due to price provider error
-        """
-
-        self.mock_pyth_client.get_price.side_effect = Exception('TestException')
-        self.mock_airdrop_ready.is_airdrop_ready.side_effect = [False]  # new eth address
-        self.faucet.request_neon_in_galans_mock.side_effect = [Response("{}", status=200, mimetype='application/json')]
-
-        self.gas_tank._process_sol_tx(neon_pass_tx)
-        self.gas_tank.process_scheduled_trxs()
-
-        self.mock_failed_attempts.airdrop_failed.assert_called_once_with('ALL', ANY)
-        self.mock_pyth_client.update_mapping.assert_called_once()
-        self.mock_airdrop_ready.is_airdrop_ready.assert_called_once_with(neon_pass_gas_tank_address)
-        self.mock_airdrop_ready.register_airdrop.assert_not_called()
-        self.mock_pyth_client.get_price.assert_called_once_with('Crypto.SOL/USD')
-        self.faucet.request_neon_in_galans_mock.assert_not_called()
-
     @patch.object(NeonPassAnalyzer, '_is_allowed_contract')
-    def test_failed_airdrop_contract_not_in_whitelist(self, mock_is_allowed_contract):
-        """
-        Should not airdrop for contract that is not in whitelist
-        """
-        self.gas_tank.current_slot = 1
-        self.mock_pyth_client.get_price.side_effect = [{
-            'valid_slot': self.gas_tank.current_slot,
-            'price': Decimal('235.0'),
-            'conf': Decimal('1.3'),
-            'status': 1
-        }]
-
+    @patch.object(GasLessAccountsDB, 'add_gas_less_permit_list')
+    def test_failed_permit_contract_not_in_whitelist(self, mock_add_gas_less_permit, mock_is_allowed_contract):
+        """ Should not permit gas-less txs for contract that is not in whitelist """
+        self.gas_tank._current_slot = 1
         mock_is_allowed_contract.side_effect = [False]
 
         self.gas_tank._process_sol_tx(neon_pass_tx)
-        self.gas_tank.process_scheduled_trxs()
+        self.gas_tank._save_cached_data()
 
-        self.mock_failed_attempts.airdrop_failed.assert_not_called()
-        self.mock_pyth_client.update_mapping.assert_called_once()
         mock_is_allowed_contract.assert_called_once()
-        self.mock_pyth_client.get_price.assert_called_once_with('Crypto.SOL/USD')
-        self.mock_airdrop_ready.is_airdrop_ready.assert_not_called()
-        self.mock_airdrop_ready.register_airdrop.assert_not_called()
-        self.faucet.request_neon_in_galans_mock.assert_not_called()
+        mock_add_gas_less_permit.assert_not_called()
 
-    def test_faucet_failure(self):
-        """
-        Should not add address to processed list due to faucet error
-        """
-        config = FakeConfig('0')
-        sol_price = Decimal('341.5')
-        airdrop_amount = int(pow(Decimal(10), config.neon_decimals) * (AIRDROP_AMOUNT_SOL * sol_price) /
-                             config.neon_price_usd)
-        self.gas_tank.current_slot = 2
-        self.mock_pyth_client.get_price.side_effect = [{
-            'valid_slot': self.gas_tank.current_slot,
-            'price': sol_price,
-            'conf': Decimal('1.3'),
-            'status': 1
-        }]
-
-        self.mock_airdrop_ready.is_airdrop_ready.side_effect = [False]  # new eth address
-        self.faucet.request_neon_in_galans_mock.side_effect = [Response("{}", status=400, mimetype='application/json')]
+    @patch.object(GasTank, '_has_gas_less_tx_permit')
+    @patch.object(GasLessAccountsDB, 'add_gas_less_permit_list')
+    def test_not_permit_for_already_processed_address(self, mock_add_gas_less_permit, mock_has_gas_less_tx_permit):
+        """ Should not permit gas-less txs to repeated address """
+        self.gas_tank._current_slot = 1
+        mock_has_gas_less_tx_permit.side_effect = [True]
 
         self.gas_tank._process_sol_tx(neon_pass_tx)
-        self.gas_tank.process_scheduled_trxs()
+        self.gas_tank._save_cached_data()
 
-        self.mock_failed_attempts.airdrop_failed.assert_called_once_with(neon_pass_gas_tank_address, ANY)
-        self.mock_pyth_client.update_mapping.assert_called_once()
-        self.mock_airdrop_ready.is_airdrop_ready.assert_called_once_with(neon_pass_gas_tank_address)
-        self.mock_pyth_client.get_price.assert_called_once_with('Crypto.SOL/USD')
-        self.mock_airdrop_ready.register_airdrop.assert_not_called()
-        json_req = {'wallet': neon_pass_gas_tank_address, 'amount': airdrop_amount}
-        self.faucet.request_neon_in_galans_mock.assert_called_once_with(json_req)
-
-    def test_process_trx_with_one_airdrop_for_already_processed_address(self):
-        """
-        Should not airdrop to repeated address
-        """
-        self.gas_tank.current_slot = 1
-        self.mock_pyth_client.get_price.side_effect = [{
-            'valid_slot': self.gas_tank.current_slot,
-            'price': Decimal('235.0'),
-            'conf': Decimal('1.3'),
-            'status': 1
-        }]
-
-        self.mock_airdrop_ready.is_airdrop_ready.side_effect = [True]  # eth address processed earlier
-
-        self.gas_tank._process_sol_tx(neon_pass_tx)
-        self.gas_tank.process_scheduled_trxs()
-
-        self.mock_pyth_client.update_mapping.assert_called_once()
-        self.mock_pyth_client.get_price.assert_called_once_with('Crypto.SOL/USD')
-        self.mock_failed_attempts.airdrop_failed.assert_not_called()
-        self.mock_airdrop_ready.is_airdrop_ready.assert_called_once_with(neon_pass_gas_tank_address)
-        self.mock_airdrop_ready.register_airdrop.assert_not_called()
-        self.faucet.request_neon_in_galans_mock.assert_not_called()
-
-    def test_failed_airdrop_confidence_interval_too_large(self):
-        """
-        Should not airdrop because confidence interval too large
-        """
-        self.gas_tank.current_slot = 3
-        self.mock_pyth_client.get_price.side_effect = [{
-            'valid_slot': self.gas_tank.current_slot,
-            'price': Decimal('235.0'),
-            'conf': Decimal('54.0'),
-            'status': 1
-        }]
-
-        self.gas_tank._process_sol_tx(neon_pass_tx)
-        self.gas_tank.process_scheduled_trxs()
-
-        self.mock_pyth_client.update_mapping.assert_called_once()
-        self.mock_pyth_client.get_price.assert_called_once_with('Crypto.SOL/USD')
-        self.mock_airdrop_ready.is_airdrop_ready.assert_called_once_with(neon_pass_gas_tank_address)
-        self.mock_airdrop_ready.register_airdrop.assert_not_called()
-        self.faucet.request_neon_in_galans_mock.assert_not_called()
-
-    def test_update_mapping_error(self):
-        self.mock_pyth_client.update_mapping.side_effect = [Exception('TestException')]
-        try:
-            self.gas_tank.process_scheduled_trxs()
-            self.mock_pyth_client.update_mapping.assert_called_once()
-            self.mock_pyth_client.get_price.assert_not_called()
-        except Exception as err:
-            self.fail(f'Excpected not throws exception but it does: {err}')
-
-    def test_get_price_error(self):
-        self.mock_pyth_client.get_price.side_effect = [Exception('TestException')]
-        try:
-            self.gas_tank.process_scheduled_trxs()
-            self.mock_pyth_client.update_mapping.assert_called_once()
-            self.mock_pyth_client.get_price.assert_called_once_with('Crypto.SOL/USD')
-        except Exception as err:
-            self.fail(f'Excpected not throws exception but it does: {err}')
+        mock_has_gas_less_tx_permit.assert_called_once()
+        mock_add_gas_less_permit.assert_not_called()
 
     @patch.object(SQLDict, 'get')
     @patch.object(SolInteractor, 'get_block_slot')
@@ -254,8 +88,10 @@ class TestGasTank(unittest.TestCase):
         start_slot = 1234
         mock_dict_get.side_effect = [start_slot - 1]
         mock_get_slot.side_effect = [start_slot + 1]
+
         new_gas_tank = self.create_gas_tank('CONTINUE')
-        self.assertEqual(new_gas_tank.latest_processed_slot, start_slot - 1)
+
+        self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot - 1)
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
@@ -265,8 +101,10 @@ class TestGasTank(unittest.TestCase):
         start_slot = 1234
         mock_dict_get.side_effect = [None]
         mock_get_slot.side_effect = [start_slot + 1]
+
         new_gas_tank = self.create_gas_tank('CONTINUE')
-        self.assertEqual(new_gas_tank.latest_processed_slot, start_slot + 1)
+
+        self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot + 1)
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
@@ -276,8 +114,10 @@ class TestGasTank(unittest.TestCase):
         start_slot = 1234
         mock_dict_get.side_effect = [start_slot - 1]
         mock_get_slot.side_effect = [start_slot + 1]
+
         new_gas_tank = self.create_gas_tank('Wrong value')
-        self.assertEqual(new_gas_tank.latest_processed_slot, start_slot - 1)
+
+        self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot - 1)
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
@@ -287,8 +127,10 @@ class TestGasTank(unittest.TestCase):
         start_slot = 1234
         mock_dict_get.side_effect = [start_slot - 1]
         mock_get_slot.side_effect = [start_slot + 1]
+
         new_gas_tank = self.create_gas_tank('LATEST')
-        self.assertEqual(new_gas_tank.latest_processed_slot, start_slot + 1)
+
+        self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot + 1)
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
@@ -298,8 +140,10 @@ class TestGasTank(unittest.TestCase):
         start_slot = 1234
         mock_dict_get.side_effect = [start_slot - 1]
         mock_get_slot.side_effect = [start_slot + 1]
+
         new_gas_tank = self.create_gas_tank(str(start_slot))
-        self.assertEqual(new_gas_tank.latest_processed_slot, start_slot)
+
+        self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot)
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
@@ -309,39 +153,30 @@ class TestGasTank(unittest.TestCase):
         start_slot = 1234
         mock_dict_get.side_effect = [start_slot - 1]
         mock_get_slot.side_effect = [start_slot + 1]
+
         new_gas_tank = self.create_gas_tank(str(start_slot + 100))
-        self.assertEqual(new_gas_tank.latest_processed_slot, start_slot + 1)
+
+        self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot + 1)
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
+    def test_neonpass_tx_simple_case(self):
+        """ Should allow gas-less txs to liquidity transfer in simple case by NeonPass"""
+        self.gas_tank._current_slot = 2
+        self.gas_tank._process_sol_tx(neon_pass_tx)
+        self.gas_tank._save_cached_data()
+
+        has_permit = self.gas_tank._gas_less_account_db.has_gas_less_tx_permit(NeonAddress(neon_pass_gas_less_account))
+        self.assertTrue(has_permit)
+
     def test_wormhole_transaction_simple_case(self):
-        """
-        Should provide gas-less txs to liquidity transfer in simple case
-        """
+        """ Should allow gas-less txs to liquidity transfer in simple case by Wormhole"""
 
-        # self.mock_pyth_client.get_price.side_effect = Exception('TestException')
-        # self.mock_airdrop_ready.is_airdrop_ready.side_effect = [False]  # new eth address
-        # self.faucet.request_neon_in_galans_mock.side_effect = [Response("{}", status=200, mimetype='application/json')]
-
-        config = FakeConfig('0')
-        sol_price = Decimal('341.5')
-        airdrop_amount = int(pow(Decimal(10), config.neon_decimals) * (AIRDROP_AMOUNT_SOL * sol_price) /
-                             config.neon_price_usd)
-        self.gas_tank.current_slot = 2
-        self.mock_pyth_client.get_price.side_effect = [{
-            'valid_slot': self.gas_tank.current_slot,
-            'price': sol_price,
-            'conf': Decimal('1.3'),
-            'status': 1
-        }]
+        self.gas_tank._current_slot = 2
 
         self.gas_tank._process_neon_ix(write_wormhole_redeem_tx)
         self.gas_tank._process_neon_ix(execute_wormhole_redeem_tx)
-        self.gas_tank.process_scheduled_trxs()
+        self.gas_tank._save_cached_data()
 
-        # self.mock_failed_attempts.airdrop_failed.assert_called_once_with('ALL', ANY)
-        # self.mock_pyth_client.update_mapping.assert_called_once()
-        # self.mock_airdrop_ready.is_airdrop_ready.assert_called_once_with(token_airdrop_address)
-        # self.mock_airdrop_ready.register_airdrop.assert_not_called()
-        # self.mock_pyth_client.get_price.assert_called_once_with('Crypto.SOL/USD')
-        # self.faucet.request_neon_in_galans_mock.assert_not_called()
+        has_permit = self.gas_tank._gas_less_account_db.has_gas_less_tx_permit(NeonAddress(wormhole_gas_less_account))
+        self.assertTrue(has_permit)

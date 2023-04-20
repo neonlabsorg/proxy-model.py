@@ -20,16 +20,9 @@ class GasTankApp:
         Logger.setup()
         LOG.info("GasTank application is starting ...")
         config = Config()
-        faucet_url = os.environ['FAUCET_URL']
-        sol_tx_analyzer_list = self._get_neon_pass_contract_cfg(config)
+        sol_tx_analyzer_dict = self._get_neon_pass_contract_cfg(config)
 
-        max_conf = float(os.environ.get('MAX_CONFIDENCE_INTERVAL', 0.02))
-
-        LOG.info(f"""
-            Construct GasTank with params: {str(config)}
-            faucet_url: {faucet_url},
-            Max confidence interval: {max_conf}
-        """)
+        LOG.info(f"Construct GasTank with params: {str(config)}")
 
         neon_tx_analyzer_list = self._get_portal_bridge_contract_cfg() + self._get_common_erc20_bridge_contract_cfg()
         neon_tx_analyzer_dict: Dict[NeonAddress, GasTankNeonTxAnalyzer] = dict()
@@ -38,20 +31,21 @@ class GasTankApp:
                 raise RuntimeError(f'Address {neon_address} already specified to analyze')
             neon_tx_analyzer_dict[neon_address] = tx_analyzer
 
-        self._gas_tank = GasTank(config, sol_tx_analyzer_list, neon_tx_analyzer_dict, faucet_url, max_conf)
+        self._gas_tank = GasTank(config, sol_tx_analyzer_dict, neon_tx_analyzer_dict)
 
     @staticmethod
-    def _get_neon_pass_contract_cfg(config: Config) -> List[GasTankSolTxAnalyzer]:
+    def _get_neon_pass_contract_cfg(config: Config) -> Dict[str, GasTankSolTxAnalyzer]:
         neon_pass_whitelist = os.environ.get('INDEXER_ERC20_WRAPPER_WHITELIST', '')
         if len(neon_pass_whitelist) == 0:
-            return list()
+            return dict()
 
         if neon_pass_whitelist == 'ANY':
             neon_pass_whitelist = True
         else:
             neon_pass_whitelist = set(s.lower() for s in neon_pass_whitelist.split(','))
 
-        return [NeonPassAnalyzer(config, neon_pass_whitelist)]
+        neon_pass_analyzer = NeonPassAnalyzer(config, neon_pass_whitelist)
+        return {neon_pass_analyzer.name: neon_pass_analyzer}
 
     @staticmethod
     def _get_portal_bridge_contract_cfg() -> List[Tuple[NeonAddress, GasTankNeonTxAnalyzer]]:

@@ -1,12 +1,14 @@
 import logging
-from typing import Set, Union
+
+from typing import Set, Union, Optional
 
 from construct import Const, Struct, GreedyBytes, Byte, Bytes, BytesInteger, Int32ub, Int16ub, Int64ub, Switch
 from construct import this, Enum
 
-from .gas_tank import GasTankState, GasTankNeonTxAnalyzer, GasTankTxInfo
+from .gas_tank_types import GasTankNeonTxAnalyzer, GasTankTxInfo
 
 from ..common_neon.address import NeonAddress
+
 
 LOG = logging.getLogger(__name__)
 
@@ -69,14 +71,14 @@ class PortalTxAnalyzer(GasTankNeonTxAnalyzer):
         else:
             self._has_token_whitelist = len(self._token_whitelist) > 0
 
-    def process(self, neon_tx: GasTankTxInfo, state: GasTankState) -> bool:
+    def process(self, neon_tx: GasTankTxInfo) -> Optional[NeonAddress]:
         if not self._has_token_whitelist:
-            return False
+            return None
 
         call_data = bytes.fromhex(neon_tx.neon_tx.calldata[2:])
         LOG.debug(f'callData: {call_data.hex()}')
         if call_data[0:4] != COMPLETE_TRANSFER:
-            return False
+            return None
 
         offset = int.from_bytes(call_data[4:36], 'big')
         length = int.from_bytes(call_data[36:68], 'big')
@@ -88,9 +90,8 @@ class PortalTxAnalyzer(GasTankNeonTxAnalyzer):
         if isinstance(self._token_whitelist, bool):
             pass
         elif token_id not in self._token_whitelist:
-            return False
+            return None
 
         to = NeonAddress(vaa.payload.to[12:])
         LOG.info(f"Portal transfer: {vaa.payload.amount} of {token_id} token to {to}")
-        state.allow_gas_less_tx(to)
-        return True
+        return to
