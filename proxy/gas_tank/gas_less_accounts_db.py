@@ -1,4 +1,4 @@
-from typing import Iterator, Any, List
+from typing import Iterator, Any, List, Union
 
 from .gas_tank_types import GasLessPermit
 
@@ -16,15 +16,19 @@ class GasLessAccountsDB(BaseDB):
             ]
         )
 
-    def has_gas_less_tx_permit(self, address: NeonAddress) -> bool:
+    def has_gas_less_tx_permit(self, address: Union[str, NeonAddress]) -> bool:
         request = f'''
             SELECT a.address
               FROM {self._table_name} AS a
              WHERE a.address = %s AND a.nonce = 0 AND a.contract IS NULL
              LIMIT 1
         '''
+
+        if isinstance(address, NeonAddress):
+            address = str(address)
+
         with self._conn.cursor() as cursor:
-            cursor.execute(request, (str(address),))
+            cursor.execute(request, (address,))
             value_list = cursor.fetchone()
             return value_list is not None
 

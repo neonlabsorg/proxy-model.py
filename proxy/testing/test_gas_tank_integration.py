@@ -171,6 +171,7 @@ class TestGasTankIntegration(TestCase):
         )
 
     def neon_gas_price(self, account: str) -> int:
+        self.proxy.neon_gasPrice()
         # TODO: neon_gasPrice(account)
         gas_price = 0
         print(f'neon_gasPrice{account} = {gas_price}')
