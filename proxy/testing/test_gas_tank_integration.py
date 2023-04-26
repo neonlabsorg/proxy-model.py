@@ -3,6 +3,7 @@ import unittest
 
 from time import sleep
 from unittest import TestCase
+from typing import Dict, Any
 
 from solana.rpc.api import Client as SolanaClient
 from solders.system_program import ID as SYS_PROGRAM_ID
@@ -170,11 +171,33 @@ class TestGasTankIntegration(TestCase):
             ] + ix_list
         )
 
+    def neon_gas_price_impl(self, param: Dict[str, Any]) -> int:
+        gas_price = self.proxy.web3.neon.neon_gasPrice(param)
+        return int(gas_price[2:], 16)
+
     def neon_gas_price(self, account: str) -> int:
-        self.proxy.neon_gasPrice()
-        # TODO: neon_gasPrice(account)
-        gas_price = 0
-        print(f'neon_gasPrice{account} = {gas_price}')
+        gas = 1_000_000
+        big_gas = 30_000_000
+
+        gas_price = self.neon_gas_price_impl({'from': account, 'gas': gas})
+        print(f'neon_gasPrice(from={account}, gas={gas}) = {gas_price}')
+        if gas_price != 0:
+            return gas_price
+
+        big_nonce = 6
+        for nonce in range(0, big_nonce):
+            zero_gas_price = self.neon_gas_price_impl({'from': account, 'nonce': nonce, 'gas': gas})
+            self.assertEqual(zero_gas_price, 0)
+
+            big_gas_price = self.neon_gas_price_impl({'from': account, 'nonce': nonce, 'gas': big_gas})
+            self.assertNotEqual(big_gas_price, 0)
+
+        big_gas_price = self.neon_gas_price_impl({'from': account, 'nonce': big_nonce, 'gas': gas})
+        self.assertNotEqual(big_gas_price, 0)
+
+        big_gas_price = self.neon_gas_price_impl({'from': account, 'nonce': big_nonce, 'gas': big_gas})
+        self.assertNotEqual(big_gas_price, 0)
+
         return gas_price
 
     def test_success_gas_less_simple_case(self):
@@ -222,7 +245,7 @@ class TestGasTankIntegration(TestCase):
         gas_price = 1
         wait_time = 0
         while wait_time < MAX_ZERO_GAS_PRICE_WAIT_TIME:
-            gas_price = self.neon_gas_price(str(to_neon_acc.address))
+            gas_price = self.neon_gas_price(to_neon_acc.address)
             if gas_price == 0:
                 return
 
@@ -293,8 +316,8 @@ class TestGasTankIntegration(TestCase):
         gas_price2 = 2
         wait_time = 0
         while wait_time < MAX_ZERO_GAS_PRICE_WAIT_TIME:
-            gas_price1 = self.neon_gas_price(str(to_neon_acc1.address))
-            gas_price2 = self.neon_gas_price(str(to_neon_acc2.address))
+            gas_price1 = self.neon_gas_price(to_neon_acc1.address)
+            gas_price2 = self.neon_gas_price(to_neon_acc2.address)
             if gas_price1 == 0 and gas_price2 == 0:
                 return
 
@@ -349,5 +372,5 @@ class TestGasTankIntegration(TestCase):
         self.assertEqual(self.erc20_wrapper.get_balance(from_spl_token_acc), mint_amount - transfer_amount)
         self.assertEqual(self.erc20_wrapper.get_balance(to_neon_acc.address), transfer_amount)
 
-        gas_price = self.neon_gas_price(str(to_neon_acc.address))
+        gas_price = self.neon_gas_price(to_neon_acc.address)
         self.assertNotEqual(gas_price, 0)

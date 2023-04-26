@@ -113,8 +113,8 @@ class NeonRpcApiWorker:
             tx_nonce = self._normalize_hex(tx_nonce, 'nonce')
         if tx_nonce is None:
             tx_nonce = state_tx_cnt
-        elif state_tx_cnt >= tx_nonce:
-            raise NonceTooLowError(account, tx_nonce, state_tx_cnt)
+        else:
+            NonceTooLowError.raise_if_error(account, tx_nonce, state_tx_cnt)
 
         tx_gas = param.get('gas', None)
         tx_gas = self._normalize_hex(tx_gas, 'gas')
@@ -753,7 +753,7 @@ class NeonRpcApiWorker:
             elif result.code == MPTxSendResultCode.Underprice:
                 raise EthereumError(message='replacement transaction underpriced')
             elif result.code == MPTxSendResultCode.NonceTooLow:
-                neon_tx_validator.raise_if_nonce_error(result.state_tx_cnt, neon_tx.nonce)
+                NonceTooLowError.raise_if_error(neon_tx.hex_sender, neon_tx.nonce, result.state_tx_cnt)
             else:
                 raise EthereumError(message='unknown error')
         except (EthereumError, NonceTooLowError):

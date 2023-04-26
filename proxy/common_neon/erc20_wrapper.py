@@ -168,7 +168,7 @@ class ERC20Wrapper:
         claim_tx = self.proxy.eth.account.sign_transaction(claim_tx, signer_acc.key)
 
         neon_tx = bytearray.fromhex(claim_tx.rawTransaction.hex()[2:])
-        emulating_result = self.proxy.neon.emulate(neon_tx)
+        emulating_result = self.proxy.neon.neon_emulate(neon_tx)
 
         neon_account_dict = dict()
         for account in emulating_result['accounts']:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from ..common_neon.config import Config
 from ..common_neon.data import NeonTxExecCfg, NeonEmulatedResult
@@ -79,8 +79,7 @@ class NeonTxValidator:
     def extract_ethereum_error(self, e: BaseException):
         receipt_parser = SolTxErrorParser(e)
         state_tx_cnt, tx_nonce = receipt_parser.get_nonce_error()
-        if state_tx_cnt is not None:
-            self.raise_if_nonce_error(state_tx_cnt, tx_nonce)
+        self._raise_if_nonce_error(state_tx_cnt, tx_nonce)
 
     def _prevalidate_tx_gas(self):
         if self._tx_gas_limit > self.max_u64:
@@ -119,7 +118,7 @@ class NeonTxValidator:
                 message=f'nonce has max value: address {sender}, tx: {tx_nonce} state: {self._state_tx_cnt}'
             )
 
-        self.raise_if_nonce_error(self._state_tx_cnt, tx_nonce)
+        self._raise_if_nonce_error(self._state_tx_cnt, tx_nonce)
 
     def _prevalidate_sender_eoa(self):
         if not self._neon_account_info:
@@ -191,9 +190,9 @@ class NeonTxValidator:
         if account_cnt > self._config.max_tx_account_cnt:
             raise EthereumError(f"transaction requires too lot of accounts {account_cnt}")
 
-    def raise_if_nonce_error(self, state_tx_cnt: int, tx_nonce: int):
-        if state_tx_cnt <= tx_nonce:
+    def _raise_if_nonce_error(self, state_tx_cnt: Optional[int], tx_nonce: Optional[int]):
+        if (state_tx_cnt is None) and (tx_nonce is None):
             return
 
-        raise NonceTooLowError(self._tx.hex_sender, tx_nonce, state_tx_cnt)
+        NonceTooLowError.raise_if_error(self._tx.hex_sender, tx_nonce, state_tx_cnt)
 
