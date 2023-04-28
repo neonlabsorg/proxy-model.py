@@ -183,7 +183,7 @@ jobs:
         run: |
           docker exec -i ${{ env.CONTAINER }} ./clickfile.py run oz \
             --network ${{ env.NETWORK_NAME }} \
-            --jobs 8 \
+            --jobs 2 \
             --users 10
       - name: Print OpenZeppelin report
         run: |
