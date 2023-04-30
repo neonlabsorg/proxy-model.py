@@ -215,7 +215,7 @@ class NeonPassAnalyzer(GasTankSolTxAnalyzer):
 
         # CreateERC20TokenAccount instruction must use ERC20-wrapper from whitelist
         if not self._is_allowed_contract('0x' + erc20.hex(), claim_to.amount):
-            LOG.debug(f'0x{erc20.hex()} is not whitelisted ERC20 contract')
+            LOG.debug(f'0x{erc20.hex()} ({claim_to.amount}) is not whitelisted ERC20 contract')
             return None
 
         claim_key = base58.b58decode(tx_parser.acct_key_list[approve_ix['accounts'][0]])

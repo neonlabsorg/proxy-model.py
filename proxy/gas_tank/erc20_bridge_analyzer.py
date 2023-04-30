@@ -1,9 +1,8 @@
 import logging
 
-from typing import Set, Union, Optional
+from typing import Optional
 
 from ..common_neon.address import NeonAddress
-from ..common_neon.config import Config
 
 from .gas_tank_types import GasTankNeonTxAnalyzer, GasTankTxInfo
 
@@ -16,9 +15,6 @@ TRANSFER_EVENT = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523
 
 class ERC20Analyzer(GasTankNeonTxAnalyzer):
     name = 'ERC20'
-
-    def __init__(self, config: Config, token_whitelist: Union[bool, Set[str]]):
-        super().__init__(config, token_whitelist)
 
     def process(self, neon_tx: GasTankTxInfo) -> Optional[NeonAddress]:
         if not self._has_token_whitelist:

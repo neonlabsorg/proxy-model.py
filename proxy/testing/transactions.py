@@ -1,14 +1,16 @@
 from ..common_neon.environment_data import EVM_LOADER_ID
-import json
+
 
 token_program = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
-evm_loader_addr = EVM_LOADER_ID
-neon_pass_erc20_wrapper = '0x04b27acb0013a31822ec1624c1a3066b023e3a93'
-neon_pass_whitelist = [neon_pass_erc20_wrapper]
+evm_program = EVM_LOADER_ID
 
+neon_pass_erc20_for_spl = '0x04b27acb0013a31822ec1624c1a3066b023e3a93'
 neon_pass_gas_less_account = '0x4136faa9cae6c9afde37045a255b087f2ccfee75'
+neon_pass_gas_less_amount = 123456
+neon_pass_claim_to_ix_data = 'TjDbbsDNCryDtGGYA4MXa9pT7et6FgLvJPdf4ezz3twpbTrexM1HrC3QrKR1yNMYYizyEZNcYhXoLyzDbdpZGwCqPPrYsUMWgg4diCW6mbxXUzbyVwbMERRhADEY4rAqBAutTXaPq3BZxMVLRvffkSZGrZLTp3STFfmBVX8ZTZpks7b2iKsVqFuHAkxNtHpD8UWAhuptGzpheHyEybzKFDrn1bi1YL6zs6eRqB1VCv64tR1D52pzQ4WZWLt8VebjcbeYdQUeKihW4TsyMN825kJHJ'
 
-# Solana transaction for simple case gas-less tx
+
+# The Solana transaction for simple case gas-less tx
 neon_pass_tx = {
     "blockTime": 1675239756,
     "meta": {
@@ -210,8 +212,8 @@ neon_pass_tx = {
                 "11111111111111111111111111111111",
                 "ComputeBudget111111111111111111111111111111",
                 "SysvarRent111111111111111111111111111111111",
-                "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-                "53DfF883gyixYNXnM7s5xhdeyV8mVk9T4i2hGV9vG9io"
+                token_program,
+                evm_program
             ],
             "header": {
                 "numReadonlySignedAccounts": 0,
@@ -246,7 +248,7 @@ neon_pass_tx = {
                 },
                 {
                     "accounts": [0, 6, 5, 9, 13, 3, 5, 7, 8, 2, 4, 11, 12],
-                    "data": "TjDbbsDNCryDtGGYA4MXa9pT7et6FgLvJPdf4ezz3twpbTrexM1HrC3QrKR1yNMYYizyEZNcYhXoLyzDbdpZGwCqPPrYsUMWgg4diCW6mbxXUzbyVwbMERRhADEY4rAqBAutTXaPq3BZxMVLRvffkSZGrZLTp3STFfmBVX8ZTZpks7b2iKsVqFuHAkxNtHpD8UWAhuptGzpheHyEybzKFDrn1bi1YL6zs6eRqB1VCv64tR1D52pzQ4WZWLt8VebjcbeYdQUeKihW4TsyMN825kJHJ",
+                    "data": neon_pass_claim_to_ix_data,
                     "programIdIndex": 13
                 }
             ],
@@ -258,9 +260,14 @@ neon_pass_tx = {
     }
 }
 
-wormhole_gas_less_account = '0x4136faa9cae6c9afde37045a255b087f2ccfee75'
+wormhole_gas_less_account = '0x0c37a6adb193b8d50003e46edf20999049ba02de'
+wormhole_gas_less_amount = 1200000
+wormhole_contract = '0xee3db83916ccdc3593b734f7f2d16d630f39f1d0'
+erc20_token_mint = '0xae13d989dac2f0debff460ac112a837c89baa7cd'
+wormhole_token_mint = f'4:{erc20_token_mint}'
+wormhole_write_ix_data = '3UTv64yHjqhjz5C3kPryURvtiiH1ntFhLCyk2MXq541jPMvwhZrTwu678u2WJxsnAyBLERGpkh1H9fS89MSerce77RmebjEmfAAQZxYkm2tNnoDPejEiKLVPzK3zpCRdJt9M1tA6GXN2ADp5TQurh5MLHd1rk59ed7TdTwKBzgKY4eYya5uWFFoBCf5XduyPpGHzhq1rjVXy8K2edUKiw2n7az9McsMVgoWTeR9QyqNvSiW7NShFM8JWGTCHFWyCwp9wvjeWJSt8NZyr24L7kfXiZ9kPQh6jyNDUxrPVQmBkBhZGLaS19TxgrJhhpZDjuhdFtpqK3x4XmVZ1a8MaHRSHBbCojF4KNb2sYpFMFdijNPtq5pCxzGPe99LRBTDbPjYRhX6x3yW1h3H5BcnMZ81mk9yYgfFoiQRn78nhbNcu1BzDSCrf6C7BTcppuu9giTz5fnKwQ9sTwA4mbKhv28HMWyAmdTgiW9PEpAKZ3WVvKFmpQkqDX98V18xu1wNrXnAY37KyCnCEe15U3bHwJSUC461bjGF4zDvR9HokNXHd8tFScgykh7daeMzJo7pkgSy2jwnuXMMyxD233k2JcyzVzheZQTKs1XrMHDnQkaADyaLAdxvRsAV4SpeFeJV4FrqTJH76K'
 
-write_wormhole_redeem_tx = {
+wormhole_redeem_write_tx = {
     'blockTime': 1675925799,
     'meta': {
         'computeUnitsConsumed': 3322,
@@ -272,11 +279,11 @@ write_wormhole_redeem_tx = {
             'writable': []
         },
         'logMessages': [
-            'Program eeLSJgWzzxrqKv1UxtRVVH8FX3qCQWUs9QuAjJpETGU invoke [1]',
+            f'Program {evm_program} invoke [1]',
             'Program log: Instruction: Write To Holder',
             'Program data: SEFTSA== zp8/68tfhFttkh2ivNc5VKIZ6KM7iBgBJOAN5M+ZOzs=',
-            'Program eeLSJgWzzxrqKv1UxtRVVH8FX3qCQWUs9QuAjJpETGU consumed 3322 of 200000 compute units',
-            'Program eeLSJgWzzxrqKv1UxtRVVH8FX3qCQWUs9QuAjJpETGU success'
+            f'Program {evm_program} consumed 3322 of 200000 compute units',
+            f'Program {evm_program} success'
         ],
         'postBalances': [
             87604395320,
@@ -299,7 +306,7 @@ write_wormhole_redeem_tx = {
             'accountKeys': [
                 '6DBP3gXhh9CQxseeEDV5HUK762XU9oTRDcvGdbCk9oUB',
                 'BVh1AdDwbnxnhRGKtR14DRZtJZx5pthvC3ThfjyDrevr',
-                'eeLSJgWzzxrqKv1UxtRVVH8FX3qCQWUs9QuAjJpETGU'
+                evm_program
             ],
             'header': {
                 'numReadonlySignedAccounts': 0,
@@ -309,7 +316,7 @@ write_wormhole_redeem_tx = {
             'instructions': [
                 {
                     'accounts': [1, 0],
-                    'data': '3UTv64yHjqhjz5C3kPryURvtiiH1ntFhLCyk2MXq541jPMvwhZrTwu678u2WJxsnAyBLERGpkh1H9fS89MSerce77RmebjEmfAAQZxYkm2tNnoDPejEiKLVPzK3zpCRdJt9M1tA6GXN2ADp5TQurh5MLHd1rk59ed7TdTwKBzgKY4eYya5uWFFoBCf5XduyPpGHzhq1rjVXy8K2edUKiw2n7az9McsMVgoWTeR9QyqNvSiW7NShFM8JWGTCHFWyCwp9wvjeWJSt8NZyr24L7kfXiZ9kPQh6jyNDUxrPVQmBkBhZGLaS19TxgrJhhpZDjuhdFtpqK3x4XmVZ1a8MaHRSHBbCojF4KNb2sYpFMFdijNPtq5pCxzGPe99LRBTDbPjYRhX6x3yW1h3H5BcnMZ81mk9yYgfFoiQRn78nhbNcu1BzDSCrf6C7BTcppuu9giTz5fnKwQ9sTwA4mbKhv28HMWyAmdTgiW9PEpAKZ3WVvKFmpQkqDX98V18xu1wNrXnAY37KyCnCEe15U3bHwJSUC461bjGF4zDvR9HokNXHd8tFScgykh7daeMzJo7pkgSy2jwnuXMMyxD233k2JcyzVzheZQTKs1XrMHDnQkaADyaLAdxvRsAV4SpeFeJV4FrqTJH76K',
+                    'data': wormhole_write_ix_data,
                     'programIdIndex': 2
                 }
             ],
@@ -322,7 +329,7 @@ write_wormhole_redeem_tx = {
     'version': 'legacy'
 }
 
-execute_wormhole_redeem_tx = {
+wormhole_redeem_execute_tx = {
     'blockTime': 1675925800,
     'meta': {
         'computeUnitsConsumed': 773154,
@@ -354,7 +361,7 @@ execute_wormhole_redeem_tx = {
             'Program ComputeBudget111111111111111111111111111111 success',
             'Program ComputeBudget111111111111111111111111111111 invoke [1]',
             'Program ComputeBudget111111111111111111111111111111 success',
-            'Program eeLSJgWzzxrqKv1UxtRVVH8FX3qCQWUs9QuAjJpETGU invoke [1]',
+            f'Program {evm_program} invoke [1]',
             'Program log: Instruction: Execute Transaction from Account',
             'Program data: SEFTSA== zp8/68tfhFttkh2ivNc5VKIZ6KM7iBgBJOAN5M+ZOzs=',
             'Program 11111111111111111111111111111111 invoke [2]',
@@ -383,8 +390,8 @@ execute_wormhole_redeem_tx = {
             'Program 11111111111111111111111111111111 success',
             'Program data: R0FT eGEXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= eGEXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
             'Program log: exit_status=0x12', 'Program data: UkVUVVJO Eg==',
-            'Program eeLSJgWzzxrqKv1UxtRVVH8FX3qCQWUs9QuAjJpETGU consumed 773098 of 1399944 compute units',
-            'Program eeLSJgWzzxrqKv1UxtRVVH8FX3qCQWUs9QuAjJpETGU success'
+            f'Program {evm_program} consumed 773098 of 1399944 compute units',
+            f'Program {evm_program} success'
         ],
         'postBalances': [
             87602868040,
@@ -460,7 +467,7 @@ execute_wormhole_redeem_tx = {
                 'G1U4NB2BhLSnjPckeAAeyj7Sc6QYnpUxuN7ktzikTHu2',
                 '11111111111111111111111111111111',
                 'ComputeBudget111111111111111111111111111111',
-                'eeLSJgWzzxrqKv1UxtRVVH8FX3qCQWUs9QuAjJpETGU',
+                evm_program,
                 '35xDoVVnYfy6KE2xGoxbxq1vHBwDhHKwyPcC17pQe1vo',
                 '4Cz6XhfKTLajftkbRtwdeMNrofhx62QGvNx55hFRQcpP',
                 'A11nLCkTV4VxbcTqWJteSEAQ5iVFH5dHBj6LtdMGn6sr',

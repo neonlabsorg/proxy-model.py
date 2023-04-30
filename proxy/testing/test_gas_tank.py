@@ -1,23 +1,30 @@
 import unittest
+import base58
 
 from unittest.mock import patch
-from typing import Optional, Dict
+from typing import Optional
 
 from ..common_neon.config import Config
+from ..common_neon.utils import NeonTxInfo
+from ..common_neon.address import NeonAddress
 from ..common_neon.solana_tx import SolPubKey
 from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.address import NeonAddress
 
 from ..gas_tank import GasTank
-from ..gas_tank.portal_analyzer import PortalAnalyzer, GasTankNeonTxAnalyzer
+from ..gas_tank.portal_analyzer import PortalAnalyzer
 from ..gas_tank.erc20_bridge_analyzer import ERC20Analyzer
-from ..gas_tank.neon_pass_analyzer import NeonPassAnalyzer, GasTankSolTxAnalyzer
+from ..gas_tank.neon_pass_analyzer import NeonPassAnalyzer
 from ..gas_tank.gas_less_accounts_db import GasLessAccountsDB
 
 from ..indexer.sql_dict import SQLDict
 
-from ..testing.transactions import neon_pass_tx, neon_pass_whitelist, evm_loader_addr, neon_pass_gas_less_account
-from ..testing.transactions import write_wormhole_redeem_tx, execute_wormhole_redeem_tx, wormhole_gas_less_account
+from ..testing.transactions import (
+    neon_pass_tx, neon_pass_claim_to_ix_data, neon_pass_erc20_for_spl,
+    neon_pass_gas_less_account, neon_pass_gas_less_amount,
+    erc20_token_mint,
+    wormhole_redeem_write_tx, wormhole_redeem_execute_tx, wormhole_write_ix_data,
+    wormhole_gas_less_account, wormhole_gas_less_amount, wormhole_contract, wormhole_token_mint
+)
 
 
 class FakeConfig(Config):
@@ -37,59 +44,104 @@ class FakeConfig(Config):
 
 class TestGasTank(unittest.TestCase):
     @classmethod
-    def create_gas_tank(cls, start_slot: str):
+    def create_gas_tank(cls, start_slot: str) -> GasTank:
         config = FakeConfig(start_slot)
-
-        sol_tx_analyzer_dict: Dict[str, GasTankSolTxAnalyzer] = dict()
-        if enable_neon_pass:
-            neon_pass_analyzer = NeonPassAnalyzer(config, neon_pass_whitelist)
-            sol_tx_analyzer_dict[neon_pass_analyzer.name] = neon_pass_analyzer
-
-        # neon_tx_analyzer_dict: Dict[NeonAddress, GasTankNeonTxAnalyzer] = dict()
-        # if enable_portal:
-        #     portal_tx_analyzer = PortalAnalyzer(True)
-        #     neon_tx_analyzer_dict[] = portal_tx_analyzer
-        #
-        # if enable_erc20:
-        #     erc20_tx_analyzer = ERC20BridgeAnalyzer(True)
-
         return GasTank(config=config)
 
     @classmethod
-    @patch.object(SQLDict, 'get')
-    @patch.object(SolInteractor, 'get_block_slot')
-    def setUpClass(cls, mock_get_slot, mock_dict_get) -> None:
-        print("testing indexer in gas-tank mode")
-        cls.evm_loader_id = evm_loader_addr
-        cls.gas_tank = cls.create_gas_tank('0')
-        mock_get_slot.assert_called_once_with('finalized')
-        mock_dict_get.assert_called()
+    def add_neon_pass_analyzer(cls, gas_tank: GasTank):
+        neon_pass_whitelist = {neon_pass_erc20_for_spl: neon_pass_gas_less_amount}
+        neon_pass_analyzer = NeonPassAnalyzer(gas_tank._config, neon_pass_whitelist)
+        gas_tank.add_sol_tx_analyzer(neon_pass_analyzer)
+
+    @classmethod
+    def add_portal_analyzer(cls, gas_tank: GasTank):
+        portal_whitelist = {wormhole_token_mint: wormhole_gas_less_amount}
+        portal_analyzer = PortalAnalyzer(gas_tank._config, portal_whitelist)
+        gas_tank.add_neon_tx_analyzer(NeonAddress(wormhole_contract), portal_analyzer)
+
+    @classmethod
+    def add_erc20_analyzer(cls, gas_tank: GasTank):
+        erc20_whitelist = {erc20_token_mint: wormhole_gas_less_amount}
+        erc20_analyzer = ERC20Analyzer(gas_tank._config, erc20_whitelist)
+        gas_tank.add_neon_tx_analyzer(NeonAddress(wormhole_contract), erc20_analyzer)
 
     @patch.object(NeonPassAnalyzer, '_is_allowed_contract')
     @patch.object(GasLessAccountsDB, 'add_gas_less_permit_list')
     def test_failed_permit_contract_not_in_whitelist(self, mock_add_gas_less_permit, mock_is_allowed_contract):
         """ Should not permit gas-less txs for contract that is not in whitelist """
-        self.gas_tank._current_slot = 1
+        gas_tank = self.create_gas_tank('0')
+        gas_tank._current_slot = 1
+        self.add_neon_pass_analyzer(gas_tank)
         mock_is_allowed_contract.side_effect = [False]
 
-        self.gas_tank._process_sol_tx(neon_pass_tx)
-        self.gas_tank._save_cached_data()
+        gas_tank._process_sol_tx(neon_pass_tx)
+        gas_tank._save_cached_data()
 
-        mock_is_allowed_contract.assert_called_once()
+        mock_is_allowed_contract.assert_called_once_with(neon_pass_erc20_for_spl, neon_pass_gas_less_amount)
         mock_add_gas_less_permit.assert_not_called()
 
     @patch.object(GasTank, '_has_gas_less_tx_permit')
     @patch.object(GasLessAccountsDB, 'add_gas_less_permit_list')
     def test_not_permit_for_already_processed_address(self, mock_add_gas_less_permit, mock_has_gas_less_tx_permit):
         """ Should not permit gas-less txs to repeated address """
-        self.gas_tank._current_slot = 1
+        gas_tank = self.create_gas_tank('0')
+        gas_tank._current_slot = 1
+        self.add_neon_pass_analyzer(gas_tank)
         mock_has_gas_less_tx_permit.side_effect = [True]
 
-        self.gas_tank._process_sol_tx(neon_pass_tx)
-        self.gas_tank._save_cached_data()
+        gas_tank._process_sol_tx(neon_pass_tx)
+        gas_tank._save_cached_data()
 
-        mock_has_gas_less_tx_permit.assert_called_once()
+        mock_has_gas_less_tx_permit.assert_called_once_with(NeonAddress(neon_pass_gas_less_account))
         mock_add_gas_less_permit.assert_not_called()
+
+    @patch.object(GasTank, '_allow_gas_less_tx')
+    def test_neon_pass_simple_case(self, mock_allow_gas_less_tx):
+        """ Should allow gas-less txs to liquidity transfer in simple case by NeonPass"""
+        gas_tank = self.create_gas_tank('0')
+        gas_tank._current_slot = 1
+        self.add_neon_pass_analyzer(gas_tank)
+
+        gas_tank._process_sol_tx(neon_pass_tx)
+        gas_tank._save_cached_data()
+
+        ix_data = base58.b58decode(neon_pass_claim_to_ix_data)
+        neon_tx = NeonTxInfo.from_sig_data(ix_data[5:])
+
+        mock_allow_gas_less_tx.assert_called_once_with(NeonAddress(neon_pass_gas_less_account), neon_tx)
+
+    @patch.object(GasTank, '_allow_gas_less_tx')
+    def test_wormhole_transaction_simple_case(self, mock_allow_gas_less_tx):
+        """ Should allow gas-less txs to liquidity transfer in simple case by Wormhole"""
+        gas_tank = self.create_gas_tank('0')
+        gas_tank._current_slot = 2
+        self.add_portal_analyzer(gas_tank)
+
+        gas_tank._process_neon_ix(wormhole_redeem_write_tx)
+        gas_tank._process_neon_ix(wormhole_redeem_execute_tx)
+        gas_tank._save_cached_data()
+
+        ix_data = base58.b58decode(wormhole_write_ix_data)
+        neon_tx = NeonTxInfo.from_sig_data(ix_data[41:])
+
+        mock_allow_gas_less_tx.assert_called_once_with(NeonAddress(wormhole_gas_less_account), neon_tx)
+
+    @patch.object(GasTank, '_allow_gas_less_tx')
+    def test_erc20_transaction_simple_case(self, mock_allow_gas_less_tx):
+        """ Should allow gas-less txs to liquidity transfer in simple case by ERC20"""
+        gas_tank = self.create_gas_tank('0')
+        gas_tank._current_slot = 2
+        self.add_erc20_analyzer(gas_tank)
+
+        gas_tank._process_neon_ix(wormhole_redeem_write_tx)
+        gas_tank._process_neon_ix(wormhole_redeem_execute_tx)
+        gas_tank._save_cached_data()
+
+        ix_data = base58.b58decode(wormhole_write_ix_data)
+        neon_tx = NeonTxInfo.from_sig_data(ix_data[41:])
+
+        mock_allow_gas_less_tx.assert_called_once_with(NeonAddress(wormhole_gas_less_account), neon_tx)
 
     @patch.object(SQLDict, 'get')
     @patch.object(SolInteractor, 'get_block_slot')
@@ -168,24 +220,3 @@ class TestGasTank(unittest.TestCase):
         self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot + 1)
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
-
-    def test_neonpass_tx_simple_case(self):
-        """ Should allow gas-less txs to liquidity transfer in simple case by NeonPass"""
-        self.gas_tank._current_slot = 2
-        self.gas_tank._process_sol_tx(neon_pass_tx)
-        self.gas_tank._save_cached_data()
-
-        has_permit = self.gas_tank._gas_less_account_db.has_gas_less_tx_permit(NeonAddress(neon_pass_gas_less_account))
-        self.assertTrue(has_permit)
-
-    def test_wormhole_transaction_simple_case(self):
-        """ Should allow gas-less txs to liquidity transfer in simple case by Wormhole"""
-
-        self.gas_tank._current_slot = 2
-
-        self.gas_tank._process_neon_ix(write_wormhole_redeem_tx)
-        self.gas_tank._process_neon_ix(execute_wormhole_redeem_tx)
-        self.gas_tank._save_cached_data()
-
-        has_permit = self.gas_tank._gas_less_account_db.has_gas_less_tx_permit(NeonAddress(wormhole_gas_less_account))
-        self.assertTrue(has_permit)

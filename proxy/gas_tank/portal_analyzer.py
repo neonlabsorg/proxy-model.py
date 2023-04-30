@@ -73,12 +73,11 @@ class PortalAnalyzer(GasTankNeonTxAnalyzer):
 
         call_data = bytes.fromhex(neon_tx.neon_tx.calldata[2:])
         if len(call_data) < 69:
-            LOG.debug('small callData')
+            LOG.debug(f'small callData {len(call_data)}')
             return None
 
-        LOG.debug(f'callData: {call_data.hex()[:4]}')
         if call_data[:4] != METHOD_ID:
-            LOG.debug('bad method name')
+            LOG.debug(f'bad method name {call_data.hex()[:8]}')
             return None
 
         try:

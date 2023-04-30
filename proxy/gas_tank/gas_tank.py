@@ -18,6 +18,7 @@ from ..indexer.indexed_objects import NeonIndexedHolderInfo
 from ..indexer.indexer_base import IndexerBase
 from ..indexer.solana_tx_meta_collector import SolTxMetaDict, FinalizedSolTxMetaCollector
 from ..indexer.sql_dict import SQLDict
+from ..indexer.utils import MetricsToLogger
 
 
 LOG = logging.getLogger(__name__)
@@ -44,6 +45,8 @@ class GasTank(IndexerBase):
         self._last_block_slot = self._start_slot
         self._latest_gas_tank_slot = self._start_slot
         self._current_slot = 0
+
+        self._counted_logger = MetricsToLogger()
 
         sol_tx_meta_dict = SolTxMetaDict()
         self._sol_tx_collector = FinalizedSolTxMetaCollector(config, self._solana, sol_tx_meta_dict, self._start_slot)
@@ -336,6 +339,17 @@ class GasTank(IndexerBase):
         self._save_cached_data()
         self._clear_old_data()
 
+        with logging_context(ident='stat'):
+            self._counted_logger.print(
+                self._config,
+                list_value_dict={},
+                latest_value_dict={
+                    'Latest slot': self._last_block_slot,
+                    'Latest processed slot': self._latest_gas_tank_slot,
+                    'Solana finalized slot': self._sol_tx_collector.last_block_slot
+                }
+            )
+
     @staticmethod
     def _check_error(tx: Dict[str, Any]) -> bool:
         if 'meta' not in tx:
@@ -380,11 +394,6 @@ class GasTank(IndexerBase):
             self._latest_gas_tank_slot = min(self._latest_gas_tank_slot, tx.start_block_slot - 1)
 
         self._constants['latest_gas_tank_slot'] = self._latest_gas_tank_slot
-        LOG.debug(
-            f'Latest slot: {self._last_block_slot}, '
-            f'Latest processed slot: {self._latest_gas_tank_slot}, '
-            f'Solana finalized slot {self._sol_tx_collector.last_block_slot}'
-        )
 
     def _save_cached_data(self) -> None:
         if (len(self._gas_less_account_dict) == 0) and (len(self._gas_less_usage_list) == 0):

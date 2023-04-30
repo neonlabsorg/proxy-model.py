@@ -105,7 +105,7 @@ class GasTankNeonTxAnalyzer(abc.ABC):
         min_amount = self._token_whitelist.get(token, None)
         if min_amount is None:
             return False
-        return min_amount < amount
+        return min_amount <= amount
 
 
 class GasTankSolTxAnalyzer(abc.ABC):
@@ -130,7 +130,7 @@ class GasTankSolTxAnalyzer(abc.ABC):
         min_amount = self._token_whitelist.get(token, None)
         if min_amount is None:
             return False
-        return min_amount < amount
+        return min_amount <= amount
 
 
 @dataclasses.dataclass(frozen=True)
