@@ -116,7 +116,7 @@ class NeonRpcApiWorker:
         else:
             NonceTooLowError.raise_if_error(account, tx_nonce, state_tx_cnt)
 
-        tx_gas = param.get('gas', None)
+        tx_gas = param.get('gas', 0)
         tx_gas = self._normalize_hex(tx_gas, 'gas')
 
         if self._has_gas_less_tx_permit(account, tx_nonce, tx_gas):
@@ -314,7 +314,7 @@ class NeonRpcApiWorker:
 
         event_type_str = event_type_dict.get(event_type, None)
         if event_type_str is not None:
-            log_rec[key] = event_type
+            log_rec[key] = event_type_str
 
     @staticmethod
     def _normalize_topic(raw_topic: Any) -> str:
