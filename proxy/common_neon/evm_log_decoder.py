@@ -201,7 +201,7 @@ class _NeonLogDecoder:
 
         data = b''
         if len(data_list) > 1:
-            data = base64.b64decode(data_list[1]).decode('utf-8')
+            data = base64.b64decode(data_list[1])
 
         return NeonLogTxEvent(event_type=event_type, is_hidden=True, address=b'', data=data, topic_list=list())
 
