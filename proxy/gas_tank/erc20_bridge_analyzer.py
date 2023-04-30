@@ -1,7 +1,9 @@
 import logging
+
 from typing import Set, Union, Optional
 
 from ..common_neon.address import NeonAddress
+from ..common_neon.config import Config
 
 from .gas_tank_types import GasTankNeonTxAnalyzer, GasTankTxInfo
 
@@ -12,17 +14,11 @@ LOG = logging.getLogger(__name__)
 TRANSFER_EVENT = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'
 
 
-class CommonERC20BridgeAnalyzer(GasTankNeonTxAnalyzer):
-    name = 'CommonERC20'
+class ERC20Analyzer(GasTankNeonTxAnalyzer):
+    name = 'ERC20'
 
-    # token_whitelist - the white list of tokens, transfers to which lead to gas-less transactions.
-    # This set should contain ERC20 addresses separated by comma.
-    def __init__(self, token_whitelist: Union[bool, Set[str]]):
-        self._token_whitelist = token_whitelist
-        if isinstance(self._token_whitelist, bool) and self._token_whitelist:
-            self._has_token_whitelist = True
-        else:
-            self._has_token_whitelist = len(self._token_whitelist) > 0
+    def __init__(self, config: Config, token_whitelist: Union[bool, Set[str]]):
+        super().__init__(config, token_whitelist)
 
     def process(self, neon_tx: GasTankTxInfo) -> Optional[NeonAddress]:
         if not self._has_token_whitelist:
@@ -39,13 +35,11 @@ class CommonERC20BridgeAnalyzer(GasTankNeonTxAnalyzer):
                 continue
 
             token_id = event['address']
-            if isinstance(self._token_whitelist, bool):
-                pass
-            elif token_id not in self._token_whitelist:
+            amount = int.from_bytes(bytes.fromhex(event['data'][2:]), 'big')
+            if self._is_allowed_token(token_id, amount):
                 continue
 
             to = NeonAddress(bytes.fromhex(event['topics'][2][2:])[12:])
-            amount = int.from_bytes(bytes.fromhex(event['data'][2:]), 'big')
             LOG.info(f'Common ERC20 bridge transfer: {amount} of {token_id} token to {to}')
             return to
         return None

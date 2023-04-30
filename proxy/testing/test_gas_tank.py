@@ -1,7 +1,7 @@
 import unittest
 
 from unittest.mock import patch
-from typing import Optional
+from typing import Optional, Dict
 
 from ..common_neon.config import Config
 from ..common_neon.solana_tx import SolPubKey
@@ -9,8 +9,9 @@ from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.address import NeonAddress
 
 from ..gas_tank import GasTank
-from ..gas_tank.portal_analyzer import PortalTxAnalyzer
-from ..gas_tank.neon_pass_analyzer import NeonPassAnalyzer
+from ..gas_tank.portal_analyzer import PortalAnalyzer, GasTankNeonTxAnalyzer
+from ..gas_tank.erc20_bridge_analyzer import ERC20Analyzer
+from ..gas_tank.neon_pass_analyzer import NeonPassAnalyzer, GasTankSolTxAnalyzer
 from ..gas_tank.gas_less_accounts_db import GasLessAccountsDB
 
 from ..indexer.sql_dict import SQLDict
@@ -38,13 +39,21 @@ class TestGasTank(unittest.TestCase):
     @classmethod
     def create_gas_tank(cls, start_slot: str):
         config = FakeConfig(start_slot)
-        neon_pass_analyzer = NeonPassAnalyzer(config, neon_pass_whitelist)
-        # portal_tx_analyzer = PortalTxAnalyzer(True)
-        return GasTank(
-            config=config,
-            sol_tx_analyzer_dict={neon_pass_analyzer.name: neon_pass_analyzer},
-            neon_tx_analyzer_dict={}
-        )
+
+        sol_tx_analyzer_dict: Dict[str, GasTankSolTxAnalyzer] = dict()
+        if enable_neon_pass:
+            neon_pass_analyzer = NeonPassAnalyzer(config, neon_pass_whitelist)
+            sol_tx_analyzer_dict[neon_pass_analyzer.name] = neon_pass_analyzer
+
+        # neon_tx_analyzer_dict: Dict[NeonAddress, GasTankNeonTxAnalyzer] = dict()
+        # if enable_portal:
+        #     portal_tx_analyzer = PortalAnalyzer(True)
+        #     neon_tx_analyzer_dict[] = portal_tx_analyzer
+        #
+        # if enable_erc20:
+        #     erc20_tx_analyzer = ERC20BridgeAnalyzer(True)
+
+        return GasTank(config=config)
 
     @classmethod
     @patch.object(SQLDict, 'get')

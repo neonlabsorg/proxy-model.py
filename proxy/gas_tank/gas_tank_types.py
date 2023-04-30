@@ -4,9 +4,10 @@ import abc
 import dataclasses
 import logging
 
-from typing import Dict, Iterator, Optional, Any, Tuple
+from typing import Dict, Iterator, Optional, Any, Tuple, Union, List
 
 from ..common_neon.address import NeonAddress
+from ..common_neon.config import Config
 from ..common_neon.evm_log_decoder import NeonLogTxEvent
 from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptInfo
 from ..common_neon.utils.neon_tx_info import NeonTxInfo
@@ -81,21 +82,55 @@ class GasTankTxInfo(NeonIndexedTxInfo):
 class GasTankNeonTxAnalyzer(abc.ABC):
     name = 'UNKNOWN'
 
+    # token_whitelist - the white list of tokens, transfers to which lead to gas-less transactions.
+    def __init__(self, config: Config, token_whitelist: Union[bool, Dict[str, int]]):
+        self._config = config
+        self._token_whitelist = token_whitelist
+        if isinstance(self._token_whitelist, bool) and self._token_whitelist:
+            self._has_token_whitelist = True
+        else:
+            self._has_token_whitelist = len(self._token_whitelist) > 0
+
     # Function to process NeonEVM transaction to find one that should be allowed with gas-less transactions
     # Arguments:
     #  - neon_tx - information about NeonEVM transaction
-    #  - state - gas tank state
     @abc.abstractmethod
     def process(self, neon_tx: GasTankTxInfo) -> Optional[NeonAddress]:
         pass
+
+    def _is_allowed_token(self, token: str, amount: int) -> bool:
+        if isinstance(self._token_whitelist, bool):
+            return True
+
+        min_amount = self._token_whitelist.get(token, None)
+        if min_amount is None:
+            return False
+        return min_amount < amount
 
 
 class GasTankSolTxAnalyzer(abc.ABC):
     name = 'UNKNOWN'
 
+    def __init__(self, config: Config, token_whitelist: Union[bool, Dict[str, int]]):
+        self._config = config
+        self._token_whitelist = token_whitelist
+        if isinstance(self._token_whitelist, bool) and self._token_whitelist:
+            self._has_token_whitelist = True
+        else:
+            self._has_token_whitelist = len(self._token_whitelist) > 0
+
     @abc.abstractmethod
-    def process(self, sol_tx: Dict[str, Any]) -> Optional[Tuple[NeonAddress, NeonTxInfo]]:
+    def process(self, sol_tx: Dict[str, Any]) -> List[Tuple[NeonAddress, NeonTxInfo]]:
         pass
+
+    def _is_allowed_contract(self, token: str, amount: int) -> bool:
+        if isinstance(self._token_whitelist, bool):
+            return True
+
+        min_amount = self._token_whitelist.get(token, None)
+        if min_amount is None:
+            return False
+        return min_amount < amount
 
 
 @dataclasses.dataclass(frozen=True)

@@ -1,9 +1,11 @@
 import logging
 
-from typing import Set, Union, Optional
+from typing import Optional
 
-from construct import Const, Struct, GreedyBytes, Byte, Bytes, BytesInteger, Int32ub, Int16ub, Int64ub, Switch
-from construct import this, Enum
+from construct import (
+    Const, Struct, GreedyBytes, Byte, Bytes, BytesInteger,
+    Int32ub, Int16ub, Int64ub, Switch, this, Enum, ConstructError
+)
 
 from .gas_tank_types import GasTankNeonTxAnalyzer, GasTankTxInfo
 
@@ -19,7 +21,12 @@ Signer = Struct(
     "v" / Byte,
 )
 
-COMPLETE_TRANSFER = bytes.fromhex('c6878519')
+METHOD_ID = bytes.fromhex('c6878519')
+
+VAASize = Struct(
+    "offset" / BytesInteger(32),
+    "length" / BytesInteger(32)
+)
 
 VAA = Struct(
     "version" / Const(b"\1"),
@@ -57,41 +64,48 @@ VAA = Struct(
 )
 
 
-class PortalTxAnalyzer(GasTankNeonTxAnalyzer):
+class PortalAnalyzer(GasTankNeonTxAnalyzer):
     name = 'Portal'
-    # token_whitelist - the whitelist of tokens for the transfer of which to provide gas-less transactions
-    #    this set should contain next items: "tokenChain:tokenAddress",
-    #    where `tokenChain` is originally chain of token in terms of Portal bridge numbers
-    #          `tokenAddress` is address of token in hexadecimal lowercase form with '0x' prefix
-
-    def __init__(self, token_whitelist: Union[bool, Set[str]]):
-        self._token_whitelist = token_whitelist
-        if isinstance(self._token_whitelist, bool) and self._token_whitelist:
-            self._has_token_whitelist = True
-        else:
-            self._has_token_whitelist = len(self._token_whitelist) > 0
 
     def process(self, neon_tx: GasTankTxInfo) -> Optional[NeonAddress]:
         if not self._has_token_whitelist:
             return None
 
         call_data = bytes.fromhex(neon_tx.neon_tx.calldata[2:])
-        LOG.debug(f'callData: {call_data.hex()}')
-        if call_data[0:4] != COMPLETE_TRANSFER:
+        if len(call_data) < 69:
+            LOG.debug('small callData')
             return None
 
-        offset = int.from_bytes(call_data[4:36], 'big')
-        length = int.from_bytes(call_data[36:68], 'big')
-        data = call_data[36+offset:36+offset+length]
-        vaa = VAA.parse(data)
+        LOG.debug(f'callData: {call_data.hex()[:4]}')
+        if call_data[:4] != METHOD_ID:
+            LOG.debug('bad method name')
+            return None
+
+        try:
+            vaa_size = VAASize.parse(call_data[4:68])
+        except ConstructError as exc:
+            LOG.debug(f'Exception on parsing VAASize: {str(exc)}')
+            return None
+
+        vaa_offset = 36 + vaa_size.offset
+        vaa_len = vaa_offset + vaa_size.length
+        if vaa_len > len(call_data):
+            LOG.debug(f'size of callData {len(call_data)} is less than size of VAA: {vaa_len}')
+            return None
+
+        data = call_data[vaa_offset:vaa_len]
+        try:
+            vaa = VAA.parse(data)
+        except ConstructError as exc:
+            LOG.debug(f'Exception on parsing VAA: {str(exc)}')
+            return None
 
         token_address = NeonAddress(vaa.payload.tokenAddress[12:32])
-        token_id = f"{vaa.payload.tokenChain}:{token_address}"
-        if isinstance(self._token_whitelist, bool):
-            pass
-        elif token_id not in self._token_whitelist:
+        token_id = f'{vaa.payload.tokenChain}:{token_address}'
+        if not self._is_allowed_token(token_id, vaa.payload.amount):
+            LOG.debug(f'not allowed token: {str(token_address)}')
             return None
 
         to = NeonAddress(vaa.payload.to[12:])
-        LOG.info(f"Portal transfer: {vaa.payload.amount} of {token_id} token to {to}")
+        LOG.info(f'Portal transfer: {vaa.payload.amount} of {token_id} token to {to}')
         return to

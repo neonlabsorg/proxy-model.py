@@ -39,12 +39,13 @@
     );
 
     CREATE TABLE IF NOT EXISTS gas_less_accounts (
-        address TEXT UNIQUE,
-        contract TEXT UNIQUE,
-        nonce BIGINT UNIQUE,
+        address TEXT,
+        contract TEXT,
+        nonce BIGINT,
         block_slot BIGINT,
         neon_sig TEXT
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_gas_less_accounts ON gas_less_accounts(address, contract, nonce);
 
     CREATE TABLE IF NOT EXISTS gas_less_usages(
         address TEXT,

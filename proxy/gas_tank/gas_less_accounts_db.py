@@ -35,7 +35,6 @@ class GasLessAccountsDB(BaseDB):
     def add_gas_less_permit_list(self, cursor: BaseDB.Cursor, permit_list: Iterator[GasLessPermit]) -> None:
         row_list: List[List[Any]] = list()
         for permit in permit_list:
-
             account = str(permit.account)
             contract = str(permit.contract) if permit.contract is not None else None
 
