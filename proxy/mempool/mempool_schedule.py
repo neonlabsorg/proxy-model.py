@@ -3,10 +3,10 @@ from typing import List, Dict, Set, Optional, Tuple, Iterator, cast
 
 from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.eth_proto import NeonTx
-from ..common_neon.sorted_queue import SortedQueue
 from ..common_neon.utils.json_logger import logging_context
 
-from ..mempool.mempool_api import MPTxRequest, MPTxSendResult, MPTxSendResultCode, MPSenderTxCntData, MPTxRequestList
+from .mempool_api import MPTxRequest, MPTxSendResult, MPTxSendResultCode, MPSenderTxCntData, MPTxRequestList
+from .sorted_queue import SortedQueue
 
 
 LOG = logging.getLogger(__name__)

@@ -18,9 +18,11 @@ from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_tx import SolPubKey, SolAccount
 from ..common_neon.solana_tx_list_sender import SolTxListSender
 
+from .neon_tx_stages import (
+    NeonCreateAccountTxStage, NeonCreateHolderAccountStage, NeonDeleteHolderAccountStage,
+    NeonTxStage
+)
 from .mempool_api import OpResIdent
-from .neon_tx_stages import NeonCreateAccountTxStage, NeonCreateHolderAccountStage, NeonDeleteHolderAccountStage
-from .neon_tx_stages import NeonTxStage
 
 from ..statistic.data import NeonOpResStatData
 from ..statistic.proxy_client import ProxyStatClient

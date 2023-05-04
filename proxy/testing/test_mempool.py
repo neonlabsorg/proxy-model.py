@@ -49,7 +49,6 @@ def create_transfer_mp_request(*, req_id: str, nonce: int, gas: int, gas_price: 
     neon_tx_exec_cfg.set_state_tx_cnt(0)
     mp_tx_req = MPTxExecRequest(
         req_id=req_id,
-        sig=neon_sig,
         neon_tx=neon_tx,
         neon_tx_exec_cfg=neon_tx_exec_cfg,
         res_ident=OpResIdent(public_key='test', private_key=b'test'),

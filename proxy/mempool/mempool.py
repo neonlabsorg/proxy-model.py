@@ -6,11 +6,14 @@ import time
 from collections import deque
 from typing import List, Tuple, Optional, Any, Dict, cast, Iterator, Union, Deque
 
+from .mempool_api import (
+    MPRequest, MPRequestType, MPTask, MPTxRequestList,
+    MPResult, MPGasPriceResult,
+    MPTxExecResult, MPTxExecResultCode, MPTxRequest, MPTxExecRequest,
+    MPTxSendResult, MPTxSendResultCode
+)
+
 from .executor_mng import MPExecutorMng
-from .mempool_api import MPRequest, MPRequestType, MPTask, MPTxRequestList
-from .mempool_api import MPResult, MPGasPriceResult
-from .mempool_api import MPTxExecResult, MPTxExecResultCode, MPTxRequest, MPTxExecRequest
-from .mempool_api import MPTxSendResult, MPTxSendResultCode
 from .mempool_neon_tx_dict import MPTxDict
 from .mempool_periodic_task_elf_params import MPElfParamDictTaskLoop
 from .mempool_periodic_task_free_alt_queue import MPFreeALTQueueTaskLoop
