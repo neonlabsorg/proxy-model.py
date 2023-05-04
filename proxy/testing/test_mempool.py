@@ -14,11 +14,14 @@ from ..common_neon.config import Config
 from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.solana_tx import SolPubKey
 
+from ..mempool.mempool_api import (
+    MPRequest, OpResIdent,
+    MPTxRequest, MPTxExecRequest, MPTxExecResult, MPTxExecResultCode, MPTxSendResult,
+    MPGasPriceResult, MPSenderTxCntData, MPTxSendResultCode
+)
+
 from ..mempool.executor_mng import MPExecutorMng
 from ..mempool.mempool import MemPool, MPTask, MPTxRequestList
-from ..mempool.mempool_api import MPRequest, OpResIdent
-from ..mempool.mempool_api import MPTxRequest, MPTxExecRequest, MPTxExecResult, MPTxExecResultCode, MPTxSendResult
-from ..mempool.mempool_api import MPGasPriceResult, MPSenderTxCntData, MPTxSendResultCode
 from ..mempool.mempool_schedule import MPTxSchedule, MPSenderTxPool
 from ..common_neon.eth_proto import NeonTx
 from ..common_neon.elf_params import ElfParams
@@ -32,6 +35,8 @@ def create_transfer_mp_request(*, req_id: str, nonce: int, gas: int, gas_price: 
                                from_acct: Union[NeonAccount, NeonLocalAccount, None] = None,
                                to_acct: Union[NeonAccount, NeonLocalAccount, None] = None,
                                value: int = 0, data: bytes = b'') -> MPTxExecRequest:
+    evm_program_id = SolPubKey.from_string('CmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2')
+
     if from_acct is None:
         from_acct = NeonAccount.create()
 
@@ -43,7 +48,6 @@ def create_transfer_mp_request(*, req_id: str, nonce: int, gas: int, gas_price: 
         dict(nonce=nonce, chainId=111, gas=gas, gasPrice=gas_price, to=to_addr, value=value, data=data),
         from_acct.key
     )
-    neon_sig = signed_tx_data.hash.hex()
     neon_tx = NeonTx.from_string(bytearray(signed_tx_data.rawTransaction))
     neon_tx_exec_cfg = NeonTxExecCfg()
     neon_tx_exec_cfg.set_state_tx_cnt(0)
@@ -51,7 +55,7 @@ def create_transfer_mp_request(*, req_id: str, nonce: int, gas: int, gas_price: 
         req_id=req_id,
         neon_tx=neon_tx,
         neon_tx_exec_cfg=neon_tx_exec_cfg,
-        res_ident=OpResIdent(public_key='test', private_key=b'test'),
+        res_ident=OpResIdent(evm_program_id=evm_program_id, public_key='test', private_key=b'test'),
         elf_param_dict=ElfParams().elf_param_dict
     )
     return mp_tx_req
@@ -108,7 +112,7 @@ class MockResourceManager(OpResMng):
         pass
 
     def get_resource(self, ident: str) -> OpResIdent:
-        return OpResIdent(public_key='test', private_key=b'test')
+        return OpResIdent(self._config.evm_program_id, public_key='test', private_key=b'test')
 
     def enable_resource(self, ident: OpResIdent) -> None:
         pass
@@ -129,7 +133,7 @@ class FakeConfig(Config):
         return 0
 
     @property
-    def evm_loader_id(self) -> SolPubKey:
+    def evm_program_id(self) -> SolPubKey:
         return SolPubKey.from_string('CmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2')
 
     @property

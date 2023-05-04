@@ -4,7 +4,7 @@ from web3.method import Method
 from web3.eth import default_root_munger
 from web3.providers.base import BaseProvider
 from typing import Optional, Tuple
-from web3.types import RPCEndpoint
+from web3.types import RPCEndpoint, ChecksumAddress
 
 
 class Neon(Module):

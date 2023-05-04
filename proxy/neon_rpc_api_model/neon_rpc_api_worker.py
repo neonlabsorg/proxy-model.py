@@ -752,7 +752,8 @@ class NeonRpcApiWorker:
                 LOG.error('Failed to process eth_sendRawTransaction', exc_info=exc)
             raise
 
-    def _decode_neon_raw_tx(self, raw_tx: str) -> NeonTx:
+    @staticmethod
+    def _decode_neon_raw_tx(raw_tx: str) -> NeonTx:
         try:
             neon_tx = NeonTx.from_string(bytearray.fromhex(raw_tx[2:]))
         except (Exception,):
@@ -974,10 +975,11 @@ class NeonRpcApiWorker:
         slot = self._db.get_finalized_block_slot()
         return hex(slot)
 
-    @staticmethod
-    def neon_getEvmParams() -> Dict[str, str]:
+    def neon_getEvmParams(self) -> Dict[str, str]:
         """Returns map of Neon-EVM parameters"""
-        return ElfParams().elf_param_dict
+        elf_param_dict = ElfParams().elf_param_dict
+        elf_param_dict['NEON_EVM_ID'] = self._config.evm_program_id
+        return elf_param_dict
 
     def is_allowed_api(self, method_name: str) -> bool:
         for prefix in ('eth_', 'net_', 'web3_', 'neon_'):

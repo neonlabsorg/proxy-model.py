@@ -65,7 +65,7 @@ class MPTxRequest(MPRequest):
         return self.neon_tx.hex_tx_sig
 
     @property
-    def sender(self) -> str:
+    def sender_address(self) -> str:
         return self.neon_tx.hex_sender
 
     @property
@@ -78,6 +78,7 @@ class MPTxRequest(MPRequest):
 
 @dataclass(frozen=True)
 class OpResIdent:
+    evm_program_id: SolPubKey
     public_key: str
     private_key: bytes
     res_id: int = -1

@@ -80,7 +80,7 @@ class NeonTxValidator:
         self._prevalidate_account_cnt(emulator_json)
 
     def extract_ethereum_error(self, e: BaseException):
-        receipt_parser = SolTxErrorParser(e)
+        receipt_parser = SolTxErrorParser(self._config.evm_program_id, e)
         state_tx_cnt, tx_nonce = receipt_parser.get_nonce_error()
         NonceTooLowError.raise_if_error(self._tx.hex_sender, tx_nonce, state_tx_cnt)
 
