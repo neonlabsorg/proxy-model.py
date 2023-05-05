@@ -302,7 +302,7 @@ class NeonRpcApiWorker:
             return
 
         event_type_dict: Dict[int, str] = {
-            1: 'LOG',
+            1:   'LOG',
             101: 'ENTER CALL',
             102: 'ENTER CALL CODE',
             103: 'ENTER STATICCALL',

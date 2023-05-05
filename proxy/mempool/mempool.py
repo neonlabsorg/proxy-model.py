@@ -103,6 +103,9 @@ class MemPool:
 
     async def schedule_mp_tx_request(self, tx: MPTxRequest) -> MPTxSendResult:
         try:
+            if self._completed_tx_dict.get(tx.sig) is not None:
+                return MPTxSendResult(MPTxSendResultCode.AlreadyKnown, state_tx_cnt=None)
+
             result: Optional[MPTxSendResult] = self._update_gas_price(tx)
             if result is not None:
                 return result
@@ -350,14 +353,14 @@ class MemPool:
     def _on_done_tx(self, tx: MPTxRequest) -> NeonTxEndCode:
         self._release_resource(tx)
         self._tx_schedule.done_tx(tx)
-        self._completed_tx_dict.add(tx.sig, tx.neon_tx, None)
+        self._completed_tx_dict.add(tx.neon_tx, None)
         LOG.debug(f'Request {tx.sig} is done')
         return NeonTxEndCode.Done
 
     def _on_fail_tx(self, tx: MPTxRequest, exc: Optional[BaseException]) -> NeonTxEndCode:
         self._release_resource(tx)
         self._tx_schedule.fail_tx(tx)
-        self._completed_tx_dict.add(tx.sig, tx.neon_tx, exc)
+        self._completed_tx_dict.add(tx.neon_tx, exc)
         LOG.debug(f'Request {tx.sig} is failed - dropped away')
         return NeonTxEndCode.Failed
 
