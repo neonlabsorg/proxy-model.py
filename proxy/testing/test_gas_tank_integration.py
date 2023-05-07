@@ -87,7 +87,7 @@ class TestGasTankIntegration(TestCase):
 
         print(f'Created new token mint: {cls.token.pubkey}')
 
-        metadata = create_metadata_instruction_data(NAME, SYMBOL, 0, ())
+        metadata = create_metadata_instruction_data(NAME, SYMBOL)
         tx = SolLegacyTx(
             name='CreateMetadata',
             ix_list=[
@@ -105,13 +105,14 @@ class TestGasTankIntegration(TestCase):
     @classmethod
     def deploy_erc20_for_spl(cls):
         cls.erc20_for_spl = ERC20Wrapper(
-            cls.config.evm_program_id,
+            cls.config,
             cls.proxy.web3,
             NAME,
             SYMBOL,
             cls.token,
             cls.admin,
-            cls.mint_authority        )
+            cls.mint_authority
+        )
         cls.erc20_for_spl.deploy_wrapper()
 
     @classmethod

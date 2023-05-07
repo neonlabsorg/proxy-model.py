@@ -17,6 +17,7 @@ from ..common_neon.constants import ACCOUNT_SEED_VERSION
 from ..common_neon.eth_proto import NeonTx
 from ..common_neon.neon_instruction import NeonIxBuilder
 from ..common_neon.web3 import NeonWeb3, ChecksumAddress
+from ..common_neon.config import Config
 
 
 install_solc(version='0.7.6')
@@ -72,13 +73,14 @@ class ERC20Wrapper:
     interface: Dict
     wrapper: Dict
 
-    def __init__(self, evm_program_id: SolPubKey,
+    def __init__(self, config: Config,
                  proxy: NeonWeb3,
                  name: str, symbol: str,
                  token: Token,
                  admin: NeonAccount,
                  mint_authority: SolAccount):
-        self.evm_program_id = evm_program_id
+        self._config = config
+        self.evm_program_id = config.evm_program_id
         self.proxy = proxy
         self.name = name
         self.symbol = symbol
