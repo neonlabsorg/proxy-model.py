@@ -20,7 +20,7 @@ from ..mempool.mempool_api import (
     MPGasPriceResult, MPSenderTxCntData, MPTxSendResultCode
 )
 
-from ..mempool.executor_mng import MPExecutorMng
+from ..mempool.executor_mng import MPExecutorMng, IMPExecutorMngUser
 from ..mempool.mempool import MemPool, MPTask, MPTxRequestList
 from ..mempool.mempool_schedule import MPTxSchedule, MPSenderTxPool
 from ..common_neon.eth_proto import NeonTx
@@ -77,10 +77,12 @@ class MockTask:
         return self._exception
 
 
-class MockMPExecutor(MPExecutorMng):
-    def __init__(self, *args, **kwargs):
+class FakeExecutorMsgUser(IMPExecutorMngUser):
+    def on_executor_released(self, executor_id: int):
         pass
 
+
+class MockMPExecutor(MPExecutorMng):
     def submit_mp_request(self, mp_req: MPRequest) -> MPTask:
         return self.create_mp_task(mp_req)
 
@@ -105,9 +107,6 @@ class MockMPExecutor(MPExecutorMng):
 
 
 class MockResourceManager(OpResMng):
-    def __init__(self, *args):
-        pass
-
     def init_resource_list(self, res_ident_list: List[Union[OpResIdent, bytes]]) -> None:
         pass
 
@@ -133,6 +132,10 @@ class FakeConfig(Config):
         return 0
 
     @property
+    def gather_statistics(self) -> bool:
+        return False
+
+    @property
     def evm_program_id(self) -> SolPubKey:
         return SolPubKey.from_string('CmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2')
 
@@ -148,18 +151,21 @@ class FakeConfig(Config):
     def recheck_resource_after_uses_cnt(self) -> int:
         return 1000
 
-    @property
-    def gather_statistics(self) -> bool:
-        return False
-
 
 class TestMemPool(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self._executor = MockMPExecutor()
-        self._config = FakeConfig()
-        self._stat_client = ProxyStatClient(self._config)
-        self._op_res_mng = MockResourceManager(self._config)
-        self._mempool = MemPool(self._config, self._stat_client, self._op_res_mng, self._executor)
+        config = FakeConfig()
+        self._config = config
+
+        stat_client = ProxyStatClient(config)
+        self._stat_client = stat_client
+
+        user = FakeExecutorMsgUser()
+        self._user = user
+
+        self._executor = MockMPExecutor(config, user, stat_client)
+        self._op_res_mng = MockResourceManager(self._config, stat_client)
+        self._mempool = MemPool(self._config, stat_client, self._op_res_mng, self._executor)
 
         price_result = MPGasPriceResult(
             suggested_gas_price=1,
