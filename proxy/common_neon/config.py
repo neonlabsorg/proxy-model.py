@@ -37,7 +37,6 @@ class Config(DBConfig):
         self._allow_underpriced_tx_wo_chainid = self._env_bool("ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID", False)
         self._extra_gas_pct = self._env_decimal("EXTRA_GAS_PCT", "0.0")
         self._operator_fee = self._env_decimal("OPERATOR_FEE", "0.1")
-        self._slot_processing_delay = self._env_int("SLOT_PROCESSING_DELAY", 0, 0)
         self._gas_price_suggested_pct = self._env_decimal("GAS_PRICE_SUGGEST_PCT", "0.01")
         self._min_gas_price = self._env_int("MINIMAL_GAS_PRICE", 0, 1) * (10 ** 9)
         self._min_wo_chainid_gas_price = self._env_int("MINIMAL_WO_CHAINID_GAS_PRICE", 0, 10) * (10 ** 9)
@@ -67,6 +66,11 @@ class Config(DBConfig):
         self._hvac_path = os.environ.get('HVAC_PATH', '')
         self._genesis_timestamp = self._env_int('GENESIS_BLOCK_TIMESTAMP', 0, 0)
         self._commit_level = os.environ.get('COMMIT_LEVEL', SolCommit.Confirmed)
+        self._ch_host = os.environ.get('CLICKHOUSE_HOST', None)
+        self._ch_user = os.environ.get('CLICKHOUSE_USER', None)
+        self._ch_password = os.environ.get('CLICKHOUSE_PASSWORD', None)
+        self._ch_port = int(os.environ.get('CLICKHOUSE_PORT', 0))
+        self._ch_secure = self._env_bool('CLICKHOUSE', False)
 
         pyth_mapping_account = os.environ.get('PYTH_MAPPING_ACCOUNT', None)
         if pyth_mapping_account is not None:
@@ -84,7 +88,6 @@ class Config(DBConfig):
         assert (self._operator_fee > 0) and (self._operator_fee < 1)
         assert (self._gas_price_suggested_pct >= 0) and (self._gas_price_suggested_pct < 1)
         assert (self._extra_gas_pct >= 0) and (self._extra_gas_pct < 1)
-        assert (self._slot_processing_delay < 32)
         assert (self._fuzz_fail_pct >= 0) and (self._fuzz_fail_pct < 100)
 
     @staticmethod
@@ -198,11 +201,6 @@ class Config(DBConfig):
     @property
     def operator_fee(self) -> Decimal:
         return self._operator_fee
-
-    @property
-    def slot_processing_delay(self) -> int:
-        """Slot processing delay relative to the last confirmed slot on Solana cluster"""
-        return self._slot_processing_delay
 
     @property
     def gas_price_suggested_pct(self) -> Decimal:
@@ -322,6 +320,26 @@ class Config(DBConfig):
     def commit_level(self) -> SolCommit.Type:
         return self._commit_level
 
+    @property
+    def ch_host(self) -> Optional[str]:
+        return self._ch_host
+
+    @property
+    def ch_user(self) -> Optional[str]:
+        return self._ch_user
+
+    @property
+    def ch_password(self) -> Optional[str]:
+        return self._ch_password
+
+    @property
+    def ch_port(self) -> int:
+        return self._ch_port
+
+    @property
+    def ch_secure(self) -> bool:
+        return self._ch_secure
+
     def as_dict(self) -> dict:
         return {
             # 'SOLANA_URL': self.solana_url,
@@ -347,7 +365,6 @@ class Config(DBConfig):
             'ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID': self.allow_underpriced_tx_wo_chainid,
             'EXTRA_GAS_PCT': self.extra_gas_pct,
             'OPERATOR_FEE': self.operator_fee,
-            'SLOT_PROCESSING_DELAY': self.slot_processing_delay,
             'GAS_PRICE_SUGGEST_PCT': self.gas_price_suggested_pct,
             'MINIMAL_GAS_PRICE': self.min_gas_price,
             'MINIMAL_WO_CHAINID_GAS_PRICE': self.min_wo_chainid_gas_price,

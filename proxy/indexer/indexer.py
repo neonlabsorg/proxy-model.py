@@ -21,14 +21,15 @@ from ..common_neon.metrics_logger import MetricsLogger
 from ..statistic.data import NeonBlockStatData
 from ..statistic.indexer_client import IndexerStatClient
 
-from ..indexer.indexed_objects import NeonIndexedBlockInfo, NeonIndexedBlockDict, SolNeonTxDecoderState
-from ..indexer.indexed_objects import NeonIndexedTxInfo
-from ..indexer.indexer_base import IndexerBase
-from ..indexer.indexer_db import IndexerDB
-from ..indexer.neon_ix_decoder import DummyIxDecoder, get_neon_ix_decoder_list
-from ..indexer.neon_ix_decoder_deprecate import get_neon_ix_decoder_deprecated_list
-from ..indexer.solana_tx_meta_collector import FinalizedSolTxMetaCollector, ConfirmedSolTxMetaCollector
-from ..indexer.solana_tx_meta_collector import SolTxMetaDict, SolHistoryNotFound
+from .indexed_objects import NeonIndexedBlockInfo, NeonIndexedBlockDict, SolNeonTxDecoderState
+from .indexed_objects import NeonIndexedTxInfo
+from .indexer_base import IndexerBase
+from .indexer_db import IndexerDB
+from .neon_ix_decoder import DummyIxDecoder, get_neon_ix_decoder_list
+from .neon_ix_decoder_deprecate import get_neon_ix_decoder_deprecated_list
+from .solana_tx_meta_collector import FinalizedSolTxMetaCollector, ConfirmedSolTxMetaCollector
+from .solana_tx_meta_collector import SolTxMetaDict, SolHistoryNotFound
+from .tracer_api_client import TracerAPIClient
 
 
 LOG = logging.getLogger(__name__)
@@ -40,6 +41,8 @@ class Indexer(IndexerBase):
         self._db = IndexerDB(config)
         last_known_slot = self._db.get_min_receipt_block_slot()
         super().__init__(config, solana, last_known_slot)
+
+        self._tracer_api = TracerAPIClient(config)
 
         self._last_op_account_update_time = 0.0
         self._op_account_set: Set[str] = set()
@@ -254,8 +257,11 @@ class Indexer(IndexerBase):
         state.set_neon_block(neon_block)
         return neon_block
 
-    def _run_sol_tx_collector(self, state: SolNeonTxDecoderState, slot_processing_delay: int) -> None:
-        stop_block_slot = self._solana.get_block_slot(state.commitment) - slot_processing_delay
+    def _run_sol_tx_collector(self, state: SolNeonTxDecoderState, tracer_max_slot: Optional[int]) -> None:
+        stop_block_slot = self._solana.get_block_slot(state.commitment)
+        if tracer_max_slot is not None:
+            stop_block_slot = max(stop_block_slot, tracer_max_slot)
+
         state.set_stop_block_slot(stop_block_slot)
         if stop_block_slot < state.start_block_slot:
             return
@@ -308,6 +314,7 @@ class Indexer(IndexerBase):
         if not self._has_new_blocks():
             return
 
+        tracer_max_slot = self._tracer_api.max_slot()
         start_block_slot = self._finalized_sol_tx_collector.last_block_slot + 1
         finalized_neon_block = self._neon_block_dict.finalized_neon_block
         if finalized_neon_block is not None:
@@ -318,7 +325,7 @@ class Indexer(IndexerBase):
                 self._config, self._finalized_sol_tx_collector,
                 start_block_slot, finalized_neon_block
             )
-            self._run_sol_tx_collector(state, 0)
+            self._run_sol_tx_collector(state, tracer_max_slot)
         except SolHistoryNotFound as err:
             LOG.debug(f'skip parsing of finalized history: {str(err)}')
             return
@@ -331,7 +338,7 @@ class Indexer(IndexerBase):
         if (finalized_block_slot - state.stop_block_slot) < 3:
             state.shift_to_collector(self._confirmed_sol_tx_collector)
             try:
-                self._run_sol_tx_collector(state, self._config.slot_processing_delay)
+                self._run_sol_tx_collector(state, tracer_max_slot)
             except SolHistoryNotFound as err:
                 LOG.debug(f'skip parsing of confirmed history: {str(err)}')
             else:
