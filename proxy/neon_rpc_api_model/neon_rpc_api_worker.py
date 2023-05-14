@@ -16,11 +16,12 @@ from ..common_neon.emulator_interactor import call_emulated, check_emulated_exit
 from ..common_neon.environment_utils import NeonCli
 from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.errors import EthereumError, InvalidParamError, RescheduleError, NonceTooLowError
-from ..common_neon.eth_proto import NeonTx
+from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.keys_storage import KeyStorage
 from ..common_neon.solana_tx import SolCommit
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.utils import SolBlockInfo, NeonTxReceiptInfo, NeonTxInfo, NeonTxResultInfo
+from ..common_neon.db.db_connect import DBConnection
 
 from ..indexer.indexer_db import IndexerDB
 from ..gas_tank.gas_less_accounts_db import GasLessAccountsDB
@@ -48,9 +49,9 @@ class NeonRpcApiWorker:
 
     def __init__(self, config: Config):
         self._config = config
-        self._solana = SolInteractor(self._config, self._config.solana_url)
+        self._solana = SolInteractor(config, config.solana_url)
         self._db = IndexerDB(config)
-        self._gas_tank = GasLessAccountsDB()
+        self._gas_tank = GasLessAccountsDB(DBConnection(config))
         self._mempool_client = MemPoolClient(MP_SERVICE_ADDR)
 
         self._gas_price_value: Optional[MPGasPriceResult] = None

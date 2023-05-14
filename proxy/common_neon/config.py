@@ -4,15 +4,17 @@ import os
 from decimal import Decimal
 from typing import Optional
 
-from ..common_neon.environment_data import EVM_LOADER_ID
-from ..common_neon.solana_tx import SolPubKey, SolCommit
+from .db.db_config import DBConfig
+from .environment_data import EVM_LOADER_ID
+from .solana_tx import SolPubKey, SolCommit
 
 
-class Config:
+class Config(DBConfig):
     _one_block_sec = 0.4
     _min_finalize_sec = _one_block_sec * 32
 
     def __init__(self):
+        super().__init__()
         self._solana_url = os.environ.get("SOLANA_URL", "http://localhost:8899")
         self._pp_solana_url = os.environ.get("PP_SOLANA_URL", self._solana_url)
         self._evm_program_id = SolPubKey.from_string(EVM_LOADER_ID)
@@ -96,6 +98,14 @@ class Config:
     @staticmethod
     def _env_decimal(name: str, default_value: str) -> Decimal:
         return Decimal(os.environ.get(name, default_value))
+
+    @property
+    def one_block_sec(self) -> float:
+        return self._one_block_sec
+
+    @property
+    def min_finalize_sec(self) -> float:
+        return self._min_finalize_sec
 
     @property
     def solana_url(self) -> str:
@@ -314,9 +324,9 @@ class Config:
 
     def as_dict(self) -> dict:
         return {
-            'SOLANA_URL': self.solana_url,
+            # 'SOLANA_URL': self.solana_url,
             'EVM_LOADER_ID': str(self.evm_program_id),
-            'PP_SOLANA_URL': self.pyth_solana_url,
+            # 'PP_SOLANA_URL': self.pyth_solana_url,
             'PYTH_MAPPING_ACCOUNT': str(self.pyth_mapping_account),
             'UPDATE_PYTH_MAPPING_PERIOD_SEC': self.update_pyth_mapping_period_sec,
             'MEMPOOL_CAPACITY': self.mempool_capacity,
@@ -361,10 +371,10 @@ class Config:
             'SKIP_CANCEL_TIMEOUT': self.skip_cancel_timeout,
             'HOLDER_TIMOUT': self.holder_timeout,
             'GATHER_STATISTICS': self.gather_statistics,
-            'HVAC_URL': self.hvac_url,
-            'HVAC_TOKEN': self.hvac_token,
-            'HVAC_PATH': self.hvac_path,
-            'HVAC_MOUNT': self.hvac_mount,
+            # 'HVAC_URL': self.hvac_url,
+            # 'HVAC_TOKEN': self.hvac_token,
+            # 'HVAC_PATH': self.hvac_path,
+            # 'HVAC_MOUNT': self.hvac_mount,
             'GENESIS_BLOCK_TIMESTAMP': self.genesis_timestamp,
             'COMMIT_LEVEL': self.commit_level
         }

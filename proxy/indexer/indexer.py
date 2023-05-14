@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import logging
+
 from collections import deque
 from typing import List, Optional, Dict, Deque, Type, Set
 
@@ -15,6 +16,7 @@ from ..common_neon.solana_tx import SolPubKey, SolAccount
 from ..common_neon.solana_tx_error_parser import SolTxErrorParser
 from ..common_neon.utils import SolBlockInfo
 from ..common_neon.utils.json_logger import logging_context
+from ..common_neon.metrics_logger import MetricsLogger
 
 from ..statistic.data import NeonBlockStatData
 from ..statistic.indexer_client import IndexerStatClient
@@ -27,7 +29,6 @@ from ..indexer.neon_ix_decoder import DummyIxDecoder, get_neon_ix_decoder_list
 from ..indexer.neon_ix_decoder_deprecate import get_neon_ix_decoder_deprecated_list
 from ..indexer.solana_tx_meta_collector import FinalizedSolTxMetaCollector, ConfirmedSolTxMetaCollector
 from ..indexer.solana_tx_meta_collector import SolTxMetaDict, SolHistoryNotFound
-from ..indexer.utils import MetricsToLogger
 
 
 LOG = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ class Indexer(IndexerBase):
         self._cancel_tx_executor: Optional[CancelTxExecutor] = None
         self._refresh_op_account_list()
 
-        self._counted_logger = MetricsToLogger()
+        self._counted_logger = MetricsLogger()
         self._stat_client = IndexerStatClient(config)
         self._stat_client.start()
         self._last_stat_time = 0.0
