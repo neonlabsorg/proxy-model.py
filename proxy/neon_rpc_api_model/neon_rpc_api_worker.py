@@ -344,12 +344,12 @@ class NeonRpcApiWorker:
         address_list: List[str] = list()
         topic_list: List[List[str]] = list()
 
-        if 'fromBlock' in obj and obj['fromBlock'] != '0':
+        if obj.get('fromBlock', '0') != '0':
             from_block = self._process_block_tag(obj['fromBlock']).block_slot
-        if 'toBlock' in obj and obj['toBlock'] not in {'latest', 'pending', 'finalized', 'safe'}:
+        if obj.get('toBlock', 'latest') not in {'latest', 'pending', 'finalized', 'safe'}:
             to_block = self._process_block_tag(obj['toBlock']).block_slot
 
-        if 'blockHash' in obj:
+        if obj.get('blockHash', None) is not None:
             block_hash = obj['blockHash']
             block = self._get_block_by_hash(block_hash)
             if block.is_empty():
@@ -357,7 +357,7 @@ class NeonRpcApiWorker:
             from_block = block.block_slot
             to_block = block.block_slot
 
-        if 'address' in obj:
+        if obj.get('address', None) is not None:
             raw_address_list = obj['address']
             if isinstance(raw_address_list, str):
                 address_list = [self._normalize_address(raw_address_list).lower()]
