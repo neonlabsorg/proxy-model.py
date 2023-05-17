@@ -1,9 +1,8 @@
-from typing import List, Any, Iterator
+from typing import List, Any, Iterator, Set
 
 from ..common_neon.db.base_db_table import BaseDBTable
 from ..common_neon.db.db_connect import DBConnection
-
-from ..indexer.indexed_objects import SolNeonIxReceiptInfo
+from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptInfo, SolNeonIxShortInfo
 
 
 class SolNeonTxsDB(BaseDBTable):
@@ -12,8 +11,9 @@ class SolNeonTxsDB(BaseDBTable):
             db,
             table_name='solana_neon_transactions',
             column_list=[
-                'sol_sig', 'block_slot', 'idx', 'inner_idx', 'neon_sig', 'neon_step_cnt', 'neon_income',
-                'neon_gas_used', 'neon_total_gas_used', 'heap_size', 'max_bpf_cycle_cnt', 'used_bpf_cycle_cnt'
+                'sol_sig', 'block_slot', 'idx', 'inner_idx', 'neon_sig', 'neon_step_cnt',
+                'neon_gas_used', 'neon_total_gas_used',
+                'max_heap_size', 'used_heap_size', 'max_bpf_cycle_cnt', 'used_bpf_cycle_cnt'
             ],
             key_list=['sol_sig', 'block_slot', 'idx', 'inner_idx']
         )
@@ -25,10 +25,6 @@ class SolNeonTxsDB(BaseDBTable):
             for idx, column in enumerate(self._column_list):
                 if column == 'neon_sig':
                     value_list.append(ix.neon_tx_sig)
-                elif column == 'neon_income':
-                    value_list.append(None)
-                elif column == 'heap_size':
-                    value_list.append(ix.used_heap_size)
                 elif column == 'neon_total_gas_used':
                     neon_total_gas_used = ix.neon_total_gas_used
                     if ix.neon_total_gas_used == 0:
@@ -44,24 +40,61 @@ class SolNeonTxsDB(BaseDBTable):
 
     def get_sol_sig_list_by_neon_sig(self, neon_sig: str) -> List[str]:
         request = f'''
-            SELECT sol_sig, neon_total_gas_used
+            SELECT a.sol_sig, a.neon_total_gas_used
               FROM {self._table_name} AS a
-             WHERE neon_sig = %s
-          ORDER BY neon_total_gas_used
+        INNER JOIN {self._blocks_table_name} AS b
+                ON b.block_slot = a.block_slot
+               AND b.is_active = True
+             WHERE a.neon_sig = %s
+          ORDER BY a.neon_total_gas_used
         '''
 
         row_list = self._db.fetch_all(request, (neon_sig,))
 
-        prev_sol_sig = ''
+        done_sig_set: Set[str] = set()
         sol_sig_list: List[str] = list()
         for value_list in row_list:
             sol_sig = value_list[0]
-            if prev_sol_sig == sol_sig:
+            if sol_sig in done_sig_set:
                 continue
+
+            done_sig_set.add(sol_sig)
             sol_sig_list.append(sol_sig)
-            prev_sol_sig = sol_sig
 
         return sol_sig_list
+
+    def get_sol_ix_info_list_by_neon_sig(self, neon_sig: str) -> List[SolNeonIxShortInfo]:
+        request = f'''
+            SELECT {', '.join(f'a.{c}' for c in self._column_list)}
+              FROM {self._table_name} a
+        INNER JOIN {self._blocks_table_name} AS b
+                ON b.block_slot = a.block_slot
+               AND b.is_active = True
+             WHERE a.neon_sig = %s
+          ORDER BY a.neon_total_gas_used
+        '''
+
+        row_list = self._db.fetch_all(request, (neon_sig,))
+
+        sol_ix_list: List[SolNeonIxShortInfo] = list()
+
+        for value_list in row_list:
+            ix_info = SolNeonIxShortInfo(
+                sol_sig=self._get_column_value('sol_sig', value_list),
+                block_slot=self._get_column_value('block_slot', value_list),
+                idx=self._get_column_value('idx', value_list),
+                inner_idx=self._get_column_value('inner_idx', value_list),
+                neon_step_cnt=self._get_column_value('neon_step_cnt', value_list),
+                neon_gas_used=self._get_column_value('neon_gas_used', value_list),
+                neon_total_gas_used=self._get_column_value('neon_total_gas_used', value_list),
+                max_heap_size=self._get_column_value('max_heap_size', value_list),
+                used_heap_size=self._get_column_value('used_heap_size', value_list),
+                max_bpf_cycle_cnt=self._get_column_value('max_bpf_cycle_cnt', value_list),
+                used_bpf_cycle_cnt=self._get_column_value('used_bpf_cycle_cnt', value_list),
+            )
+            sol_ix_list.append(ix_info)
+
+        return sol_ix_list
 
     def finalize_block_list(self, base_block_slot: int, block_slot_list: List[int]) -> None:
         request = f'''

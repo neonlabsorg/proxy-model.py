@@ -33,7 +33,6 @@ from .transaction_validator import NeonTxValidator
 from .nonce_validator import NeonTxNonceValidator
 from .estimate import GasEstimate
 
-
 NEON_PROXY_PKG_VERSION = '0.15.0-dev'
 NEON_PROXY_REVISION = 'NEON_PROXY_REVISION_TO_BE_REPLACED'
 LOG = logging.getLogger(__name__)
@@ -239,7 +238,7 @@ class NeonRpcApiWorker:
                     raise InvalidParamError(message=f'header for hash {block_hash} not found')
             else:
                 assert False, 'Bad type of tag'
-        except (InvalidParamError, ):
+        except (InvalidParamError,):
             raise
         except (Exception,):
             raise InvalidParamError(message=f'invalid block tag {tag}')
@@ -310,7 +309,7 @@ class NeonRpcApiWorker:
             return
 
         event_type_dict: Dict[int, str] = {
-            1:   'LOG',
+            1: 'LOG',
             101: 'ENTER CALL',
             102: 'ENTER CALL CODE',
             103: 'ENTER STATICCALL',
@@ -393,17 +392,17 @@ class NeonRpcApiWorker:
 
         return self._db.get_log_list(from_block, to_block, address_list, topic_list)
 
-    def _filter_log_list(self, log_list: List[Dict[str, Any]], with_hidden) -> List[Dict[str, Any]]:
+    def _filter_log_list(self, log_list: List[Dict[str, Any]], full: bool) -> List[Dict[str, Any]]:
         filtered_log_list: List[Dict[str, Any]] = list()
 
         for log_rec in log_list:
-            if log_rec.get('neonIsHidden', False) and (not with_hidden):
+            if log_rec.get('neonIsHidden', False) and (not full):
                 continue
 
             log_rec['removed'] = False
 
             # remove fields available only for neon_getLogs
-            if not with_hidden:
+            if not full:
                 remove_key_list: List[str] = list()
                 for key in log_rec.keys():
                     if key[:4] == 'neon':
@@ -493,10 +492,10 @@ class NeonRpcApiWorker:
 
         try:
             value = NeonCli(self._config).call('get-storage-at', account, position)
-            return '0x' + (value or 64*'0')
+            return '0x' + (value or 64 * '0')
         except (Exception,):
             # LOG.error(f"eth_getStorageAt: Neon-cli failed to execute: {err}")
-            return '0x' + 64*'0'
+            return '0x' + 64 * '0'
 
     def _get_block_by_hash(self, block_hash: str) -> SolBlockInfo:
         try:
@@ -541,14 +540,11 @@ class NeonRpcApiWorker:
         return ret
 
     def eth_call(self, obj: dict, tag: Union[int, str]) -> str:
-        """Executes a new message call immediately without creating a transaction on the block chain.
+        """Executes a new message call immediately without creating a transaction on the blockchain.
            Parameters
             obj - The transaction call object
                 from: DATA, 20 Bytes - (optional) The address the transaction is sent from.
                 to: DATA, 20 Bytes   - The address the transaction is directed to.
-                gas: QUANTITY        - (optional) Integer of the gas provided for the transaction execution.
-                                       eth_call consumes zero gas, but this parameter may be needed by some executions.
-                gasPrice: QUANTITY   - (optional) Integer of the gasPrice used for each paid gas
                 value: QUANTITY      - (optional) Integer of the value sent with this transaction
                 data: DATA           - (optional) Hash of the method signature and encoded parameters.
                                        For details see Ethereum Contract ABI in the Solidity documentation
@@ -624,8 +620,8 @@ class NeonRpcApiWorker:
             # LOG.debug(f"eth_getTransactionCount: Can't get account info: {err}")
             return hex(0)
 
-    def _fill_transaction_receipt_answer(self, tx: NeonTxReceiptInfo, with_hidden: bool) -> dict:
-        log_list = self._filter_log_list(tx.neon_tx_res.log_list, with_hidden)
+    def _fill_transaction_receipt_answer(self, tx: NeonTxReceiptInfo, full: bool) -> dict:
+        log_list = self._filter_log_list(tx.neon_tx_res.log_list, full)
 
         result = {
             "transactionHash": tx.neon_tx.sig,
@@ -642,6 +638,9 @@ class NeonRpcApiWorker:
             "status": tx.neon_tx_res.status,
             "logsBloom": "0x" + '0' * 512
         }
+
+        if full:
+
 
         return result
 
@@ -688,7 +687,7 @@ class NeonRpcApiWorker:
             "transactionIndex": tx_idx,
             "type": "0x0",
             "from": t.addr,
-            "nonce":  t.nonce,
+            "nonce": t.nonce,
             "gasPrice": t.gas_price,
             "gas": t.gas_limit,
             "to": t.to_addr,
@@ -967,9 +966,17 @@ class NeonRpcApiWorker:
     def net_listening() -> bool:
         return False
 
-    def neon_getSolanaTransactionByNeonTransaction(self, neon_tx_id: str) -> Union[str, list]:
+    def neon_getSolanaTransactionByNeonTransaction(
+        self, neon_tx_id: str,
+        full: bool = False
+    ) -> Union[List[str], List[Optional[Dict[str, Any]]]]:
         neon_sig = self._normalize_tx_id(neon_tx_id)
-        return self._db.get_sol_sig_list_by_neon_sig(neon_sig)
+        sol_sig_list = self._db.get_sol_sig_list_by_neon_sig(neon_sig)
+        if not full:
+            return sol_sig_list
+
+        sol_tx_list = self._solana.get_tx_receipt_list(sol_sig_list, SolCommit.Confirmed)
+        return sol_tx_list
 
     def neon_emulate(self, raw_signed_tx: str):
         """Executes emulator with given transaction"""

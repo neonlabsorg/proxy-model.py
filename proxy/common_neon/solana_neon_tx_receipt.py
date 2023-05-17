@@ -248,6 +248,21 @@ class SolTxLogDecoder:
 
 
 @dataclass(frozen=True)
+class SolNeonIxShortInfo:
+    sol_sig: str
+    block_slot: int
+    idx: int
+    inner_idx: Optional[int]
+    neon_step_cnt: int
+    neon_gas_used: int
+    neon_total_gas_used: int
+    max_heap_size: int
+    used_heap_size: int
+    max_bpf_cycle_cnt: int
+    used_bpf_cycle_cnt: int
+
+
+@dataclass(frozen=True)
 class SolIxMetaInfo:
     class Status(Enum):
         Unknown = 0
@@ -263,6 +278,7 @@ class SolIxMetaInfo:
     status: Status
     error: Optional[str]
 
+    max_heap_size: int
     used_heap_size: int
     max_bpf_cycle_cnt: int
     used_bpf_cycle_cnt: int
@@ -329,8 +345,8 @@ class SolTxCostInfo:
     operator: str
     sol_spent: int
 
-    _str: str
-    _calculated_stat: bool
+    _str: str = ''
+    _calculated_stat: bool = False
 
     @staticmethod
     def from_tx_meta(tx_meta: SolTxMetaInfo) -> SolTxCostInfo:
@@ -342,8 +358,6 @@ class SolTxCostInfo:
             block_slot=tx_meta.block_slot,
             operator=msg['accountKeys'][0],
             sol_spent=(meta['preBalances'][0] - meta['postBalances'][0]),
-            _str='',
-            _calculated_stat=False,
         )
 
     def __str__(self) -> str:
