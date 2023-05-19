@@ -100,7 +100,7 @@ def emulator(config: Config, contract: str, sender: str, data: Optional[str], va
     chain_id = ElfParams().chain_id
     max_evm_steps_to_execute = config.max_evm_step_cnt_emulate
     if data is not None:
-        data = {"data": data}
+        data = {"data": f"0x{data}"}
     try:
         return NeonCli(config).call(
             'emulate',
