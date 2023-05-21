@@ -74,7 +74,7 @@ class NeonRpcApiWorker:
             self.proxy_id_glob.value += 1
 
         if self.proxy_id == 0:
-            LOG.debug(f'Neon Proxy version: {self.neon_proxy_version()}')
+            LOG.debug(f'Neon Proxy version: {self.neon_proxyVersion()}')
         LOG.debug(f"Worker id {self.proxy_id}")
 
     @property
@@ -88,26 +88,34 @@ class NeonRpcApiWorker:
             raise EthereumError(message='Failed to calculate gas price. Try again later')
         return cast(MPGasPriceResult, self._gas_price_value)
 
-    def neon_proxy_version(self) -> str:
-        return self.neon_proxyVersion()
-
     @staticmethod
     def neon_proxyVersion() -> str:
         return 'Neon-proxy/v' + NEON_PROXY_PKG_VERSION + '-' + NEON_PROXY_REVISION
 
     @staticmethod
-    def web3_clientVersion() -> str:
+    def neon_evmVersion() -> str:
         return 'Neon/v' + ElfParams().neon_evm_version + '-' + ElfParams().neon_evm_revision
+
+    def neon_cliVersion(self) -> str:
+        return NeonCli(self._config).version()
+
+    def neon_solanaVersion(self) -> str:
+        return 'Solana/v' + self._solana.get_solana_version()
+
+    def neon_versions(self) -> Dict[str, str]:
+        return {
+            'proxy': self.neon_proxyVersion(),
+            'evm': self.neon_evmVersion(),
+            'cli': self.neon_cliVersion(),
+            'solana': self.neon_solanaVersion()
+        }
+
+    def web3_clientVersion(self) -> str:
+        return self.neon_evmVersion()
 
     @staticmethod
     def eth_chainId() -> str:
         return hex(ElfParams().chain_id)
-
-    def neon_cli_version(self) -> str:
-        return self.neon_cliVersion()
-
-    def neon_cliVersion(self) -> str:
-        return NeonCli(self._config).version()
 
     @staticmethod
     def net_version() -> str:
@@ -242,10 +250,18 @@ class NeonRpcApiWorker:
                 assert tag[:2] == '0x'
                 int(tag[2:], 16)
             elif isinstance(tag, dict):
-                block_hash = tag['blockHash']
-                block = self._get_block_by_hash(block_hash)
-                if block.is_empty():
-                    raise InvalidParamError(message=f'header for hash {block_hash} not found')
+                if 'blockHash' in tag:
+                    assert 'blockNumber' not in tag
+                    block_hash = tag['blockHash']
+                    block = self._get_block_by_hash(block_hash)
+                    if block.is_empty():
+                        raise InvalidParamError(message=f'header for block hash {block_hash} not found')
+                else:
+                    block_number = tag['blockNumber']
+                    isinstance(block_number, int)
+                    block = self._db.get_block_by_slot(block_number)
+                    if block.is_empty():
+                        raise InvalidParamError(message=f'header for block number {block_number} not found')
             else:
                 assert False, 'Bad type of tag'
         except (InvalidParamError,):
@@ -1101,7 +1117,7 @@ class NeonRpcApiWorker:
         else:
             return False
 
-        if method_name in {'neon_proxy_version', 'neon_proxyVersion'}:
+        if method_name == 'neon_proxyVersion':
             return True
 
         now = math.ceil(time.time())
@@ -1115,8 +1131,10 @@ class NeonRpcApiWorker:
         always_allowed_method_set = {
             "eth_chainId",
             "neon_cliVersion",
-            "neon_cli_version",
-            "neon_getEvmParams"
+            "neon_evmVersion",
+            "neon_solanaVersion",
+            "neon_versions",
+            "neon_getEvmParams",
             "net_version",
             "web3_clientVersion"
         }
@@ -1127,7 +1145,7 @@ class NeonRpcApiWorker:
 
         if not elf_params.is_evm_compatible(NEON_PROXY_PKG_VERSION):
             raise EthereumError(
-                f'Neon Proxy {self.neon_proxy_version()} is not compatible with '
+                f'Neon Proxy {self.neon_proxyVersion()} is not compatible with '
                 f'Neon EVM {self.web3_clientVersion()}'
             )
 

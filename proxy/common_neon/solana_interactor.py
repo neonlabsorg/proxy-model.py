@@ -159,6 +159,9 @@ class SolInteractor:
     def get_cluster_nodes(self) -> List[Dict[str, Any]]:
         return self._send_rpc_request('getClusterNodes').get('result', list())
 
+    def get_solana_version(self) -> str:
+        return self._send_rpc_request('getVersion').get('result', dict()).get('solana-core', 'Unknown')
+
     def get_slots_behind(self) -> Optional[int]:
         response = self._send_rpc_request('getHealth')
         status = response.get('result', None)
