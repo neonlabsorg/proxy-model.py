@@ -3,8 +3,7 @@ from __future__ import annotations
 import time
 import logging
 
-from collections import deque
-from typing import List, Optional, Dict, Deque, Type, Set
+from typing import List, Optional, Dict, Type, Set
 
 from ..common_neon.cancel_transaction_executor import CancelTxExecutor
 from ..common_neon.config import Config
@@ -14,7 +13,6 @@ from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_neon_tx_receipt import SolTxMetaInfo, SolTxCostInfo
 from ..common_neon.solana_tx import SolPubKey, SolAccount, SolCommit
 from ..common_neon.solana_tx_error_parser import SolTxErrorParser
-from ..common_neon.utils import SolBlockInfo
 from ..common_neon.utils.json_logger import logging_context
 from ..common_neon.metrics_logger import MetricsLogger
 
@@ -257,14 +255,13 @@ class Indexer(IndexerBase):
                 for sol_neon_ix in state.iter_sol_neon_ix():
                     with logging_context(sol_neon_ix=sol_neon_ix.req_id):
                         neon_block.add_sol_neon_ix(sol_neon_ix)
-                        SolNeonIxDecoder = self._sol_neon_ix_decoder_dict.get(sol_neon_ix.program_ix, DummyIxDecoder)
+                        SolNeonIxDecoder = self._sol_neon_ix_decoder_dict.get(sol_neon_ix.ix_code, DummyIxDecoder)
                         sol_neon_ix_decoder = SolNeonIxDecoder(state)
                         if is_error:
                             if hasattr(sol_neon_ix_decoder, 'decode_failed_neon_tx_event_list'):
                                 sol_neon_ix_decoder.decode_failed_neon_tx_event_list()
                             # LOG.debug('failed tx')
                             continue
-
                         sol_neon_ix_decoder.execute()
             else:
                 self._print_stat(state)

@@ -4,6 +4,7 @@ import dataclasses
 from typing import Any, List, Type, Optional, Iterator
 
 from ..common_neon.utils import NeonTxInfo
+from ..common_neon.neon_instruction import EvmIxCode, EvmIxCodeName
 from ..common_neon.utils.evm_log_decoder import NeonLogTxEvent
 
 from ..indexer.indexed_objects import NeonIndexedTxInfo, NeonIndexedHolderInfo, NeonAccountInfo, SolNeonTxDecoderState
@@ -13,7 +14,6 @@ LOG = logging.getLogger(__name__)
 
 
 class DummyIxDecoder:
-    _name = 'Unknown'
     _ix_code = 0xFF
     _is_deprecated = True
 
@@ -31,12 +31,12 @@ class DummyIxDecoder:
 
     @classmethod
     def name(cls) -> str:
-        return cls._name
+        return EvmIxCodeName().get(cls.ix_code(), 'UNKNOWN')
 
     def __str__(self):
         if self._is_deprecated:
-            return f'DEPRECATED 0x{self._ix_code:02x}:{self._name} {self.state.sol_neon_ix}'
-        return f'0x{self._ix_code:02x}:{self._name} {self.state.sol_neon_ix}'
+            return f'DEPRECATED 0x{self.ix_code():02x}:{self.name()} {self.state.sol_neon_ix}'
+        return f'0x{self.ix_code():02x}:{self.name()} {self.state.sol_neon_ix}'
 
     def execute(self) -> bool:
         """ By default, skip the instruction without parsing. """
@@ -160,7 +160,7 @@ class BaseTxIxDecoder(DummyIxDecoder):
 
     def _decode_neon_tx_receipt(self, tx: NeonIndexedTxInfo) -> bool:
         self._decode_neon_tx_event_list(tx)
-        if tx.neon_tx_res.is_completed():
+        if tx.neon_tx_res.is_completed:
             pass
         elif self._decode_neon_tx_return(tx):
             self._add_return_event(tx)
@@ -180,9 +180,9 @@ class BaseTxIxDecoder(DummyIxDecoder):
         ix = self.state.sol_neon_ix
         res = tx.neon_tx_res
 
-        if res.is_canceled():
+        if res.is_canceled:
             event_type = NeonLogTxEvent.Type.Cancel
-        elif res.is_completed():
+        elif res.is_completed:
             event_type = NeonLogTxEvent.Type.Return
         else:
             return
@@ -194,8 +194,8 @@ class BaseTxIxDecoder(DummyIxDecoder):
             is_hidden=True,
             address=b'',
             topic_list=list(),
-            data=int(res.status[2:], 16).to_bytes(1, 'little'),
-            total_gas_used=int(res.gas_used[2:], 16) + 5000,  # to move event to the end of the list
+            data=res.status.to_bytes(1, 'little'),
+            total_gas_used=res.gas_used + 5000,  # to move event to the end of the list
             sol_sig=ix.sol_sig,
             idx=ix.idx,
             inner_idx=ix.inner_idx
@@ -242,8 +242,7 @@ class BaseTxSimpleIxDecoder(BaseTxIxDecoder):
 
 
 class TxExecFromDataIxDecoder(BaseTxSimpleIxDecoder):
-    _name = 'TransactionExecuteFromInstruction'
-    _ix_code = 0x1f
+    _ix_code = EvmIxCode.TxExecFromData
     _is_deprecated = False
 
     def execute(self) -> bool:
@@ -267,8 +266,7 @@ class TxExecFromDataIxDecoder(BaseTxSimpleIxDecoder):
 
 
 class TxExecFromAccountIxDecoder(BaseTxSimpleIxDecoder):
-    _name = 'TransactionExecFromAccount'
-    _ix_code = 0x2a
+    _ix_code = EvmIxCode.TxExecFromAccount
     _is_deprecated = False
 
     def execute(self) -> bool:
@@ -366,8 +364,7 @@ class BaseTxStepIxDecoder(BaseTxIxDecoder):
 
 
 class TxStepFromDataIxDecoder(BaseTxStepIxDecoder):
-    _name = 'TransactionStepFromInstruction'
-    _ix_code = 0x20
+    _ix_code = EvmIxCode.TxStepFromData
     _is_deprecated = False
 
     def execute(self) -> bool:
@@ -390,8 +387,7 @@ class TxStepFromDataIxDecoder(BaseTxStepIxDecoder):
 
 
 class TxStepFromAccountIxDecoder(BaseTxStepIxDecoder):
-    _name = 'TransactionStepFromAccount'
-    _ix_code = 0x21
+    _ix_code = EvmIxCode.TxStepFromAccount
     _is_deprecated = False
 
     def execute(self) -> bool:
@@ -403,8 +399,7 @@ class TxStepFromAccountIxDecoder(BaseTxStepIxDecoder):
 
 
 class TxStepFromAccountNoChainIdIxDecoder(BaseTxStepIxDecoder):
-    _name = 'TransactionStepFromAccountNoChainId'
-    _ix_code = 0x22
+    _ix_code = EvmIxCode.TxStepFromAccountNoChainId
     _is_deprecated = False
 
     def execute(self) -> bool:
@@ -416,8 +411,7 @@ class TxStepFromAccountNoChainIdIxDecoder(BaseTxStepIxDecoder):
 
 
 class CancelWithHashIxDecoder(BaseTxStepIxDecoder):
-    _name = 'CancelWithHash'
-    _ix_code = 0x23
+    _ix_code = EvmIxCode.CancelWithHash
     _is_deprecated = False
     _first_blocked_account_idx = 3
 
@@ -433,7 +427,7 @@ class CancelWithHashIxDecoder(BaseTxStepIxDecoder):
         if tx is None:
             return self._decoding_skip(f'cannot find NeonTx "{neon_tx_sig}"')
 
-        if tx.neon_tx_res.is_completed():
+        if tx.neon_tx_res.is_completed:
             return self._decoding_skip(f'NeonTx {neon_tx_sig} is already has NeonReceipt')
 
         self._decode_neon_tx_receipt(tx)
@@ -445,8 +439,7 @@ class CancelWithHashIxDecoder(BaseTxStepIxDecoder):
 
 
 class WriteHolderAccountIx(BaseTxIxDecoder):
-    _name = 'WriteHolderAccount'
-    _ix_code = 0x26
+    _ix_code = EvmIxCode.HolderWrite
     _is_deprecated = False
 
     def execute(self) -> bool:
@@ -492,8 +485,7 @@ class WriteHolderAccountIx(BaseTxIxDecoder):
 
 
 class CreateAccount3IxDecoder(DummyIxDecoder):
-    _name = 'CreateAccount3'
-    _ix_code = 0x28
+    _ix_code = EvmIxCode.CreateAccountV03
     _is_deprecated = False
 
     def execute(self) -> bool:
@@ -517,8 +509,7 @@ class CreateAccount3IxDecoder(DummyIxDecoder):
 
 
 class CollectTreasureIxDecoder(DummyIxDecoder):
-    _name = 'CollectTreasure'
-    _ix_code = 0x1e
+    _ix_code = EvmIxCode.CollectTreasure
     _is_deprecated = False
 
     def execute(self) -> bool:
@@ -526,8 +517,7 @@ class CollectTreasureIxDecoder(DummyIxDecoder):
 
 
 class CreateHolderAccountIx(DummyIxDecoder):
-    _name = 'CreateHolderAccount'
-    _ix_code = 0x24
+    _ix_code = EvmIxCode.HolderCreate
     _is_deprecated = False
 
     def execute(self) -> bool:
@@ -535,8 +525,7 @@ class CreateHolderAccountIx(DummyIxDecoder):
 
 
 class DeleteHolderAccountIx(DummyIxDecoder):
-    _name = 'DeleteHolderAccount'
-    _ix_code = 0x25
+    _ix_code = EvmIxCode.HolderDelete
     _is_deprecated = False
 
     def execute(self) -> bool:
@@ -544,8 +533,7 @@ class DeleteHolderAccountIx(DummyIxDecoder):
 
 
 class Deposit3IxDecoder(DummyIxDecoder):
-    _name = 'Deposit3'
-    _ix_code = 0x27
+    _ix_code = EvmIxCode.DepositV03
     _is_deprecated = False
 
     def execute(self) -> bool:

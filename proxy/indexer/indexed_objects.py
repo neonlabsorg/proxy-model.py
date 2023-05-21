@@ -273,7 +273,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
             object.__setattr__(event, 'event_order', current_order)
 
         reverted_level = -1
-        is_failed = (self.neon_tx_res.status == '0x0')
+        is_failed = (self.neon_tx_res.status == 0)
 
         for event in reversed(neon_event_list):
             if event.is_reverted:
@@ -476,8 +476,8 @@ class NeonIndexedBlockInfo:
             stat = self._stat_neon_tx_dict.setdefault(tx_type, _new_stat(tx_type))
 
             neon_income = 0
-            if (tx is not None) and (tx.neon_tx.gas_price[:2] == '0x'):
-                neon_income = sol_neon_ix.neon_gas_used * int(tx.neon_tx.gas_price, 16)
+            if tx is not None:
+                neon_income = sol_neon_ix.neon_gas_used * tx.neon_tx.gas_price
 
             sol_spent = 0
             if not sol_neon_ix.sol_tx_cost.is_calculated_stat:
@@ -507,9 +507,11 @@ class NeonIndexedBlockInfo:
     def fill_log_info_list(self) -> None:
         log_idx = 0
         tx_idx = 0
+        sum_gas_used = 0
         for tx in self._done_neon_tx_list:
             tx.complete_event_list()
-            log_idx = tx.neon_tx_res.set_block_info(self._sol_block, tx.neon_tx.sig, tx_idx, log_idx)
+            sum_gas_used += tx.neon_tx_res.gas_used
+            log_idx = tx.neon_tx_res.set_block_info(self._sol_block, tx.neon_tx.sig, tx_idx, log_idx, sum_gas_used)
             tx_idx += 1
 
     def complete_block(self, config: Config) -> None:

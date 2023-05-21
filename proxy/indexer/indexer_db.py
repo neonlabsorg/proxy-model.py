@@ -4,7 +4,7 @@ from ..common_neon.utils import NeonTxReceiptInfo, SolBlockInfo
 from ..common_neon.db.db_connect import DBConnection
 from ..common_neon.db.sql_dict import SQLDict
 from ..common_neon.config import Config
-from ..common_neon.solana_neon_tx_receipt import SolNeonIxShortInfo, SolTxCostInfo
+from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptShortInfo, SolTxCostInfo
 
 from ..indexer.indexed_objects import NeonIndexedBlockInfo
 from ..indexer.neon_tx_logs_db import NeonTxLogsDB
@@ -40,6 +40,10 @@ class IndexerDB:
         self._latest_block_slot = self.get_latest_block_slot()
         self._finalized_block_slot = self.get_finalized_block_slot()
         self._min_receipt_block_slot = self.get_min_receipt_block_slot()
+
+    @property
+    def db_connection(self) -> DBConnection:
+        return self._db
 
     def is_healthy(self) -> bool:
         return self._db.is_connected()
@@ -158,7 +162,7 @@ class IndexerDB:
     def get_sol_sig_list_by_neon_sig(self, neon_sig: str) -> List[str]:
         return self._sol_neon_txs_db.get_sol_sig_list_by_neon_sig(neon_sig)
 
-    def get_sol_ix_info_list_by_neon_sig(self, neon_sig: str) -> List[SolNeonIxShortInfo]:
+    def get_sol_ix_info_list_by_neon_sig(self, neon_sig: str) -> List[SolNeonIxReceiptShortInfo]:
         return self._sol_neon_txs_db.get_sol_ix_info_list_by_neon_sig(neon_sig)
 
     def get_cost_list_by_sol_sig_list(self, sol_sig_list: List[str]) -> List[SolTxCostInfo]:

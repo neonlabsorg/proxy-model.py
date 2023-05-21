@@ -79,7 +79,7 @@ class GasTank(IndexerBase):
 
     # Method to process NeonEVM transaction extracted from the instructions
     def _process_neon_tx(self, tx_info: GasTankTxInfo) -> None:
-        if tx_info.status != GasTankTxInfo.Status.Done or tx_info.neon_tx_res.status != '0x1':
+        if tx_info.status != GasTankTxInfo.Status.Done or tx_info.neon_tx_res.status != 1:
             LOG.debug(f'SKIPPED {tx_info.key} status {tx_info.status} result {tx_info.neon_tx_res.status}: {tx_info}')
             return
 
@@ -117,7 +117,7 @@ class GasTank(IndexerBase):
 
     def _process_gas_less_tx(self, tx_info: GasTankTxInfo) -> None:
         neon_tx = tx_info.neon_tx
-        if neon_tx.gas_price != '0x0':
+        if neon_tx.gas_price != 0:
             return
 
         LOG.debug(f'gas-less tx: {neon_tx}')
@@ -126,9 +126,9 @@ class GasTank(IndexerBase):
             account=NeonAddress(neon_tx.addr),
             block_slot=self._current_slot,
             neon_sig=neon_tx.sig,
-            nonce=int(neon_tx.nonce[2:], 16),
+            nonce=neon_tx.nonce,
             to_addr=NeonAddress(neon_tx.to_addr) if neon_tx.to_addr is not None else None,
-            neon_total_gas_usage=int(tx_info.neon_tx_res.gas_used[2:], 16),
+            neon_total_gas_usage=tx_info.neon_tx_res.gas_used,
             operator=tx_info.operator
         )
         self._gas_less_usage_list.append(gas_less_usage)
