@@ -546,8 +546,8 @@ class SolInteractor:
         return self._get_block_status(block_slot, finalized_block_info, response)
 
     def check_confirm_of_tx_sig_list(self, tx_sig_list: List[str],
-                                     commitment: SolCommit,
-                                     timeout_sec: int) -> bool:
+                                     commitment: SolCommit.Type,
+                                     timeout_sec: float) -> bool:
         if not tx_sig_list:
             return True
 
@@ -580,7 +580,7 @@ class SolInteractor:
                         if subscription is not None:
                             subscriptions[subscription] = True
 
-                if (len(tx_sig_list) == len(requests) and len(requests) == len(subscriptions)
+                if (len(tx_sig_list) == len(subscriptions)
                     and all(requests.values()) and all(subscriptions.values())):
                     all_sigs_confirmed = True
                     websocket.close()

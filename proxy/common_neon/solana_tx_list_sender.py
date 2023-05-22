@@ -374,19 +374,17 @@ class SolTxListSender:
             tx_sig_list.append(tx_state.sig)
             tx_list.append(tx_state.tx)
 
-        self._wait_for_confirm_of_tx_list(tx_sig_list)
+        self._solana.check_confirm_of_tx_sig_list(
+            tx_sig_list,
+            SolCommit.Confirmed,
+            self._config.confirm_timeout_sec)
+
         self._get_tx_receipt_list(tx_sig_list, tx_list)
 
     def _get_tx_receipt_list(self, tx_sig_list: Optional[List[str]], tx_list: List[SolTx]) -> None:
         tx_receipt_list = self._solana.get_tx_receipt_list(tx_sig_list, SolCommit.Confirmed)
         for tx, tx_receipt in zip(tx_list, tx_receipt_list):
             self._add_tx_state(tx, tx_receipt, SolTxSendState.Status.NoReceiptError)
-
-    def _wait_for_confirm_of_tx_list(self, tx_sig_list: List[str]) -> None:
-        self._solana.check_confirm_of_tx_sig_list(
-            tx_sig_list,
-            SolCommit.Confirmed,
-            self._config.confirm_timeout_sec)
 
     @dataclass(frozen=True)
     class _DecodeResult:
