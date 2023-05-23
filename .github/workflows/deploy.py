@@ -450,9 +450,9 @@ def trigger_dapps_tests(solana_ip, proxy_ip, token):
     wait_condition(lambda: github.get_dapps_run_info(run_id)["status"] == "completed", timeout_sec=7200, delay=5)
 
     if github.get_dapps_run_info(run_id)["conclusion"] == "success":
-        click.echo("Proxy tests passed successfully")
+        click.echo("Dapps tests passed successfully")
     else:
-        raise RuntimeError(f"Proxy tests failed! See {link}")
+        raise RuntimeError(f"Dapps tests failed! See {link}")
 
 
 @cli.command(name="send_notification", help="Send notification to slack")
