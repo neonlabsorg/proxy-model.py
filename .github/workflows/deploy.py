@@ -435,7 +435,7 @@ def trigger_dapps_tests(solana_ip, proxy_ip, token):
 
     runs_before = github.get_dapps_runs_list()
     runs_count_before = github.get_dapps_runs_count()
-    proxy_url = f"http://{proxy_ip}:9090/solana",
+    proxy_url = f"http://{proxy_ip}:9090/solana"
     solana_url = f"http://{solana_ip}:8899/"
     faucet_url = f"http://{proxy_ip}:3333/"
 
