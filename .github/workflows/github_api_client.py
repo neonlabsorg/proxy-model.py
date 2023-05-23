@@ -33,9 +33,10 @@ class GithubClient():
         response = requests.post(
             f"{self.TESTS_ENDPOINT}/actions/workflows/dapps.yml/dispatches", json=data, headers=self.headers)
         click.echo(f"Sent data: {data}")
+        click.echo(f"Headers: {self.headers}")
         click.echo(f"Status code: {response.status_code}")
         if response.status_code != 204:
-            raise RuntimeError("proxy-model.py action is not triggered")
+            raise RuntimeError(f"proxy-model.py action is not triggered. {response.text}")
 
     def get_dapps_run_info(self, id):
         response = requests.get(
