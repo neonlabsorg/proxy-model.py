@@ -28,7 +28,8 @@ class GithubClient():
                 "inputs": {"proxy_url": proxy_url,
                            "solana_url": solana_url,
                            "faucet_url": faucet_url,
-                           "network_id": network_id}
+                           "network_id": network_id,
+                           "network": "custom"}
                 }
         response = requests.post(
             f"{self.TESTS_ENDPOINT}/actions/workflows/dapps.yml/dispatches", json=data, headers=self.headers)
