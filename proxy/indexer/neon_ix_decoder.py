@@ -490,21 +490,18 @@ class CreateAccount3IxDecoder(DummyIxDecoder):
 
     def execute(self) -> bool:
         ix = self.state.sol_neon_ix
-        block = self.state.neon_block
-        if len(ix.ix_data) < 20:
+        if len(ix.ix_data) < 21:
             return self._decoding_skip(f'not enough data to get NeonAccount {len(ix.ix_data)}')
 
-        neon_account = '0x' + ix.ix_data[1:][:20].hex()
+        neon_account = '0x' + ix.ix_data[1:21].hex()
         pda_account = ix.get_account(2)
 
         account_info = NeonAccountInfo(
             neon_account,
             pda_account,
             ix.block_slot,
-            None,
             ix.sol_sig
         )
-        block.add_neon_account(account_info, ix)
         return self._decoding_success(account_info, 'create NeonAccount')
 
 

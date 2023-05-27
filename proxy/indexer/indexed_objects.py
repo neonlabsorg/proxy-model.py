@@ -52,11 +52,10 @@ class BaseNeonIndexedObjInfo:
 
 @dataclass(frozen=True)
 class NeonAccountInfo:
-    neon_address: Optional[str]
+    neon_address: str
     pda_address: str
     block_slot: int
-    code: Optional[str]
-    sol_sig: Optional[str]
+    sol_sig: str
 
 
 class NeonIndexedHolderInfo(BaseNeonIndexedObjInfo):
@@ -410,9 +409,6 @@ class NeonIndexedBlockInfo:
 
         tx.set_status(NeonIndexedTxInfo.Status.Done, sol_neon_ix.block_slot)
         self._done_neon_tx_list.append(tx)
-
-    def add_neon_account(self, _: NeonAccountInfo, __: SolNeonIxReceiptInfo) -> None:
-        pass
 
     @property
     def sol_block(self) -> SolBlockInfo:
