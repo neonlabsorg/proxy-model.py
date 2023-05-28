@@ -8,24 +8,24 @@ from collections import deque
 from datetime import datetime
 from typing import Optional, List, Dict, Deque, Set
 
-from ..common_neon.address import NeonAddress, neon_2program, perm_account_seed, account_with_seed
-from ..common_neon.cancel_transaction_executor import CancelTxExecutor
-from ..common_neon.config import Config
-from ..common_neon.constants import ACTIVE_HOLDER_TAG, FINALIZED_HOLDER_TAG, HOLDER_TAG
-from ..common_neon.errors import BadResourceError, RescheduleError
-from ..common_neon.neon_instruction import NeonIxBuilder
-from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.solana_tx import SolPubKey, SolAccount
-from ..common_neon.solana_tx_list_sender import SolTxListSender
+from proxy.common_neon.address import NeonAddress, neon_2program, perm_account_seed, account_with_seed
+from proxy.common_neon.cancel_transaction_executor import CancelTxExecutor
+from proxy.common_neon.config import Config
+from proxy.common_neon.constants import ACTIVE_HOLDER_TAG, FINALIZED_HOLDER_TAG, HOLDER_TAG
+from proxy.common_neon.errors import BadResourceError, RescheduleError
+from proxy.common_neon.neon_instruction import NeonIxBuilder
+from proxy.common_neon.solana_interactor import SolInteractor
+from proxy.common_neon.solana_tx import SolPubKey, SolAccount
+from proxy.common_neon.solana_tx_list_sender import SolTxListSender
 
-from .neon_tx_stages import (
+from proxy.mempool.neon_tx_stages import (
     NeonCreateAccountTxStage, NeonCreateHolderAccountStage, NeonDeleteHolderAccountStage,
     NeonTxStage
 )
-from .mempool_api import OpResIdent
+from proxy.mempool.mempool_api import OpResIdent
 
-from ..statistic.data import NeonOpResStatData
-from ..statistic.proxy_client import ProxyStatClient
+from proxy.statistic.data import NeonOpResStatData
+from proxy.statistic.proxy_client import ProxyStatClient
 
 
 LOG = logging.getLogger(__name__)
