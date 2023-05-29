@@ -11,6 +11,7 @@ class NeonMethodData:
     latency: float
 
 
+@dataclass
 class NeonTxStatData:
     tx_type: str
     completed_neon_tx_cnt: int = 0
@@ -41,6 +42,7 @@ class NeonTxBeginCode(Enum):
     Restarted = enum_auto()
 
 
+@dataclass
 class NeonTxBeginData:
     started_cnt: int = 0
     restarted_cnt: int = 0
@@ -68,6 +70,7 @@ class NeonTxEndCode(Enum):
     Canceled = enum_auto()
 
 
+@dataclass
 class NeonTxEndData:
     done_cnt: int = 0
     failed_cnt: int = 0

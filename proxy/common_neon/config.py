@@ -77,7 +77,7 @@ class Config(DBConfig):
         self._neon_cli_debug_log = self._env_bool("NEON_CLI_DEBUG_LOG", False)
         self._cancel_timeout = self._env_int("CANCEL_TIMEOUT", 1, 60)
         self._skip_cancel_timeout = self._env_int("SKIP_CANCEL_TIMEOUT", 1, 1000)
-        self._holder_timeout = self._env_int("HOLDER_TIMEOUT", 1, 216000)  # 1 day by default
+        self._holder_timeout = self._env_int("HOLDER_TIMEOUT", 16, 64)
         self._gather_statistics = self._env_bool("GATHER_STATISTICS", False)
         self._hvac_url = os.environ.get('HVAC_URL', None)
         self._hvac_token = os.environ.get('HVAC_TOKEN', None)

@@ -23,6 +23,7 @@ LOG = logging.getLogger(__name__)
 
 
 class EvmIxCode(IntEnum):
+    Unknown = -1
     CollectTreasure = 0x1e              # 30
     TxExecFromData = 0x1f               # 31
     TxExecFromAccount = 0x2a            # 42
@@ -44,8 +45,9 @@ class EvmIxCodeName:
         for ix_code in list(EvmIxCode):
             self._ix_code_dict[ix_code.value] = str_enum(ix_code)
 
-    def get(self, ix_code: int, default=None) -> str:
-        value = self._ix_code_dict.get(ix_code, default)
+    @staticmethod
+    def get(ix_code: int, default=None) -> str:
+        value = EvmIxCodeName()._ix_code_dict.get(ix_code, default)
         if value is None:
             return hex(ix_code)
         return value

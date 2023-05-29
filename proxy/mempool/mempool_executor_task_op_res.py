@@ -3,19 +3,121 @@ from typing import List
 
 from .mempool_api import MPOpResGetListResult, MPOpResInitRequest, MPOpResInitResult, MPOpResInitResultCode
 from .mempool_executor_task_base import MPExecutorBaseTask
-from .operator_resource_mng import OpResInfo, OpResInit, OpResIdentListBuilder
 
+from ..common_neon.address import neon_2program
+from ..common_neon.cancel_transaction_executor import CancelTxExecutor
 from ..common_neon.config import Config
+from ..common_neon.constants import ACTIVE_HOLDER_TAG, FINALIZED_HOLDER_TAG, HOLDER_TAG
 from ..common_neon.elf_params import ElfParams
+from ..common_neon.errors import BadResourceError, RescheduleError
+from ..common_neon.neon_instruction import NeonIxBuilder
+
+from ..common_neon.neon_tx_stages import (
+    NeonCreateAccountTxStage, NeonCreateHolderAccountStage, NeonDeleteHolderAccountStage,
+    NeonTxStage
+)
+
+from ..common_neon.operator_resource_info import OpResInfo, OpResIdentListBuilder
 from ..common_neon.operator_secret_mng import OpSecretMng
 from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.errors import RescheduleError
+from ..common_neon.solana_tx_list_sender import SolTxListSender
 
 from ..statistic.data import NeonOpResListData
 from ..statistic.proxy_client import ProxyStatClient
 
 
 LOG = logging.getLogger(__name__)
+
+
+class OpResInit:
+    def __init__(self, config: Config, solana: SolInteractor):
+        self._config = config
+        self._solana = solana
+
+    def init_resource(self, resource: OpResInfo):
+        LOG.debug(f'Rechecking of accounts for resource {resource}')
+
+        try:
+            self._validate_operator_balance(resource)
+
+            builder = NeonIxBuilder(self._config, resource.public_key)
+            self._create_holder_account(builder, resource)
+            self._create_neon_account(builder, resource)
+        except RescheduleError:
+            raise
+        except BaseException as exc:
+            LOG.error(f'Fail to init accounts for resource {resource}', exc_info=exc)
+            raise BadResourceError(str(exc))
+
+    def _validate_operator_balance(self, resource: OpResInfo) -> None:
+        # Validate operator's account has enough SOLs
+        sol_balance = self._solana.get_sol_balance(resource.public_key)
+        min_operator_balance_to_err = self._config.min_operator_balance_to_err
+        if sol_balance <= min_operator_balance_to_err:
+            LOG.error(
+                f'Operator account {resource} has NOT enough SOLs; balance = {sol_balance}; ' +
+                f'min_operator_balance_to_err = {min_operator_balance_to_err}'
+            )
+            raise BadResourceError(f'Not enough SOLs on the resource {resource}')
+
+        min_operator_balance_to_warn = self._config.min_operator_balance_to_warn
+        if sol_balance <= min_operator_balance_to_warn:
+            LOG.warning(
+                f'Operator account {resource} SOLs are running out; balance = {sol_balance}; ' +
+                f'min_operator_balance_to_warn = {min_operator_balance_to_warn}; ' +
+                f'min_operator_balance_to_err = {min_operator_balance_to_err}; '
+            )
+
+    def _execute_stage(self, stage: NeonTxStage, resource: OpResInfo) -> None:
+        stage.build()
+        tx_sender = SolTxListSender(self._config, self._solana, resource.signer)
+        tx_sender.send([stage.tx])
+
+    def _create_neon_account(self, builder: NeonIxBuilder, resource: OpResInfo):
+        solana_address = neon_2program(builder.evm_program_id, resource.neon_address)[0]
+
+        account_info = self._solana.get_account_info(solana_address)
+        if account_info is not None:
+            LOG.debug(f"Use neon account {str(solana_address)}({str(resource.neon_address)}) for resource {resource}")
+            return []
+
+        LOG.debug(f"Create neon account {str(solana_address)}({str(resource.neon_address)}) for resource {resource}")
+        stage = NeonCreateAccountTxStage(builder, {"address": resource.neon_address})
+        stage.set_balance(self._solana.get_multiple_rent_exempt_balances_for_size([stage.size])[0])
+        self._execute_stage(stage, resource)
+
+    def _create_holder_account(self, builder: NeonIxBuilder, resource: OpResInfo) -> None:
+        holder_address = str(resource.holder)
+        holder_info = self._solana.get_account_info(resource.holder)
+        size = self._config.holder_size
+        balance = self._solana.get_multiple_rent_exempt_balances_for_size([size])[0]
+
+        if holder_info is None:
+            LOG.debug(f"Create account {holder_address} for resource {resource}")
+            self._execute_stage(NeonCreateHolderAccountStage(builder, resource.holder_seed, size, balance), resource)
+        elif holder_info.lamports < balance:
+            LOG.debug(f"Resize account {holder_address} for resource {resource}")
+            self._recreate_holder(builder, resource, balance)
+        elif holder_info.owner != self._config.evm_program_id:
+            raise BadResourceError(f'Wrong owner of {str(holder_info.owner)} for resource {resource}')
+        elif holder_info.tag == ACTIVE_HOLDER_TAG:
+            self._complete_neon_tx(resource)
+        elif holder_info.tag not in {FINALIZED_HOLDER_TAG, HOLDER_TAG}:
+            LOG.debug(f"Wrong tag {holder_info.tag} of {holder_address} for resource {resource}")
+            self._recreate_holder(builder, resource, size)
+        else:
+            LOG.debug(f"Use account {str(holder_info.owner)} for resource {resource}")
+
+    def _recreate_holder(self, builder: NeonIxBuilder, resource: OpResInfo, balance: int) -> None:
+        size = self._config.holder_size
+        self._execute_stage(NeonDeleteHolderAccountStage(builder, resource.holder_seed), resource)
+        self._execute_stage(NeonCreateHolderAccountStage(builder, resource.holder_seed, size, balance), resource)
+
+    def _complete_neon_tx(self, resource: OpResInfo) -> None:
+        holder_info = self._solana.get_holder_account_info(resource.holder)
+        cancel_tx_executor = CancelTxExecutor(self._config, self._solana, resource.signer)
+        cancel_tx_executor.add_blocked_holder_account(holder_info)
+        cancel_tx_executor.execute_tx_list()
 
 
 class MPExecutorOpResTask(MPExecutorBaseTask):

@@ -31,7 +31,7 @@ class DummyIxDecoder:
 
     @classmethod
     def name(cls) -> str:
-        return EvmIxCodeName().get(cls.ix_code(), 'UNKNOWN')
+        return EvmIxCodeName.get(cls.ix_code(), 'UNKNOWN')
 
     def __str__(self):
         if self._is_deprecated:
@@ -90,8 +90,7 @@ class BaseTxIxDecoder(DummyIxDecoder):
             return None
 
         block = self.state.neon_block
-        tx_type = NeonIndexedTxInfo.Type(self._ix_code)
-        return block.add_neon_tx(tx_type, neon_tx, holder_account, iter_blocked_account, ix)
+        return block.add_neon_tx(EvmIxCode(self.ix_code()), neon_tx, holder_account, iter_blocked_account, ix)
 
     def _decode_neon_tx(self) -> Optional[NeonTxInfo]:
         return NeonTxInfo.from_neon_sig(self.state.sol_neon_ix.neon_tx_sig)
@@ -513,20 +512,35 @@ class CollectTreasureIxDecoder(DummyIxDecoder):
         return self._decoding_success(None, 'collect NeonTreasury')
 
 
-class CreateHolderAccountIx(DummyIxDecoder):
+class BaseHolderAccountIx(DummyIxDecoder):
+    def _execute(self, name: str) -> bool:
+        ix = self.state.sol_neon_ix
+        block = self.state.neon_block
+
+        if ix.account_cnt < 1:
+            return self._decoding_skip(f'no enough SolIx.Accounts(len={ix.account_cnt}) to get NeonHolder.Account')
+        holder_account = ix.get_account(0)
+        object.__setattr__(ix, 'neon_tx_sig', f'{name.replace(" ", "_")}.{ix.ident}')
+
+        holder = block.add_neon_tx_holder(holder_account, ix)
+        block.done_neon_holder(holder)
+        return self._decoding_success(None, name)
+
+
+class CreateHolderAccountIx(BaseHolderAccountIx):
     _ix_code = EvmIxCode.HolderCreate
     _is_deprecated = False
 
     def execute(self) -> bool:
-        return self._decoding_success(None, 'create NeonHolder')
+        return self._execute('create HolderAccount')
 
 
-class DeleteHolderAccountIx(DummyIxDecoder):
+class DeleteHolderAccountIx(BaseHolderAccountIx):
     _ix_code = EvmIxCode.HolderDelete
     _is_deprecated = False
 
     def execute(self) -> bool:
-        return self._decoding_success(None, 'delete NeonHolder')
+        return self._execute('delete HolderAccount')
 
 
 class Deposit3IxDecoder(DummyIxDecoder):

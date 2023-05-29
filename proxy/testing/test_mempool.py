@@ -13,6 +13,9 @@ from unittest.mock import patch, MagicMock, call
 from ..common_neon.config import Config
 from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.solana_tx import SolPubKey
+from ..common_neon.utils.eth_proto import NeonTx
+from ..common_neon.elf_params import ElfParams
+from ..common_neon.operator_resource_mng import OpResMng
 
 from ..mempool.mempool_api import (
     MPRequest, OpResIdent,
@@ -23,10 +26,6 @@ from ..mempool.mempool_api import (
 from ..mempool.executor_mng import MPExecutorMng, IMPExecutorMngUser
 from ..mempool.mempool import MemPool, MPTask, MPTxRequestList
 from ..mempool.mempool_schedule import MPTxSchedule, MPSenderTxPool
-from proxy.common_neon.utils.eth_proto import NeonTx
-from ..common_neon.elf_params import ElfParams
-
-from ..mempool.operator_resource_mng import OpResMng
 
 from ..statistic.proxy_client import ProxyStatClient
 

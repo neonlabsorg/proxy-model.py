@@ -8,9 +8,10 @@ from enum import IntEnum
 from typing import Any, Optional, List, Dict
 
 from ..common_neon.data import NeonTxExecCfg
+from ..common_neon.operator_resource_info import OpResIdent
+from ..common_neon.solana_tx import SolPubKey
 from ..common_neon.utils import str_fmt_object
 from ..common_neon.utils.eth_proto import NeonTx
-from ..common_neon.solana_tx import SolPubKey
 
 
 @dataclass
@@ -74,29 +75,6 @@ class MPTxRequest(MPRequest):
 
     def has_chain_id(self) -> bool:
         return self.neon_tx.has_chain_id()
-
-
-@dataclass(frozen=True)
-class OpResIdent:
-    evm_program_id: SolPubKey
-    public_key: str
-    private_key: bytes
-    res_id: int = -1
-
-    _str = ''
-    _hash = 0
-
-    def __str__(self) -> str:
-        if self._str == '':
-            _str = f'{self.public_key}:{self.res_id}'
-            object.__setattr__(self, '_str', _str)
-        return self._str
-
-    def __hash__(self) -> int:
-        if self._hash == 0:
-            _hash = hash(str(self))
-            object.__setattr__(self, '_hash', _hash)
-        return self._hash
 
 
 @dataclass

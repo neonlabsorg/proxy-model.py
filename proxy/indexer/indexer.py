@@ -10,10 +10,11 @@ from ..common_neon.config import Config
 from ..common_neon.constants import ACTIVE_HOLDER_TAG
 from ..common_neon.operator_secret_mng import OpSecretMng
 from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.solana_neon_tx_receipt import SolTxMetaInfo, SolTxCostInfo
+from ..common_neon.solana_neon_tx_receipt import SolTxMetaInfo
 from ..common_neon.solana_tx import SolPubKey, SolAccount, SolCommit
 from ..common_neon.solana_tx_error_parser import SolTxErrorParser
 from ..common_neon.utils.json_logger import logging_context
+from ..common_neon.utils.solana_block import SolBlockInfo
 from ..common_neon.metrics_logger import MetricsLogger
 
 from ..statistic.data import NeonBlockStatData
@@ -152,41 +153,37 @@ class Indexer(IndexerBase):
             return
 
         neon_block = state.neon_block
-        is_finalized = state.is_neon_block_finalized
-        backup_is_finalized = neon_block.is_finalized
-        if backup_is_finalized:
+        if neon_block.is_finalized:
             return
 
-        try:
-            neon_block.set_finalized(is_finalized)
-            if not neon_block.is_completed:
-                neon_block.fill_log_info_list()
-                self._db.submit_block(neon_block)
-                neon_block.calc_stat(self._config, self._op_account_set)
-                neon_block.complete_block(self._config)
-            elif is_finalized:
-                # the confirmed block becomes finalized
-                self._db.finalize_block(neon_block)
+        is_finalized = state.is_neon_block_finalized
+        neon_block.set_finalized(is_finalized)
+        if not neon_block.is_completed:
+            neon_block.done_block(self._config, self._op_account_set)
+            self._db.submit_block(neon_block)
+            neon_block.complete_block()
+        elif is_finalized:
+            # the confirmed block becomes finalized
+            self._db.finalize_block(neon_block)
 
-            # Add block to cache only after indexing and applying last changes to DB
-            self._neon_block_dict.add_neon_block(neon_block)
-            if is_finalized:
-                self._neon_block_dict.finalize_neon_block(neon_block)
-                self._commit_tx_stat(neon_block)
-                self._save_checkpoint()
+        # Add block to cache only after indexing and applying last changes to DB
+        self._neon_block_dict.add_neon_block(neon_block)
+        if is_finalized:
+            self._neon_block_dict.finalize_neon_block(neon_block)
+            self._commit_tx_stat(neon_block)
+            self._save_checkpoint()
 
-            self._commit_block_stat(neon_block)
-            self._commit_status_stat()
-        except (Exception,):
-            # Revert finalized status
-            neon_block.set_finalized(backup_is_finalized)
-            raise
+        self._commit_block_stat(neon_block)
+        self._commit_status_stat()
 
     def _commit_tx_stat(self, neon_block: NeonIndexedBlockInfo) -> None:
         for tx_stat in neon_block.iter_stat_neon_tx():
             self._stat_client.commit_neon_tx_result(tx_stat)
 
     def _commit_block_stat(self, neon_block: NeonIndexedBlockInfo) -> None:
+        if not self._config.gather_statistics:
+            return
+
         stat = NeonBlockStatData(
             start_block=self._start_slot,
             parsed_block=neon_block.block_slot,
@@ -204,12 +201,16 @@ class Indexer(IndexerBase):
         self._stat_client.commit_db_health(self._db.is_healthy())
         self._stat_client.commit_solana_rpc_health(self._solana.is_healthy())
 
+    def _new_neon_block(self, sol_block: SolBlockInfo) -> NeonIndexedBlockInfo:
+        neon_holder_list = self._db.get_stalled_neon_holder_list(sol_block.block_slot)
+        return NeonIndexedBlockInfo.from_stalled_data(sol_block, neon_holder_list)
+
     def _locate_neon_block(self, state: SolNeonTxDecoderState, block_slot: int) -> Optional[NeonIndexedBlockInfo]:
         # The same block
         if state.has_neon_block():
             if state.neon_block.block_slot == block_slot:
                 return state.neon_block
-            # The next step, the indexer will choose another block, that is why here is saving of block in DB, cache ...
+            # The next step, the indexer chooses another block, that is why here is saving of block in DB, cache ...
             self._complete_neon_block(state)
 
         neon_block = self._neon_block_dict.find_neon_block(block_slot)
@@ -229,7 +230,8 @@ class Indexer(IndexerBase):
 
                 neon_block = state.neon_block.clone(sol_block)
             else:
-                neon_block = NeonIndexedBlockInfo(sol_block)
+                neon_block = self._new_neon_block(sol_block)
+
         state.set_neon_block(neon_block)
         return neon_block
 
@@ -248,7 +250,7 @@ class Indexer(IndexerBase):
                 continue
 
             for sol_tx_meta in state.iter_sol_tx_meta(neon_block.sol_block):
-                sol_tx_cost = SolTxCostInfo.from_tx_meta(sol_tx_meta)
+                sol_tx_cost = state.sol_tx_cost
                 neon_block.add_sol_tx_cost(sol_tx_cost)
                 is_error = SolTxErrorParser(self._config.evm_program_id, sol_tx_meta.tx).check_if_error()
 

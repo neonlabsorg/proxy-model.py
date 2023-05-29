@@ -2,9 +2,10 @@ import asyncio
 import logging
 import math
 import time
-
 from collections import deque
 from typing import List, Tuple, Optional, Any, Dict, cast, Generator, Union, Deque
+
+from .executor_mng import MPExecutorMng
 
 from .mempool_api import (
     MPRequest, MPRequestType, MPTask, MPTxRequestList,
@@ -13,7 +14,6 @@ from .mempool_api import (
     MPTxSendResult, MPTxSendResultCode
 )
 
-from .executor_mng import MPExecutorMng
 from .mempool_neon_tx_dict import MPTxDict
 from .mempool_periodic_task_elf_params import MPElfParamDictTaskLoop
 from .mempool_periodic_task_free_alt_queue import MPFreeALTQueueTaskLoop
@@ -22,12 +22,13 @@ from .mempool_periodic_task_op_res import MPInitOpResTaskLoop
 from .mempool_periodic_task_op_res_list import MPOpResGetListTaskLoop
 from .mempool_periodic_task_sender_tx_cnt import MPSenderTxCntTaskLoop
 from .mempool_schedule import MPTxSchedule
-from .operator_resource_mng import OpResMng, OpResIdent
 
 from ..common_neon.config import Config
 from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.elf_params import ElfParams
 from ..common_neon.errors import EthereumError
+from ..common_neon.operator_resource_info import OpResIdent
+from ..common_neon.operator_resource_mng import OpResMng
 from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.utils.json_logger import logging_context
 

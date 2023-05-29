@@ -198,3 +198,18 @@
         signature   TEXT
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_solana_transaction_signatures_sig ON solana_transaction_signatures(block_slot);
+
+    CREATE TABLE IF NOT EXISTS stalled_neon_holders (
+        account TEXT,
+        neon_sig TEXT,
+        block_slot BIGINT,
+
+        start_block_slot BIGINT,
+        last_block_slot BIGINT,
+
+        data_size INT,
+        data TEXT
+    );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_stalled_neon_holders_account_neon_sig ON stalled_neon_holders(account, neon_sig);
+    CREATE INDEX IF NOT EXISTS idx_stalled_neon_holders_block ON stalled_neon_holders(block_slot);

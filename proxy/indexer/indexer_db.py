@@ -6,12 +6,13 @@ from ..common_neon.db.sql_dict import SQLDict
 from ..common_neon.config import Config
 from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptShortInfo, SolTxCostInfo
 
-from ..indexer.indexed_objects import NeonIndexedBlockInfo
+from ..indexer.indexed_objects import NeonIndexedBlockInfo, NeonIndexedHolderInfo
 from ..indexer.neon_tx_logs_db import NeonTxLogsDB
 from ..indexer.neon_txs_db import NeonTxsDB
 from ..indexer.solana_blocks_db import SolBlocksDB
 from ..indexer.solana_neon_txs_db import SolNeonTxsDB
 from ..indexer.solana_tx_costs_db import SolTxCostsDB
+from ..indexer.stalled_neon_holder_db import StalledNeonHoldersDB
 
 
 class IndexerDB:
@@ -22,13 +23,14 @@ class IndexerDB:
         self._neon_txs_db = NeonTxsDB(self._db)
         self._sol_neon_txs_db = SolNeonTxsDB(self._db)
         self._neon_tx_logs_db = NeonTxLogsDB(self._db)
+        self._stalled_neon_holders_db = StalledNeonHoldersDB(self._db)
 
         self._db_table_list = [
             self._sol_blocks_db,
             self._sol_tx_costs_db,
             self._neon_txs_db,
             self._sol_neon_txs_db,
-            self._neon_tx_logs_db
+            self._neon_tx_logs_db,
         ]
 
         self._constants_db = SQLDict(self._db, table_name='constants')
@@ -71,6 +73,7 @@ class IndexerDB:
         self._sol_blocks_db.set_block(neon_block.sol_block)
         if neon_block.is_finalized:
             self._finalize_block(neon_block)
+
         self._neon_txs_db.set_tx_list(neon_block.iter_done_neon_tx())
         self._neon_tx_logs_db.set_tx_list(neon_block.iter_done_neon_tx())
         self._sol_neon_txs_db.set_tx_list(neon_block.iter_sol_neon_ix())
@@ -84,6 +87,8 @@ class IndexerDB:
         if len(block_slot_list) > 0:
             for db_table in self._db_table_list:
                 db_table.finalize_block_list(self._finalized_block_slot, block_slot_list)
+
+        self._stalled_neon_holders_db.set_holder_list(neon_block.block_slot, neon_block.iter_stalled_neon_holder())
 
         self._finalized_block_slot = neon_block.block_slot
         self._constants_db['finalized_block_slot'] = neon_block.block_slot
@@ -167,3 +172,6 @@ class IndexerDB:
 
     def get_cost_list_by_sol_sig_list(self, sol_sig_list: List[str]) -> List[SolTxCostInfo]:
         return self._sol_tx_costs_db.get_cost_list_by_sol_sig_list(sol_sig_list)
+
+    def get_stalled_neon_holder_list(self, block_slot: int) -> List[NeonIndexedHolderInfo]:
+        return self._stalled_neon_holders_db.get_holder_list(block_slot)

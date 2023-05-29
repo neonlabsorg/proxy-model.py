@@ -58,7 +58,7 @@ class InfoHandler:
             ret_js = self._all_info(args)
             print(json.dumps(ret_js, cls=DecimalEncoder))
         else:
-            print(f'Unknown command {args.subcommand} for account', file=sys.stderr)
+            print(f'Unknown command {args.subcommand} for info', file=sys.stderr)
             return
 
     def _holder_accounts_info(self, _) -> None:

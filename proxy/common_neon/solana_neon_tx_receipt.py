@@ -5,7 +5,7 @@ import re
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Dict, Union, Iterator, List, Any, Tuple, cast
+from typing import Optional, Dict, Union, Iterator, Generator, List, Any, Tuple, cast
 
 import base58
 
@@ -36,6 +36,13 @@ class SolTxSigSlotInfo:
         if self._hash == 0:
             object.__setattr__(self, '_hash', hash(str(self)))
         return self._hash
+
+    def __eq__(self, other) -> bool:
+        return (
+            isinstance(other, SolTxSigSlotInfo) and
+            other.block_slot == self.block_slot and
+            other.sol_sig == self.sol_sig
+        )
 
 
 @dataclass(frozen=True)
@@ -211,7 +218,7 @@ class SolIxLogState:
 
         object.__setattr__(self, 'used_heap_size', stat.used_heap_size)
 
-    def iter_str_log_msg(self) -> Iterator[str]:
+    def iter_str_log_msg(self) -> Generator[str, None, None]:
         for log_msg in self.log_list:
             if isinstance(log_msg, str):
                 yield log_msg
@@ -415,7 +422,6 @@ class SolTxCostInfo:
     sol_spent: int
 
     _str: str = ''
-    _calculated_stat: bool = False
 
     @staticmethod
     def from_tx_meta(tx_meta: SolTxMetaInfo) -> SolTxCostInfo:
@@ -433,13 +439,6 @@ class SolTxCostInfo:
             _str = str_fmt_object(self)
             object.__setattr__(self, '_str', _str)
         return self._str
-
-    def set_calculated_stat(self) -> None:
-        object.__setattr__(self, '_calculated_stat', True)
-
-    @property
-    def is_calculated_stat(self) -> bool:
-        return self._calculated_stat
 
 
 @dataclass(frozen=True)
@@ -481,6 +480,7 @@ class SolNeonIxReceiptInfo(SolIxMetaInfo):
     ident: Union[Tuple[str, int, int, int], Tuple[str, int, int]]
 
     _str: str
+    _req_id: str
     _account_list: List[int]
     _account_key_list: List[str]
 
@@ -540,6 +540,7 @@ class SolNeonIxReceiptInfo(SolIxMetaInfo):
             max_heap_size=compute_budget.max_heap_size,
 
             _str='',
+            _req_id='',
             _account_list=account_list,
             _account_key_list=tx_meta.account_key_list,
         )
@@ -576,7 +577,10 @@ class SolNeonIxReceiptInfo(SolIxMetaInfo):
 
     @property
     def req_id(self) -> str:
-        return '_'.join([s[:7] if isinstance(s, str) else str(s) for s in self.ident])
+        if self._req_id == '':
+            req_id = '_'.join([s[:7] if isinstance(s, str) else str(s) for s in self.ident])
+            object.__setattr__(self, '_req_id', req_id)
+        return self._req_id
 
     def get_account(self, account_idx: int) -> str:
         if len(self._account_list) > account_idx:
@@ -585,24 +589,24 @@ class SolNeonIxReceiptInfo(SolIxMetaInfo):
                 return self._account_key_list[key_idx]
         return ''
 
-    def iter_account(self, start_idx: int) -> Iterator[str]:
+    def iter_account(self, start_idx: int) -> Generator[str, None, None]:
         for idx in self._account_list[start_idx:]:
             yield self._account_key_list[idx]
 
 
 @dataclass(frozen=True)
 class SolTxReceiptInfo(SolTxMetaInfo):
-    _sol_cost: Optional[SolTxCostInfo]
+    _sol_tx_cost: Optional[SolTxCostInfo]
     _compute_budget: Optional[ComputeBudgetInfo]
     _ix_log_msg_list: Optional[List[SolIxLogState]]
 
     @staticmethod
     def from_tx_receipt(block_slot: int, tx: SolTxReceipt) -> SolTxReceiptInfo:
         tx_meta = SolTxMetaInfo.from_tx_receipt(block_slot, tx)
-        return SolTxReceiptInfo.from_tx_meta(tx_meta)
+        return SolTxReceiptInfo.from_tx_meta(tx_meta, None)
 
     @staticmethod
-    def from_tx_meta(tx_meta: SolTxMetaInfo) -> SolTxReceiptInfo:
+    def from_tx_meta(tx_meta: SolTxMetaInfo, sol_tx_cost: Optional[SolTxCostInfo]) -> SolTxReceiptInfo:
         result = SolTxReceiptInfo(
             ident=tx_meta.ident,
 
@@ -616,7 +620,7 @@ class SolTxReceiptInfo(SolTxMetaInfo):
             _req_id='',
             _signer='',
 
-            _sol_cost=None,
+            _sol_tx_cost=sol_tx_cost,
             _compute_budget=None,
             _ix_log_msg_list=None,
         )
@@ -628,10 +632,11 @@ class SolTxReceiptInfo(SolTxMetaInfo):
         return self.signer
 
     @property
-    def sol_cost(self) -> SolTxCostInfo:
-        if self._sol_cost is None:
-            object.__setattr__(self, '_sol_cost', SolTxCostInfo.from_tx_meta(self))
-        return self._sol_cost
+    def sol_tx_cost(self) -> SolTxCostInfo:
+        if self._sol_tx_cost is None:
+            sol_tx_cost = SolTxCostInfo.from_tx_meta(self)
+            object.__setattr__(self, '_sol_tx_cost', sol_tx_cost)
+        return self._sol_tx_cost
 
     @property
     def compute_budget(self) -> ComputeBudgetInfo:
@@ -712,13 +717,13 @@ class SolTxReceiptInfo(SolTxMetaInfo):
                 return inner_ix['instructions']
         return list()
 
-    def iter_sol_ix(self, evm_program_id: str) -> Iterator[SolNeonIxReceiptInfo]:
-        for ix_idx, ix in enumerate(self._ix_list):
+    def iter_sol_ix(self, evm_program_id: str) -> Generator[SolNeonIxReceiptInfo, None, None]:
+        for ix_idx, ix in enumerate(self.ix_list):
             if self.is_program(ix, evm_program_id) and self._has_ix_data(ix):
                 log_state = self.get_log_state(ix_idx, None)
                 if log_state is not None:
                     ix_meta = SolIxMetaInfo.from_log_state(ix, ix_idx, None, log_state)
-                    yield SolNeonIxReceiptInfo.from_ix(self, self.sol_cost, self.compute_budget, ix_meta)
+                    yield SolNeonIxReceiptInfo.from_ix(self, self.sol_tx_cost, self.compute_budget, ix_meta)
 
             inner_ix_list = self._get_inner_ix_list(ix_idx)
             for inner_idx, inner_ix in enumerate(inner_ix_list):
@@ -726,4 +731,4 @@ class SolTxReceiptInfo(SolTxMetaInfo):
                     log_state = self.get_log_state(ix_idx, inner_idx)
                     if log_state is not None:
                         ix_meta = SolIxMetaInfo.from_log_state(inner_ix, ix_idx, inner_idx, log_state)
-                        yield SolNeonIxReceiptInfo.from_ix(self, self.sol_cost, self.compute_budget, ix_meta)
+                        yield SolNeonIxReceiptInfo.from_ix(self, self.sol_tx_cost, self.compute_budget, ix_meta)

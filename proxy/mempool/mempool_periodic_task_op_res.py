@@ -1,9 +1,9 @@
 from .executor_mng import MPExecutorMng
 from .mempool_api import MPOpResInitRequest, MPOpResInitResult, MPOpResInitResultCode
 from .mempool_periodic_task import MPPeriodicTaskLoop
-from .operator_resource_mng import OpResMng
 
 from ..common_neon.elf_params import ElfParams
+from ..common_neon.operator_resource_mng import OpResMng
 
 
 class MPInitOpResTaskLoop(MPPeriodicTaskLoop[MPOpResInitRequest, MPOpResInitResult]):

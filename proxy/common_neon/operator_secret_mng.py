@@ -68,7 +68,8 @@ class OpSecretMng:
 
         return secret_list
 
-    def _read_secret_file(self, name: str) -> Optional[SolAccount]:
+    @staticmethod
+    def _read_secret_file(name: str) -> Optional[SolAccount]:
         LOG.debug(f"Open a secret file: {name}")
         with open(name.strip(), mode='r') as d:
             pkey = (d.read())

@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Iterator, Generator, List, Optional, Dict, Set, Deque, Tuple, Any, cast
 
+
 from ..common_neon.config import Config
+from ..common_neon.neon_instruction import EvmIxCode, EvmIxCodeName
 from ..common_neon.solana_neon_tx_receipt import SolTxMetaInfo, SolNeonIxReceiptInfo, SolTxCostInfo, SolTxReceiptInfo
 from ..common_neon.solana_tx import SolCommit
 from ..common_neon.utils.evm_log_decoder import NeonLogTxEvent
@@ -37,17 +39,17 @@ class BaseNeonIndexedObjInfo:
     def last_block_slot(self) -> int:
         return self._last_block_slot
 
-    def _set_start_block_slot(self, block_slot: int) -> None:
+    def set_start_block_slot(self, block_slot: int) -> None:
         if self._start_block_slot == 0 or block_slot < self._start_block_slot:
             self._start_block_slot = block_slot
 
-    def _set_last_block_slot(self, block_slot: int) -> None:
+    def set_last_block_slot(self, block_slot: int) -> None:
         if block_slot > self._last_block_slot:
             self._last_block_slot = block_slot
 
     def add_sol_neon_ix(self, sol_neon_ix: SolNeonIxReceiptInfo) -> None:
-        self._set_start_block_slot(sol_neon_ix.block_slot)
-        self._set_last_block_slot(sol_neon_ix.block_slot)
+        self.set_start_block_slot(sol_neon_ix.block_slot)
+        self.set_last_block_slot(sol_neon_ix.block_slot)
 
 
 @dataclass(frozen=True)
@@ -73,7 +75,7 @@ class NeonIndexedHolderInfo(BaseNeonIndexedObjInfo):
 
         def __str__(self):
             if self._str == '':
-                _str = str_fmt_object(self)
+                _str = str_fmt_object(dict(offset=self.offset, length=self.length))
                 object.__setattr__(self, '_str', _str)
             return self._str
 
@@ -81,19 +83,20 @@ class NeonIndexedHolderInfo(BaseNeonIndexedObjInfo):
             return (self.length > 0) and (len(self.data) == self.length)
 
     class Key:
-        def __init__(self, account: str, neon_tx_sig: str) -> None:
-            self._account = account
+        def __init__(self, acct: str, neon_tx_sig: str) -> None:
+            self._acct = acct
+
             if neon_tx_sig[:2] == '0x':
                 neon_tx_sig = neon_tx_sig[2:]
             self._neon_tx_sig = neon_tx_sig.lower()
-            self._value = f'{account}:{self._neon_tx_sig}'
+            self._value = f'{self._acct}:{self._neon_tx_sig}'
 
         def __str__(self) -> str:
-            return self._value
+            return self.value
 
         @property
         def account(self) -> str:
-            return self._account
+            return self._acct
 
         @property
         def neon_tx_sig(self) -> str:
@@ -110,8 +113,8 @@ class NeonIndexedHolderInfo(BaseNeonIndexedObjInfo):
         self._data = bytes()
 
     @property
-    def key(self) -> str:
-        return self._key.value
+    def key(self) -> NeonIndexedHolderInfo.Key:
+        return self._key
 
     @property
     def neon_tx_sig(self) -> str:
@@ -145,14 +148,6 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
         Canceled = 2
         Done = 3
 
-    class Type(IntEnum):
-        Unknown = 0
-        Single = 0x1f
-        SingleFromAccount = 0x2a
-        IterFromData = 0x20
-        IterFromAccount = 0x21
-        IterFromAccountWoChainId = 0x22
-
     class Key:
         def __init__(self, sol_neon_ix: SolNeonIxReceiptInfo) -> None:
             neon_tx_sig = sol_neon_ix.neon_tx_sig
@@ -170,37 +165,37 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
         def value(self) -> str:
             return self._value
 
-    def __init__(self, tx_type: NeonIndexedTxInfo.Type, key: NeonIndexedTxInfo.Key, neon_tx: NeonTxInfo,
-                 holder_account: str, iter_blocked_account: Iterator[str]):
+    def __init__(self, ix_code: EvmIxCode, key: NeonIndexedTxInfo.Key, neon_tx: NeonTxInfo,
+                 holder_acct: str, iter_blocked_acct: Iterator[str]):
         super().__init__()
         assert not key.is_empty()
 
         self._key = key
         self._neon_receipt = NeonTxReceiptInfo(neon_tx, NeonTxResultInfo())
-        self._tx_type = tx_type
-        self._holder_account = holder_account
-        self._blocked_account_list = list(iter_blocked_account)
+        self._ix_code = ix_code
+        self._holder_acct = holder_acct
+        self._blocked_acct_list = list(iter_blocked_acct)
         self._status = NeonIndexedTxInfo.Status.InProgress
         self._neon_event_list: List[NeonLogTxEvent] = list()
 
     @property
     def holder_account(self) -> str:
-        return self._holder_account
+        return self._holder_acct
 
     @property
     def blocked_account_cnt(self) -> int:
-        return len(self._blocked_account_list)
+        return len(self._blocked_acct_list)
 
     def iter_blocked_account(self) -> Iterator[str]:
-        return iter(self._blocked_account_list)
+        return iter(self._blocked_acct_list)
 
     @property
-    def key(self) -> str:
-        return self._key.value
+    def key(self) -> NeonIndexedTxInfo.Key:
+        return self._key
 
     @property
-    def tx_type(self) -> NeonIndexedTxInfo.Type:
-        return self._tx_type
+    def ix_code(self) -> EvmIxCode:
+        return self._ix_code
 
     @property
     def neon_tx(self) -> NeonTxInfo:
@@ -216,15 +211,15 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
 
     def set_status(self, value: NeonIndexedTxInfo.Status, block_slot: int) -> None:
         self._status = value
-        self._set_last_block_slot(block_slot)
+        self.set_last_block_slot(block_slot)
 
     def set_neon_tx(self, neon_tx: NeonTxInfo, holder: NeonIndexedHolderInfo) -> None:
         assert not self._neon_receipt.neon_tx.is_valid()
         assert neon_tx.is_valid()
 
         self._neon_receipt.set_neon_tx(neon_tx)
-        self._set_start_block_slot(holder.start_block_slot)
-        self._set_last_block_slot(holder.last_block_slot)
+        self.set_start_block_slot(holder.start_block_slot)
+        self.set_last_block_slot(holder.last_block_slot)
 
     def add_neon_event(self, event: NeonLogTxEvent) -> None:
         self._neon_event_list.append(event)
@@ -299,17 +294,20 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
 class NeonIndexedBlockInfo:
     def __init__(self, sol_block: SolBlockInfo):
         self._sol_block = sol_block
+        self._min_block_slot = self._sol_block.block_slot
         self._is_completed = False
 
         self._neon_holder_dict: Dict[str, NeonIndexedHolderInfo] = dict()
-        self._neon_tx_dict: Dict[str, NeonIndexedTxInfo] = dict()
+        self._modified_neon_acct_set: Set[str] = set()
+        self._stalled_neon_holder_set: Set[str] = set()
 
+        self._neon_tx_dict: Dict[str, NeonIndexedTxInfo] = dict()
         self._done_neon_tx_list: List[NeonIndexedTxInfo] = list()
 
         self._sol_neon_ix_list: List[SolNeonIxReceiptInfo] = list()
         self._sol_tx_cost_list: List[SolTxCostInfo] = list()
 
-        self._stat_neon_tx_dict: Dict[NeonIndexedTxInfo.Type, NeonTxStatData] = dict()
+        self._stat_neon_tx_dict: Dict[EvmIxCode, NeonTxStatData] = dict()
 
     def __str__(self) -> str:
         return str_fmt_object(self, False)
@@ -319,7 +317,18 @@ class NeonIndexedBlockInfo:
 
         new_block = NeonIndexedBlockInfo(sol_block)
         new_block._neon_holder_dict = copy.deepcopy(self._neon_holder_dict)
+        new_block._stalled_neon_holder_set = copy.copy(self._stalled_neon_holder_set)
         new_block._neon_tx_dict = copy.deepcopy(self._neon_tx_dict)
+        return new_block
+
+    @staticmethod
+    def from_stalled_data(sol_block: SolBlockInfo,
+                          neon_holder_list: List[NeonIndexedHolderInfo]) -> NeonIndexedBlockInfo:
+        new_block = NeonIndexedBlockInfo(sol_block)
+        for holder in neon_holder_list:
+            new_block._neon_holder_dict[holder.key.value] = holder
+            new_block._stalled_neon_holder_set.add(holder.key.value)
+
         return new_block
 
     @property
@@ -338,6 +347,10 @@ class NeonIndexedBlockInfo:
     def is_completed(self) -> bool:
         return self._is_completed
 
+    @property
+    def min_block_slot(self) -> int:
+        return self._min_block_slot
+
     def set_finalized(self, value: bool) -> None:
         self._sol_block.set_finalized(value)
 
@@ -347,28 +360,30 @@ class NeonIndexedBlockInfo:
     def add_sol_tx_cost(self, sol_tx_cost: SolTxCostInfo) -> None:
         self._sol_tx_cost_list.append(sol_tx_cost)
 
-    def find_neon_tx_holder(self, account: str, sol_neon_ix: SolNeonIxReceiptInfo) -> Optional[NeonIndexedHolderInfo]:
-        key = NeonIndexedHolderInfo.Key(account, sol_neon_ix.neon_tx_sig)
+    def find_neon_tx_holder(self, acct: str, sol_neon_ix: SolNeonIxReceiptInfo) -> Optional[NeonIndexedHolderInfo]:
+        key = NeonIndexedHolderInfo.Key(acct, sol_neon_ix.neon_tx_sig)
         holder = self._neon_holder_dict.get(key.value, None)
         if holder:
             holder.add_sol_neon_ix(sol_neon_ix)
+            self._modified_neon_acct_set.add(key.account)
         return holder
 
-    def add_neon_tx_holder(self, account: str, sol_neon_ix: SolNeonIxReceiptInfo) -> Optional[NeonIndexedHolderInfo]:
-        key = NeonIndexedHolderInfo.Key(account, sol_neon_ix.neon_tx_sig)
-        assert key.value not in self._neon_holder_dict, f'the holder {key} already in use!'
+    def add_neon_tx_holder(self, acct: str, sol_neon_ix: SolNeonIxReceiptInfo) -> Optional[NeonIndexedHolderInfo]:
+        key = NeonIndexedHolderInfo.Key(acct, sol_neon_ix.neon_tx_sig)
+
+        assert key.value not in self._neon_holder_dict, f'the NeonHolder {key} already in use!'
 
         holder = NeonIndexedHolderInfo(key)
         holder.add_sol_neon_ix(sol_neon_ix)
-        self._neon_holder_dict[holder.key] = holder
+        self._neon_holder_dict[key.value] = holder
+        self._modified_neon_acct_set.add(key.account)
         return holder
 
     def _del_neon_holder(self, holder: NeonIndexedHolderInfo) -> None:
-        if not self._neon_holder_dict.pop(holder.key, None):
+        if not self._neon_holder_dict.pop(holder.key.value, None):
             LOG.warning(f'attempt to remove the not-existent {holder}')
-
-    def fail_neon_holder(self, holder: NeonIndexedHolderInfo) -> None:
-        self._del_neon_holder(holder)
+        else:
+            self._stalled_neon_holder_set.discard(holder.key.value)
 
     def done_neon_holder(self, holder: NeonIndexedHolderInfo) -> None:
         self._del_neon_holder(holder)
@@ -380,19 +395,19 @@ class NeonIndexedBlockInfo:
             tx.add_sol_neon_ix(sol_neon_ix)
         return tx
 
-    def add_neon_tx(self, tx_type: NeonIndexedTxInfo.Type, neon_tx: NeonTxInfo,
-                    holder_account: str, iter_blocked_account: Iterator[str],
+    def add_neon_tx(self, ix_code: EvmIxCode, neon_tx: NeonTxInfo,
+                    holder_acct: str, iter_blocked_acct: Iterator[str],
                     sol_neon_ix: SolNeonIxReceiptInfo) -> NeonIndexedTxInfo:
         key = NeonIndexedTxInfo.Key(sol_neon_ix)
         assert key.value not in self._neon_tx_dict, f'the tx {key} already in use!'
 
-        tx = NeonIndexedTxInfo(tx_type, key, neon_tx, holder_account, iter_blocked_account)
+        tx = NeonIndexedTxInfo(ix_code, key, neon_tx, holder_acct, iter_blocked_acct)
         tx.add_sol_neon_ix(sol_neon_ix)
-        self._neon_tx_dict[tx.key] = tx
+        self._neon_tx_dict[key.value] = tx
         return tx
 
     def _del_neon_tx(self, tx: NeonIndexedTxInfo) -> None:
-        if not self._neon_tx_dict.pop(tx.key, None):
+        if not self._neon_tx_dict.pop(tx.key.value, None):
             LOG.warning(f'attempt to remove the not-existent {tx}')
 
     def fail_neon_tx(self, tx: NeonIndexedTxInfo) -> None:
@@ -421,8 +436,14 @@ class NeonIndexedBlockInfo:
     def neon_tx_cnt(self) -> int:
         return len(self._neon_tx_dict)
 
-    def iter_neon_holder(self) -> Iterator[NeonIndexedHolderInfo]:
-        return iter(self._neon_holder_dict.values())
+    def iter_stalled_neon_holder(self) -> Generator[NeonIndexedHolderInfo, None, None]:
+        for holder_key in self._stalled_neon_holder_set:
+            holder = self._neon_holder_dict.get(holder_key, None)
+            if holder is None:
+                LOG.warning(f'cannot find the NeonHolder {holder_key}')
+                continue
+
+            yield holder
 
     @property
     def neon_holder_cnt(self) -> int:
@@ -444,41 +465,42 @@ class NeonIndexedBlockInfo:
     def iter_stat_neon_tx(self) -> Iterator[NeonTxStatData]:
         return iter(self._stat_neon_tx_dict.values())
 
-    def calc_stat(self, config: Config, op_account_set: Set[str]) -> None:
+    def _calc_stat(self, config: Config, op_acct_set: Set[str]) -> None:
         if not config.gather_statistics:
             return
 
-        def _new_stat(neon_tx_type: NeonIndexedTxInfo.Type) -> NeonTxStatData:
-            if neon_tx_type == NeonIndexedTxInfo.Type.Single:
-                type_name = 'single'
-            elif neon_tx_type == NeonIndexedTxInfo.Type.SingleFromAccount:
-                type_name = 'single-holder'
-            elif neon_tx_type == NeonIndexedTxInfo.Type.IterFromData:
-                type_name = 'iterative'
-            elif neon_tx_type == NeonIndexedTxInfo.Type.IterFromAccount:
-                type_name = 'holder'
-            elif neon_tx_type == NeonIndexedTxInfo.Type.IterFromAccountWoChainId:
-                type_name = 'wochainid'
-            else:
-                type_name = 'other'
-            new_stat = NeonTxStatData()
-            new_stat.tx_type = type_name
+        def _new_stat(new_ix_code: EvmIxCode) -> NeonTxStatData:
+            tx_type = EvmIxCodeName.get(new_ix_code)
+            new_stat = NeonTxStatData(tx_type=tx_type)
             return new_stat
 
+        def _get_ix_code() -> EvmIxCode:
+            if tx is not None:
+                return tx.ix_code
+            elif sol_neon_ix.ix_code in {EvmIxCode.HolderWrite, EvmIxCode.CancelWithHash}:
+                return EvmIxCode.TxStepFromAccount
+            return EvmIxCode(sol_neon_ix.ix_code)
+
+        prev_sol_sig = ''
         for sol_neon_ix in self._sol_neon_ix_list:
             tx = self._neon_tx_dict.get(NeonIndexedTxInfo.Key(sol_neon_ix).value, None)
-            tx_type = tx.tx_type if tx is not None else NeonIndexedTxInfo.Type.Unknown
-            is_op_sol_neon_ix = sol_neon_ix.sol_tx_cost.operator in op_account_set
-            stat = self._stat_neon_tx_dict.setdefault(tx_type, _new_stat(tx_type))
+            ix_code = _get_ix_code()
+            is_op_sol_neon_ix = False
+            stat = self._stat_neon_tx_dict.get(ix_code)
+            if stat is None:
+                stat = _new_stat(ix_code)
+                self._stat_neon_tx_dict[ix_code] = stat
 
             neon_income = 0
             if tx is not None:
                 neon_income = sol_neon_ix.neon_gas_used * tx.neon_tx.gas_price
 
             sol_spent = 0
-            if not sol_neon_ix.sol_tx_cost.is_calculated_stat:
+            sol_sig = sol_neon_ix.sol_sig
+            if sol_sig != prev_sol_sig:
+                prev_sol_sig = sol_sig
+                is_op_sol_neon_ix = sol_neon_ix.sol_tx_cost.operator in op_acct_set
                 sol_spent = sol_neon_ix.sol_tx_cost.sol_spent
-                sol_neon_ix.sol_tx_cost.set_calculated_stat()
                 stat.sol_spent += sol_spent
                 stat.sol_tx_cnt += 1
 
@@ -500,7 +522,23 @@ class NeonIndexedBlockInfo:
                     if is_op_sol_neon_ix:
                         stat.op_completed_neon_tx_cnt += 1
 
-    def fill_log_info_list(self) -> None:
+    def done_block(self, config: Config, op_acct_set: Set[str]) -> None:
+        self._check_stalled_holders(config)
+        self._check_stalled_txs(config)
+
+        self._finalize_log_list()
+        self._calc_stat(config, op_acct_set)
+
+    def complete_block(self) -> None:
+        self._is_completed = True
+        for tx in self._done_neon_tx_list:
+            self._del_neon_tx(tx)
+
+        self._done_neon_tx_list.clear()
+        self._sol_tx_cost_list.clear()
+        self._sol_neon_ix_list.clear()
+
+    def _finalize_log_list(self) -> None:
         log_idx = 0
         tx_idx = 0
         sum_gas_used = 0
@@ -510,24 +548,33 @@ class NeonIndexedBlockInfo:
             log_idx = tx.neon_tx_res.set_block_info(self._sol_block, tx.neon_tx.sig, tx_idx, log_idx, sum_gas_used)
             tx_idx += 1
 
-    def complete_block(self, config: Config) -> None:
-        for tx in self._done_neon_tx_list:
-            self._del_neon_tx(tx)
+    def _check_stalled_holders(self, config: Config) -> None:
+        block_slot = self.block_slot
+        stalled_block_slot = block_slot - config.holder_timeout
 
-        self._is_completed = True
-        self._done_neon_tx_list.clear()
-        self._sol_tx_cost_list.clear()
-        self._sol_neon_ix_list.clear()
+        for holder in list(self._neon_holder_dict.values()):
+            if (holder.last_block_slot < block_slot) and (holder.account in self._modified_neon_acct_set):
+                LOG.warning(f'skip the stalled neon holder (< {block_slot}): {holder}')
+            elif stalled_block_slot > holder.start_block_slot:
+                if holder.key.value in self._stalled_neon_holder_set:
+                    continue
 
+                LOG.warning(f'mark stalled neon holder: {holder}')
+                self._stalled_neon_holder_set.add(holder.key.value)
+            elif self._min_block_slot > holder.start_block_slot:
+                self._min_block_slot = holder.start_block_slot
+
+        self._modified_neon_acct_set.clear()
+
+    def _check_stalled_txs(self, config: Config) -> None:
         for tx in list(self.iter_neon_tx()):
-            if abs(self.block_slot - tx.last_block_slot) > config.skip_cancel_timeout:
+            if tx.status not in {NeonIndexedTxInfo.Status.Done, NeonIndexedTxInfo.Status.Canceled}:
+                continue
+            elif abs(self.block_slot - tx.last_block_slot) > config.skip_cancel_timeout:
                 LOG.debug(f'skip to cancel {tx}')
                 self.fail_neon_tx(tx)
-
-        for holder in list(self.iter_neon_holder()):
-            if abs(self.block_slot - holder.last_block_slot) > config.holder_timeout:
-                LOG.debug(f'skip the neon holder {holder}')
-                self.fail_neon_holder(holder)
+            elif self._min_block_slot > tx.start_block_slot:
+                self._min_block_slot = tx.start_block_slot
 
 
 class NeonIndexedBlockDict:
@@ -605,13 +652,6 @@ class NeonIndexedBlockDict:
     def find_neon_block(self, block_slot: int) -> Optional[NeonIndexedBlockInfo]:
         return self._neon_block_dict.get(block_slot, None)
 
-    @staticmethod
-    def _find_min_block_slot(neon_block: NeonIndexedBlockInfo) -> int:
-        min_block_slot = neon_block.block_slot
-        for holder in neon_block.iter_neon_holder():
-            min_block_slot = min(min_block_slot, holder.start_block_slot)
-        return min_block_slot
-
     def add_neon_block(self, neon_block: NeonIndexedBlockInfo) -> None:
         if neon_block.block_slot in self._neon_block_dict:
             return
@@ -634,7 +674,7 @@ class NeonIndexedBlockDict:
 
         # LOG.debug(f'finalize block {neon_block.block_slot}')
         self._finalized_neon_block = neon_block
-        self._stat.set_min_block_slot(self._find_min_block_slot(neon_block))
+        self._stat.set_min_block_slot(neon_block.min_block_slot)
 
 
 class SolNeonTxDecoderState:
@@ -661,6 +701,7 @@ class SolNeonTxDecoderState:
 
         self._sol_tx: Optional[SolTxReceiptInfo] = None
         self._sol_tx_meta: Optional[SolTxMetaInfo] = None
+        self._sol_tx_cost: Optional[SolTxCostInfo] = None
         self._sol_neon_ix: Optional[SolNeonIxReceiptInfo] = None
 
         self._neon_block_deque: Deque[Tuple[NeonIndexedBlockInfo, bool]] = deque()
@@ -789,18 +830,27 @@ class SolNeonTxDecoderState:
     def end_range(self) -> SolTxMetaInfo:
         return SolTxMetaInfo.from_end_range(self._stop_block_slot, self._sol_commit)
 
-    def iter_sol_neon_ix(self) -> Iterator[SolNeonIxReceiptInfo]:
+    @property
+    def sol_tx_cost(self) -> SolTxCostInfo:
+        assert self._sol_tx_meta is not None
+        if self._sol_tx_cost is None:
+            self._sol_tx_cost = SolTxCostInfo.from_tx_meta(self._sol_tx_meta)
+        return self._sol_tx_cost
+
+    def iter_sol_neon_ix(self) -> Generator[SolNeonIxReceiptInfo, None, None]:
         assert self._sol_tx_meta is not None
 
         try:
-            self._sol_tx = SolTxReceiptInfo.from_tx_meta(self._sol_tx_meta)
+            sol_tx_cost = self.sol_tx_cost
+            self._sol_tx = SolTxReceiptInfo.from_tx_meta(self._sol_tx_meta, sol_tx_cost)
             for self._sol_neon_ix in self._sol_tx.iter_sol_ix(self._evm_program_id):
                 self._sol_neon_ix_cnt += 1
                 yield self._sol_neon_ix
         finally:
             self._sol_tx = None
+            self._sol_tx_cost = None
             self._sol_neon_ix = None
 
-    def iter_neon_block(self) -> Iterator[NeonIndexedBlockInfo]:
+    def iter_neon_block(self) -> Generator[NeonIndexedBlockInfo, None, None]:
         for neon_block, _ in self._neon_block_deque:
             yield neon_block
