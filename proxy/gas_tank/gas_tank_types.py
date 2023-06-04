@@ -21,8 +21,8 @@ LOG = logging.getLogger(__name__)
 
 class GasTankTxInfo(NeonIndexedTxInfo):
     def __init__(self, ix_code: EvmIxCode, key: NeonIndexedTxInfo.Key, neon_tx: NeonTxInfo,
-                 operator: str, holder: str, iter_blocked_acct: Iterator[str]):
-        super().__init__(ix_code, key, neon_tx, holder, iter_blocked_acct)
+                 operator: str, holder: str, blocked_acct_list: List[str]):
+        super().__init__(ix_code, key, neon_tx, holder, blocked_acct_list)
         self.operator = operator
         self.iterations: Dict[int, int] = {}
 
@@ -37,7 +37,8 @@ class GasTankTxInfo(NeonIndexedTxInfo):
             LOG.warning(f'Neon tx hash {neon_tx.sig} != {neon_tx_sig}')
             return None
 
-        return GasTankTxInfo(ix_code, key, neon_tx, operator, holder, iter_blocked_account)
+        blocked_account_list = list(iter_blocked_account)
+        return GasTankTxInfo(ix_code, key, neon_tx, operator, holder, blocked_account_list)
 
     def append_receipt(self, ix: SolNeonIxReceiptInfo):
         self.iterations[ix.neon_total_gas_used] = ix.neon_gas_used
@@ -63,7 +64,7 @@ class GasTankTxInfo(NeonIndexedTxInfo):
                 total_gas_used=ix.neon_tx_return.gas_used + 5000,
                 sol_sig=ix.sol_sig, idx=ix.idx, inner_idx=ix.inner_idx
             ))
-            self.set_status(GasTankTxInfo.Status.Done, ix.block_slot)
+            self.mark_done(ix.block_slot)
 
     def finalize(self):
         total_gas_used = 0

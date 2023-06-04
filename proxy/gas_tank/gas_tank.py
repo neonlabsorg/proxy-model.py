@@ -68,8 +68,8 @@ class GasTank(IndexerBase):
 
     # Method to process NeonEVM transaction extracted from the instructions
     def _process_neon_tx(self, tx_info: GasTankTxInfo) -> None:
-        if tx_info.status != GasTankTxInfo.Status.Done or tx_info.neon_tx_res.status != 1:
-            LOG.debug(f'SKIPPED {tx_info.key} status {tx_info.status} result {tx_info.neon_tx_res.status}: {tx_info}')
+        if not tx_info.is_done() or tx_info.neon_tx_res.status != 1:
+            LOG.debug(f'SKIPPED {tx_info.key} result {tx_info.neon_tx_res.status}: {tx_info}')
             return
 
         try:
@@ -143,7 +143,7 @@ class GasTank(IndexerBase):
         holder.add_sol_neon_ix(sol_neon_ix)
 
     def _process_step_ix(self, sol_neon_ix: SolNeonIxReceiptInfo, ix_code: EvmIxCode) -> None:
-        key = GasTankTxInfo.Key(sol_neon_ix)
+        key = GasTankTxInfo.Key(sol_neon_ix.neon_tx_sig)
         tx_info = self._neon_processed_tx_dict.get(key.value, None)
         if tx_info is not None:
             tx_info.append_receipt(sol_neon_ix)
@@ -166,7 +166,7 @@ class GasTank(IndexerBase):
         tx_info.append_receipt(sol_neon_ix)
 
         if ix_code == EvmIxCode.TxExecFromAccount:
-            if tx_info.status != GasTankTxInfo.Status.Done:
+            if not tx_info.is_done():
                 LOG.warning('no tx_return for single call')
             else:
                 self._process_neon_tx(tx_info)
@@ -180,21 +180,21 @@ class GasTank(IndexerBase):
 
         tx_info = GasTankTxInfo.create_tx_info(
             sol_neon_ix.neon_tx_sig, sol_neon_ix.ix_data[5:],
-            EvmIxCode.TxExecFromData, GasTankTxInfo.Key(sol_neon_ix),
+            EvmIxCode.TxExecFromData, GasTankTxInfo.Key(sol_neon_ix.neon_tx_sig),
             sol_neon_ix.sol_tx_cost.operator, '', iter(())
         )
         if tx_info is None:
             return
         tx_info.append_receipt(sol_neon_ix)
 
-        if tx_info.status != GasTankTxInfo.Status.Done:
+        if not tx_info.is_done():
             LOG.warning('no tx_return for single call')
             return
 
         self._process_neon_tx(tx_info)
 
     def _process_step_nochain_id_ix(self, sol_neon_ix: SolNeonIxReceiptInfo) -> None:
-        key = GasTankTxInfo.Key(sol_neon_ix)
+        key = GasTankTxInfo.Key(sol_neon_ix.neon_tx_sig)
         tx_info = self._neon_processed_tx_dict.get(key.value, None)
         if tx_info is None:
             first_blocked_account = 6
@@ -215,12 +215,12 @@ class GasTank(IndexerBase):
         tx_info.append_receipt(sol_neon_ix)
 
     def _process_cancel(self, sol_neon_ix: SolNeonIxReceiptInfo) -> None:
-        key = GasTankTxInfo.Key(sol_neon_ix)
+        key = GasTankTxInfo.Key(sol_neon_ix.neon_tx_sig)
         tx_info = self._neon_processed_tx_dict.get(key.value, None)
         if tx_info is None:
             LOG.warning(f'cancel unknown tx {key}')
             return
-        tx_info.set_status(GasTankTxInfo.Status.Canceled, sol_neon_ix.block_slot)
+        tx_info.mark_done(sol_neon_ix.block_slot)
 
     def _process_finalized_tx_list(self, block_slot: int) -> None:
         if self._last_finalized_slot >= block_slot:
@@ -229,7 +229,7 @@ class GasTank(IndexerBase):
         self._last_finalized_slot = block_slot
         finalized_tx_list = [
             k for k, v in self._neon_processed_tx_dict.items() if
-            v.status != GasTankTxInfo.Status.InProgress and v.last_block_slot < block_slot
+            v.is_done() and v.last_block_slot < block_slot
         ]
         if not len(finalized_tx_list):
             return
@@ -366,17 +366,17 @@ class GasTank(IndexerBase):
         # transaction processing after restart the gas-tank service. See `_process_neon_ix`
         # for more information.
 
-        stalled_block_slot = self._sol_tx_collector.last_block_slot - self._config.holder_timeout
+        stuck_block_slot = self._sol_tx_collector.last_block_slot - self._config.stuck_object_blockout
 
         for holder in list(self._neon_holder_dict.values()):
-            if holder.last_block_slot < stalled_block_slot:
+            if holder.last_block_slot < stuck_block_slot:
                 LOG.info(f'Outdated holder {holder.key}. Drop it.')
                 self._neon_holder_dict.pop(holder.key.value)
             else:
                 self._latest_gas_tank_slot = min(self._latest_gas_tank_slot, holder.start_block_slot)
 
         for tx in list(self._neon_processed_tx_dict.values()):
-            if tx.status == GasTankTxInfo.Status.InProgress and tx.last_block_slot < stalled_block_slot:
+            if not tx.is_done() and tx.last_block_slot < stuck_block_slot:
                 tx_info = self._neon_processed_tx_dict.pop(tx.key.value)
                 LOG.warning(f'Lost tx {tx_info.key}. Drop it.')
             else:

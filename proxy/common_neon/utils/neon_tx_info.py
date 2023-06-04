@@ -1,14 +1,14 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Dict, Any
 from eth_utils import big_endian_to_int
 
-from dataclasses import dataclass
+import dataclasses
 
 from .utils import str_fmt_object
 from .eth_proto import NeonTx
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class NeonTxInfo:
     addr: Optional[str] = None
     sig: str = ''
@@ -31,6 +31,10 @@ class NeonTxInfo:
         if self._str == '':
             object.__setattr__(self, '_str', str_fmt_object(self))
         return self._str
+
+    @staticmethod
+    def from_dict(src: Dict[str, Any]) -> NeonTxInfo:
+        return NeonTxInfo(**src)
 
     @staticmethod
     def from_neon_tx(tx: NeonTx) -> NeonTxInfo:
@@ -77,6 +81,9 @@ class NeonTxInfo:
     @staticmethod
     def from_neon_sig(neon_sig: str) -> NeonTxInfo:
         return NeonTxInfo(sig=neon_sig)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return dataclasses.asdict(self)
 
     def is_valid(self):
         return (self.addr is not None) and (self.error is None)

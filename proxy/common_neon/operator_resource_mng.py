@@ -209,9 +209,6 @@ class OpResMng:
         return ident
 
     def _commit_stat(self) -> None:
-        if not self._config.gather_statistics:
-            return
-
         stat = NeonOpResStatData(
             secret_cnt=len(self._secret_list),
             total_res_cnt=len(self._res_ident_set),

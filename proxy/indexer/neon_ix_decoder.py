@@ -57,7 +57,7 @@ class DummyIxDecoder:
         """ Assembling of the object has been successfully finished. """
         block = self.state.neon_block
         if isinstance(indexed_obj, NeonIndexedTxInfo):
-            block.done_neon_tx(indexed_obj, self.state.sol_neon_ix)
+            block.done_neon_tx(indexed_obj)
         elif isinstance(indexed_obj, NeonIndexedHolderInfo):
             block.done_neon_holder(indexed_obj)
         LOG.debug(f'decoding done: {msg} - {indexed_obj}')
@@ -358,7 +358,7 @@ class BaseTxStepIxDecoder(BaseTxIxDecoder):
 
         if ix.is_already_finalized and (not tx.neon_tx_res.is_valid()):
             tx.neon_tx_res.set_lost_res(1)  # unknown gas usage
-            LOG.warning(f'set lost result')
+            LOG.warning('set lost result')
             self._decoding_done(tx, 'complete by lost result')
 
 

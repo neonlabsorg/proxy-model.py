@@ -199,17 +199,15 @@
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_solana_transaction_signatures_sig ON solana_transaction_signatures(block_slot);
 
-    CREATE TABLE IF NOT EXISTS stalled_neon_holders (
-        account TEXT,
-        neon_sig TEXT,
+    CREATE TABLE IF NOT EXISTS stuck_neon_holders (
         block_slot BIGINT,
-
-        start_block_slot BIGINT,
-        last_block_slot BIGINT,
-
-        data_size INT,
-        data TEXT
+        json_data_list TEXT
     );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_stuck_neon_holders_block ON stuck_neon_holders(block_slot);
 
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_stalled_neon_holders_account_neon_sig ON stalled_neon_holders(account, neon_sig);
-    CREATE INDEX IF NOT EXISTS idx_stalled_neon_holders_block ON stalled_neon_holders(block_slot);
+    CREATE TABLE IF NOT EXISTS stuck_neon_transactions (
+        is_finalized BOOLEAN,
+        block_slot BIGINT,
+        json_data_list TEXT
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_stuck_neon_transactions_block ON stuck_neon_transactions(is_finalized, block_slot);

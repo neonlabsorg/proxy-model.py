@@ -62,11 +62,6 @@ class SolTxMetaInfo:
     _req_id: str
 
     @staticmethod
-    def from_end_range(block_slot: int, postfix: str) -> SolTxMetaInfo:
-        ident = SolTxSigSlotInfo(block_slot=block_slot, sol_sig=f'end-{postfix}')
-        return SolTxMetaInfo(ident, block_slot, ident.sol_sig, dict(), None, None, None, '', '', '')
-
-    @staticmethod
     def from_tx_receipt(block_slot: int, tx_receipt: Dict[str, Any]) -> SolTxMetaInfo:
         sol_sig = tx_receipt['transaction']['signatures'][0]
         sol_sig_slot = SolTxSigSlotInfo(sol_sig=sol_sig, block_slot=block_slot)

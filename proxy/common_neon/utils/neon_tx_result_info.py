@@ -1,6 +1,8 @@
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass
+from __future__ import annotations
 
+from typing import List, Dict, Any, Optional
+
+import dataclasses
 import logging
 
 from .solana_block import SolBlockInfo
@@ -11,7 +13,7 @@ from .evm_log_decoder import NeonLogTxEvent
 LOG = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclasses.dataclass(frozen=True)
 class NeonTxResultInfo:
     block_slot: Optional[int] = None
     block_hash: Optional[str] = None
@@ -33,13 +35,21 @@ class NeonTxResultInfo:
     is_canceled = False
     _str = ''
 
+    @staticmethod
+    def from_dict(src: Dict[str, Any]) -> NeonTxResultInfo:
+        return NeonTxResultInfo(**src)
+
     def __post_init__(self):
-        object.__setattr__(self, 'log_list', [])
+        if self.log_list is None:
+            object.__setattr__(self, 'log_list', [])
 
     def __str__(self) -> str:
         if self._str == '':
             object.__setattr__(self, '_str', str_fmt_object(self))
         return self._str
+
+    def as_dict(self) -> Dict[str, Any]:
+        return dataclasses.asdict(self)
 
     def add_event(self, event: NeonLogTxEvent) -> None:
         if self.block_slot is not None:
