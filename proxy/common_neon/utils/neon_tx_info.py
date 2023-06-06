@@ -34,7 +34,9 @@ class NeonTxInfo:
 
     @staticmethod
     def from_dict(src: Dict[str, Any]) -> NeonTxInfo:
-        return NeonTxInfo(**src)
+        field_list = dataclasses.fields(NeonTxInfo)
+        dst = {k.name: src.pop(k.name) for k in field_list}
+        return NeonTxInfo(**dst)
 
     @staticmethod
     def from_neon_tx(tx: NeonTx) -> NeonTxInfo:

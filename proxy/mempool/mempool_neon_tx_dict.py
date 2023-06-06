@@ -5,16 +5,17 @@ from collections import deque
 from dataclasses import dataclass
 from typing import Dict, Deque, Union, Optional
 
+from ..common_neon.config import Config
 from ..common_neon.errors import EthereumError
 from ..common_neon.utils.eth_proto import NeonTx
-from ..common_neon.config import Config
+from ..common_neon.utils.neon_tx_info import NeonTxInfo
 
 
 class MPTxDict:
     @dataclass(frozen=True)
     class _Item:
         last_time: int
-        neon_tx: NeonTx
+        neon_tx: NeonTxInfo
         error: Optional[EthereumError]
 
     def __init__(self, config: Config):
@@ -33,11 +34,12 @@ class MPTxDict:
         now = self._get_time()
         error = EthereumError(str(exc)) if exc is not None else None
 
+        neon_tx = NeonTxInfo.from_neon_tx(neon_tx)
         item = MPTxDict._Item(last_time=now, neon_tx=neon_tx, error=error)
         self._neon_tx_queue.append(item)
-        self._neon_tx_dict[neon_tx.hex_tx_sig] = item
+        self._neon_tx_dict[neon_tx.sig] = item
 
-    def get(self, neon_sig: str) -> Union[NeonTx, EthereumError, None]:
+    def get(self, neon_sig: str) -> Union[NeonTxInfo, EthereumError, None]:
         item = self._neon_tx_dict.get(neon_sig, None)
         if item is None:
             return item
@@ -52,4 +54,4 @@ class MPTxDict:
         last_time = max(self._get_time() - self.clear_time_sec, 0)
         while (len(self._neon_tx_queue) > 0) and (self._neon_tx_queue[0].last_time < last_time):
             item = self._neon_tx_queue.popleft()
-            self._neon_tx_dict.pop(item.neon_tx.hex_tx_sig, None)
+            self._neon_tx_dict.pop(item.neon_tx.sig, None)

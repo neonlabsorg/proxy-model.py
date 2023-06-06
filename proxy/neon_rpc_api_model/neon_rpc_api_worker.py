@@ -817,15 +817,16 @@ class NeonRpcApiWorker:
 
         neon_tx_receipt: NeonTxReceiptInfo = self._db.get_tx_by_neon_sig(neon_sig)
         if neon_tx_receipt is None:
-            neon_tx: Union[NeonTx, EthereumError, None] = self._mempool_client.get_pending_tx_by_hash(
-                get_req_id_from_log(), neon_sig)
+            neon_tx: Union[NeonTxInfo, EthereumError, None] = self._mempool_client.get_pending_tx_by_hash(
+                get_req_id_from_log(), neon_sig
+            )
             if neon_tx is None:
                 LOG.debug("Not found receipt")
                 return None
             elif isinstance(neon_tx, EthereumError):
                 raise neon_tx
 
-            neon_tx_receipt = NeonTxReceiptInfo(NeonTxInfo.from_neon_tx(neon_tx), NeonTxResultInfo())
+            neon_tx_receipt = NeonTxReceiptInfo(neon_tx, NeonTxResultInfo())
         return self._get_transaction(neon_tx_receipt)
 
     def eth_getCode(self, account: str, tag: Union[str, int]) -> str:

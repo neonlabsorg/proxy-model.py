@@ -2,6 +2,7 @@ import asyncio
 import logging
 import math
 import time
+
 from collections import deque
 from typing import List, Tuple, Optional, Any, Dict, cast, Generator, Union, Deque
 
@@ -29,7 +30,7 @@ from ..common_neon.elf_params import ElfParams
 from ..common_neon.errors import EthereumError
 from ..common_neon.operator_resource_info import OpResIdent
 from ..common_neon.operator_resource_mng import OpResMng
-from ..common_neon.utils.eth_proto import NeonTx
+from ..common_neon.utils.neon_tx_info import NeonTxInfo
 from ..common_neon.utils.json_logger import logging_context
 
 from ..statistic.data import NeonTxBeginCode, NeonTxBeginData, NeonTxEndCode, NeonTxEndData
@@ -131,10 +132,10 @@ class MemPool:
     def get_last_tx_nonce(self, sender_addr: str) -> int:
         return self._tx_schedule.get_last_tx_nonce(sender_addr)
 
-    def get_pending_tx_by_hash(self, tx_hash: str) -> Union[NeonTx, EthereumError, None]:
+    def get_pending_tx_by_hash(self, tx_hash: str) -> Union[NeonTxInfo, EthereumError, None]:
         neon_tx = self._tx_schedule.get_pending_tx_by_hash(tx_hash)
         if neon_tx is not None:
-            return neon_tx
+            return NeonTxInfo.from_neon_tx(neon_tx)
         return self._completed_tx_dict.get(tx_hash)
 
     def get_gas_price(self) -> Optional[MPGasPriceResult]:

@@ -12,6 +12,7 @@ from ..common_neon.operator_resource_info import OpResIdent
 from ..common_neon.solana_tx import SolPubKey
 from ..common_neon.utils import str_fmt_object
 from ..common_neon.utils.eth_proto import NeonTx
+from ..common_neon.utils.neon_tx_info import NeonTxInfo
 
 
 @dataclass
@@ -34,6 +35,7 @@ class MPRequestType(IntEnum):
     GetALTList = 9
     DeactivateALTList = 10
     CloseALTList = 11
+    GetStuckTxList = 12
     Unspecified = 255
 
 
@@ -206,6 +208,12 @@ class MPCloseALTListRequest(MPRequest):
         self.type = MPRequestType.CloseALTList
 
 
+@dataclass
+class MPGetStuckTxListRequest(MPRequest):
+    def __post_init__(self):
+        self.type = MPRequestType.GetStuckTxList
+
+
 class MPTxExecResultCode(IntEnum):
     Done = 0
     Reschedule = 1
@@ -277,6 +285,17 @@ class MPOpResInitResult:
 class MPALTListResult:
     block_height: int
     alt_info_list: List[MPALTInfo]
+
+
+@dataclass(frozen=True)
+class MPStuckTxInfo:
+    neon_tx: NeonTxInfo
+    account: str
+
+
+@dataclass(frozen=True)
+class MPGetStuckTxListResponse:
+    stuck_tx_list: List[MPStuckTxInfo]
 
 
 @dataclass(frozen=True)
