@@ -40,6 +40,7 @@ class NeonTxBeginCode(Enum):
     Failed = enum_auto()
     Started = enum_auto()
     Restarted = enum_auto()
+    Pushed = enum_auto()
 
 
 @dataclass

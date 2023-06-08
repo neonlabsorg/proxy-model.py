@@ -23,23 +23,26 @@ class MPTxDict:
         self._neon_tx_queue: Deque[MPTxDict._Item] = deque()
         self.clear_time_sec: int = config.mempool_cache_life_sec
 
+    def __contains__(self, neon_sig: str) -> bool:
+        return neon_sig in self._neon_tx_dict
+
     @staticmethod
     def _get_time() -> int:
         return math.ceil(time.time())
 
-    def add(self, neon_tx: NeonTx, exc: Optional[BaseException]) -> None:
+    def done_tx(self, neon_tx: NeonTx, exc: Optional[BaseException]) -> None:
         if neon_tx.hex_tx_sig in self._neon_tx_dict:
             return
 
         now = self._get_time()
         error = EthereumError(str(exc)) if exc is not None else None
 
-        neon_tx = NeonTxInfo.from_neon_tx(neon_tx)
-        item = MPTxDict._Item(last_time=now, neon_tx=neon_tx, error=error)
+        neon_tx_info = NeonTxInfo.from_neon_tx(neon_tx)
+        item = MPTxDict._Item(last_time=now, neon_tx=neon_tx_info, error=error)
         self._neon_tx_queue.append(item)
         self._neon_tx_dict[neon_tx.sig] = item
 
-    def get(self, neon_sig: str) -> Union[NeonTxInfo, EthereumError, None]:
+    def get_tx(self, neon_sig: str) -> Union[NeonTxInfo, EthereumError, None]:
         item = self._neon_tx_dict.get(neon_sig, None)
         if item is None:
             return item

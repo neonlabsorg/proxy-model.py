@@ -16,6 +16,7 @@ from .mempool_api import (
 )
 
 from .mempool_neon_tx_dict import MPTxDict
+from .mempool_stuck_tx_dict import MPStuckTxDict
 from .mempool_periodic_task_elf_params import MPElfParamDictTaskLoop
 from .mempool_periodic_task_free_alt_queue import MPFreeALTQueueTaskLoop
 from .mempool_periodic_task_gas_price import MPGasPriceTaskLoop
@@ -58,6 +59,7 @@ class MemPool:
         self._executor_mng = executor_mng
         self._op_res_mng = op_res_mng
         self._completed_tx_dict = MPTxDict(config)
+        self._stuck_tx_dict = MPStuckTxDict(self._completed_tx_dict)
         self._stat_client = stat_client
 
         self._elf_param_dict_task_loop = MPElfParamDictTaskLoop(executor_mng)
@@ -105,7 +107,7 @@ class MemPool:
 
     async def schedule_mp_tx_request(self, tx: MPTxRequest) -> MPTxSendResult:
         try:
-            if self._completed_tx_dict.get(tx.sig) is not None:
+            if self._completed_tx_dict.get_tx(tx.sig) is not None:
                 LOG.debug('Tx is already processed')
                 return MPTxSendResult(MPTxSendResultCode.AlreadyKnown, state_tx_cnt=None)
 
@@ -136,7 +138,7 @@ class MemPool:
         neon_tx = self._tx_schedule.get_pending_tx_by_hash(tx_hash)
         if neon_tx is not None:
             return NeonTxInfo.from_neon_tx(neon_tx)
-        return self._completed_tx_dict.get(tx_hash)
+        return self._completed_tx_dict.get_tx(tx_hash)
 
     def get_gas_price(self) -> Optional[MPGasPriceResult]:
         return self._gas_price
@@ -149,19 +151,9 @@ class MemPool:
         return elf_params.elf_param_dict
 
     async def _enqueue_tx_request(self) -> NeonTxBeginCode:
-        code = NeonTxBeginCode.Restarted
-        try:
-            tx = self._acquire_rescheduled_tx()
-            if tx is None:
-                code = NeonTxBeginCode.Started
-                tx = self._acquire_scheduled_tx()
-
-            if tx is None:
-                return NeonTxBeginCode.Failed
-
-        except BaseException as exc:
-            LOG.error('Failed to get tx for execution', exc_info=exc)
-            return NeonTxBeginCode.Failed
+        code, tx = self._acquire_tx()
+        if tx is None:
+            return code
 
         with logging_context(req_id=tx.req_id):
             try:
@@ -174,33 +166,70 @@ class MemPool:
                 self._on_reschedule_tx(tx)
                 return NeonTxBeginCode.Failed
 
-    def _acquire_rescheduled_tx(self) -> Optional[MPTxExecRequest]:
+    def _acquire_tx(self) -> Tuple[NeonTxBeginCode, Optional[MPTxExecRequest]]:
+        try:
+            code, tx = self._acquire_stuck_tx()
+            if tx is not None:
+                return code, tx
+
+            code, tx = self._acquire_rescheduled_tx()
+            if tx is not None:
+                return code, tx
+
+            return self._acquire_scheduled_tx()
+
+        except BaseException as exc:
+            LOG.error('Failed to get tx for execution', exc_info=exc)
+
+        return NeonTxBeginCode.Failed, None
+
+    def _acquire_stuck_tx(self) -> Tuple[NeonTxBeginCode, Optional[MPTxExecRequest]]:
+        while True:
+            stuck_tx = self._stuck_tx_dict.peek_tx()
+            if stuck_tx is None:
+                return NeonTxBeginCode.Failed, None
+
+            if not self._tx_schedule.drop_stuck_tx(stuck_tx.neon_sig):
+                self._stuck_tx_dict.skip_tx(stuck_tx)
+                continue
+
+            MPTxExecRequest =
+
+            with logging_context(req_id=tx.req_id):
+                LOG.debug('Got tx from stuck queue')
+            self._stuck_tx_dict.acquire_tx(stuck_tx)
+            return tx
+
+    def _acquire_rescheduled_tx(self) -> Tuple[NeonTxBeginCode, Optional[MPTxExecRequest]]:
         if len(self._rescheduled_tx_queue) == 0:
-            return None
+            return NeonTxBeginCode.Failed, None
 
         tx = self._rescheduled_tx_queue[0]
         tx = self._attach_resource_to_tx(tx)
         if tx is None:
-            return None
+            return NeonTxBeginCode.Failed, None
 
         with logging_context(req_id=tx.req_id):
             LOG.debug('Got tx from rescheduling queue')
+
         self._rescheduled_tx_queue.popleft()
-        return tx
+        return NeonTxBeginCode.Restarted, tx
 
-    def _acquire_scheduled_tx(self) -> Optional[MPTxRequest]:
-        tx = self._tx_schedule.peek_tx()
-        if (tx is None) or (tx.gas_price < self._gas_price.min_gas_price):
-            return None
-
-        tx = self._attach_resource_to_tx(tx)
+    def _acquire_scheduled_tx(self, tx: Optional[MPTxRequest] = None) -> Tuple[NeonTxBeginCode, Optional[MPTxExecRequest]]:
         if tx is None:
-            return None
+            tx = self._tx_schedule.peek_top_tx()
+            if (tx is None) or (tx.gas_price < self._gas_price.min_gas_price):
+                return NeonTxBeginCode.Failed, None
+
+            tx = self._attach_resource_to_tx(tx)
+            if tx is None:
+                return NeonTxBeginCode.Failed, None
 
         with logging_context(req_id=tx.req_id):
             LOG.debug('Got tx from schedule')
-        self._tx_schedule.acquire_tx()
-        return tx
+            self._tx_schedule.acquire_tx(tx)
+
+        return NeonTxBeginCode.Started, tx
 
     def _attach_resource_to_tx(self, tx: MPTxRequest) -> Optional[MPTxExecRequest]:
         with logging_context(req_id=tx.req_id):
@@ -355,14 +384,14 @@ class MemPool:
     def _on_done_tx(self, tx: MPTxRequest) -> NeonTxEndCode:
         self._release_resource(tx)
         self._tx_schedule.done_tx(tx)
-        self._completed_tx_dict.add(tx.neon_tx, None)
+        self._completed_tx_dict.done_tx(tx.neon_tx, None)
         LOG.debug(f'Request {tx.sig} is done')
         return NeonTxEndCode.Done
 
     def _on_fail_tx(self, tx: MPTxRequest, exc: Optional[BaseException]) -> NeonTxEndCode:
         self._release_resource(tx)
         self._tx_schedule.fail_tx(tx)
-        self._completed_tx_dict.add(tx.neon_tx, exc)
+        self._completed_tx_dict.done_tx(tx.neon_tx, exc)
         LOG.debug(f'Request {tx.sig} is failed - dropped away')
         return NeonTxEndCode.Failed
 

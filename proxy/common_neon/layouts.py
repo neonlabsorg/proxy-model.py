@@ -175,7 +175,7 @@ class HolderAccountInfo:
             owner=SolPubKey.from_bytes(storage.owner),
             neon_tx_sig='0x' + storage.neon_tx_sig.hex().lower(),
             neon_tx_data=None,
-            caller=storage.caller.hex(),
+            caller='0x' + storage.caller.hex(),
             gas_limit=int.from_bytes(storage.gas_limit, "little"),
             gas_price=int.from_bytes(storage.gas_price, "little"),
             gas_used=int.from_bytes(storage.gas_used, "little"),

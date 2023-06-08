@@ -81,6 +81,7 @@ class MPTxRequest(MPRequest):
 
 @dataclass
 class MPTxExecRequest(MPTxRequest):
+    neon_tx_info: Optional[NeonTxInfo] = None
     elf_param_dict: Dict[str, str] = None
     res_ident: OpResIdent = None
 
@@ -90,7 +91,9 @@ class MPTxExecRequest(MPTxRequest):
             req_id=tx.req_id,
             neon_tx=tx.neon_tx,
             neon_tx_exec_cfg=tx.neon_tx_exec_cfg,
+            gas_price=tx.gas_price,
             start_time=tx.start_time,
+            neon_tx_info=None,
             elf_param_dict=elf_param_dict,
             res_ident=res_ident
         )
@@ -291,6 +294,13 @@ class MPALTListResult:
 class MPStuckTxInfo:
     neon_tx: NeonTxInfo
     account: str
+
+    def __str__(self) -> str:
+        return str_fmt_object(self)
+
+    @property
+    def neon_sig(self) -> str:
+        return self.neon_tx.sig
 
 
 @dataclass(frozen=True)
