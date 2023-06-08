@@ -6,8 +6,6 @@ from typing import Dict, List, Optional
 from .mempool_api import MPStuckTxInfo
 from .mempool_neon_tx_dict import MPTxDict
 
-from ..common_neon.utils.neon_tx_info import NeonTxInfo
-
 LOG = logging.getLogger(__name__)
 
 
@@ -21,7 +19,7 @@ class MPStuckTxDict:
     def add_external_tx_list(self, stuck_tx_list: List[MPStuckTxInfo]) -> None:
         tx_dict: Dict[str, MPStuckTxInfo] = dict()
         for stuck_tx in stuck_tx_list:
-            neon_sig = stuck_tx.neon_sig
+            neon_sig = stuck_tx.sig
             if neon_sig in self._own_tx_dict:
                 continue
             elif neon_sig in self._processed_tx_dict:
@@ -35,7 +33,7 @@ class MPStuckTxDict:
         self._external_tx_dict = tx_dict
 
     def add_own_tx(self, stuck_tx: MPStuckTxInfo) -> None:
-        neon_sig = stuck_tx.neon_sig
+        neon_sig = stuck_tx.sig
         if neon_sig in self._processed_tx_dict:
             return
         elif neon_sig in self._own_tx_dict:
@@ -70,7 +68,7 @@ class MPStuckTxDict:
         return stuck_tx
 
     def skip_tx(self, stuck_tx: MPStuckTxInfo) -> None:
-        neon_sig = stuck_tx.neon_sig
+        neon_sig = stuck_tx.sig
         if self._own_tx_dict.pop(neon_sig, None):
             pass
         elif self._external_tx_dict.pop(neon_sig, None):

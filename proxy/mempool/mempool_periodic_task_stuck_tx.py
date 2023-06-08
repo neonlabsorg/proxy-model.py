@@ -1,24 +1,23 @@
 from .executor_mng import MPExecutorMng
 from .mempool_api import MPGetStuckTxListRequest, MPGetStuckTxListResponse, MPStuckTxInfo
 from .mempool_periodic_task import MPPeriodicTaskLoop
-from .mempool_schedule import MPTxSchedule
+from .mempool_stuck_tx_dict import MPStuckTxDict
 
 
 class MPStuckTxListLoop(MPPeriodicTaskLoop[MPGetStuckTxListRequest, MPGetStuckTxListResponse]):
-    def __init__(self, executor_mng: MPExecutorMng, ) -> None:
+    def __init__(self, executor_mng: MPExecutorMng, stuck_tx_dict: MPStuckTxDict) -> None:
         super().__init__(name='stuck_tx_list', sleep_sec=self._one_block_sec, executor_mng=executor_mng)
-        self._tx_schedule = tx_schedule
+        self._stuck_tx_dict = stuck_tx_dict
 
     def _submit_request(self) -> None:
-        paused_sender_list = self._tx_schedule.paused_sender_list
-        if len(paused_sender_list) == 0:
-            return
-
-        mp_req = MPSenderTxCntRequest(req_id=self._generate_req_id(), sender_list=paused_sender_list)
+        mp_req = MPGetStuckTxListRequest(req_id=self._generate_req_id())
         self._submit_request_to_executor(mp_req)
 
-    def _process_error(self, _: MPSenderTxCntRequest) -> None:
+    def _process_error(self, _: MPGetStuckTxListResponse) -> None:
         pass
 
-    async def _process_result(self, _: MPSenderTxCntRequest, mp_res: MPSenderTxCntResult) -> None:
-        self._tx_schedule.set_sender_state_tx_cnt_list(mp_res.sender_tx_cnt_list)
+    async def _process_result(self, _: MPGetStuckTxListRequest, mp_res: MPGetStuckTxListResponse) -> None:
+        if not len(mp_res.stuck_tx_list):
+            return
+
+        self._stuck_tx_dict.add_external_tx_list(mp_res.stuck_tx_list)

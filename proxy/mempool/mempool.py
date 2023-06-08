@@ -23,6 +23,7 @@ from .mempool_periodic_task_gas_price import MPGasPriceTaskLoop
 from .mempool_periodic_task_op_res import MPInitOpResTaskLoop
 from .mempool_periodic_task_op_res_list import MPOpResGetListTaskLoop
 from .mempool_periodic_task_sender_tx_cnt import MPSenderTxCntTaskLoop
+from .mempool_periodic_task_stuck_tx import MPStuckTxListLoop
 from .mempool_schedule import MPTxSchedule
 
 from ..common_neon.config import Config
@@ -72,6 +73,7 @@ class MemPool:
         self._op_res_get_list_task_loop = MPOpResGetListTaskLoop(executor_mng, self._op_res_mng)
         self._op_res_init_task_loop = MPInitOpResTaskLoop(executor_mng, self._op_res_mng)
         self._free_alt_queue_task_loop = MPFreeALTQueueTaskLoop(executor_mng, self._op_res_mng)
+        self._stuck_list_task_loop = MPStuckTxListLoop(executor_mng, )
 
         self._process_tx_result_task_loop = asyncio.get_event_loop().create_task(self._process_tx_result_loop())
         self._process_tx_schedule_task_loop = asyncio.get_event_loop().create_task(self._process_tx_schedule_loop())
@@ -189,11 +191,12 @@ class MemPool:
             if stuck_tx is None:
                 return NeonTxBeginCode.Failed, None
 
-            if not self._tx_schedule.drop_stuck_tx(stuck_tx.neon_sig):
+            if not self._tx_schedule.drop_stuck_tx(stuck_tx.sig):
                 self._stuck_tx_dict.skip_tx(stuck_tx)
                 continue
 
-            MPTxExecRequest =
+            NeonTxExecCfg
+            MPTxExecRequest.from_stuck_tx(stuck_tx)
 
             with logging_context(req_id=tx.req_id):
                 LOG.debug('Got tx from stuck queue')
@@ -237,7 +240,7 @@ class MemPool:
             if resource is None:
                 return None
 
-        return MPTxExecRequest.clone(tx, resource, ElfParams().elf_param_dict)
+        return MPTxExecRequest.from_tx_req(tx, resource, ElfParams().elf_param_dict)
 
     async def _process_tx_schedule_loop(self):
         while (not self.has_gas_price()) and (not ElfParams().has_params()):

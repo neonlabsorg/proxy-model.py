@@ -48,6 +48,29 @@ class MPRequest:
         return str_fmt_object(self)
 
 
+@dataclass(frozen=True)
+class MPStuckTxInfo:
+    neon_tx: NeonTxInfo
+    account: str
+    start_time: int
+
+    def __str__(self) -> str:
+        return str_fmt_object(self)
+
+    @property
+    def sig(self) -> str:
+        return self.neon_tx.sig
+
+    @property
+    def req_id(self) -> str:
+        return self.neon_tx.sig[2:8]
+
+
+@dataclass(frozen=True)
+class MPGetStuckTxListResponse:
+    stuck_tx_list: List[MPStuckTxInfo]
+
+
 @dataclass
 class MPTxRequest(MPRequest):
     neon_tx: Optional[NeonTx] = None
@@ -55,13 +78,19 @@ class MPTxRequest(MPRequest):
     gas_price: int = 0
     start_time: int = 0
 
-    def __post_init__(self):
-        self.type = MPRequestType.SendTransaction
+    @staticmethod
+    def from_neon_tx(req_id: str, neon_tx: NeonTx, neon_tx_exec_cfg: NeonTxExecCfg) -> MPTxRequest:
+        return MPTxRequest(
+            req_id=req_id,
+            type=MPRequestType.SendTransaction,
+            neon_tx=neon_tx,
+            neon_tx_exec_cfg=neon_tx_exec_cfg,
+            gas_price=neon_tx.gasPrice,
+            start_time=time.time_ns()
+        )
 
-        if self.gas_price == 0:
-            self.gas_price = self.neon_tx.gasPrice
-        if self.start_time == 0:
-            self.start_time = time.time_ns()
+    def __post_init__(self):
+        self.type = MPRequestType.GetPendingTxNonce
 
     @property
     def sig(self) -> str:
@@ -86,18 +115,41 @@ class MPTxExecRequest(MPTxRequest):
     res_ident: OpResIdent = None
 
     @staticmethod
-    def clone(tx: MPTxRequest, res_ident: OpResIdent, elf_param_dict: Dict[str, str]):
-        req = MPTxExecRequest(
+    def from_tx_req(tx: MPTxRequest,
+                    res_ident: OpResIdent,
+                    elf_param_dict: Dict[str, str]) -> MPTxExecRequest:
+        return MPTxExecRequest(
             req_id=tx.req_id,
             neon_tx=tx.neon_tx,
+            neon_tx_info=None,
             neon_tx_exec_cfg=tx.neon_tx_exec_cfg,
             gas_price=tx.gas_price,
             start_time=tx.start_time,
-            neon_tx_info=None,
             elf_param_dict=elf_param_dict,
             res_ident=res_ident
         )
-        return req
+
+    @staticmethod
+    def from_stuck_tx(stuck_tx: MPStuckTxInfo,
+                      neon_tx_exec_cfg: NeonTxExecCfg,
+                      res_ident: OpResIdent,
+                      elf_param_dict: Dict[str, str]) -> MPTxExecRequest:
+        return MPTxExecRequest(
+            req_id=stuck_tx.req_id,
+            neon_tx=None,
+            neon_tx_info=stuck_tx.neon_tx,
+            neon_tx_exec_cfg=neon_tx_exec_cfg,
+            gas_price=stuck_tx.neon_tx.gas_price,
+            start_time=stuck_tx.start_time,
+            res_ident=res_ident,
+            elf_param_dict=elf_param_dict
+        )
+
+    @property
+    def sig(self) -> str:
+        if self.neon_tx_info is None:
+            return self.neon_tx.hex_tx_sig
+        return self.neon_tx_info.sig
 
 
 MPTxRequestList = List[MPTxRequest]
@@ -288,24 +340,6 @@ class MPOpResInitResult:
 class MPALTListResult:
     block_height: int
     alt_info_list: List[MPALTInfo]
-
-
-@dataclass(frozen=True)
-class MPStuckTxInfo:
-    neon_tx: NeonTxInfo
-    account: str
-
-    def __str__(self) -> str:
-        return str_fmt_object(self)
-
-    @property
-    def neon_sig(self) -> str:
-        return self.neon_tx.sig
-
-
-@dataclass(frozen=True)
-class MPGetStuckTxListResponse:
-    stuck_tx_list: List[MPStuckTxInfo]
 
 
 @dataclass(frozen=True)

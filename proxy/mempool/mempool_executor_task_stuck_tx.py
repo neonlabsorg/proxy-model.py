@@ -22,7 +22,11 @@ class MPExecutorStuckTxListTask(MPExecutorBaseTask):
         block_slot = self._solana.get_block_slot(SolCommit.Finalized)
         src_tx_list: List[Dict[str, Any]] = self._stuck_txs_db.get_tx_list(False, block_slot)
         dst_tx_list = [
-            MPStuckTxInfo(neon_tx=NeonTxInfo.from_dict(d), account=d['account'])
+            MPStuckTxInfo(
+                neon_tx=NeonTxInfo.from_dict(d),
+                account=d['account'],
+                start_time=d['start_slot_time']
+            )
             for d in src_tx_list
         ]
         return MPGetStuckTxListResponse(stuck_tx_list=dst_tx_list)
