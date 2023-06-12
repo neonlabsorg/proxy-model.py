@@ -7,7 +7,6 @@ from typing import Dict, Deque, Union, Optional
 
 from ..common_neon.config import Config
 from ..common_neon.errors import EthereumError
-from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.utils.neon_tx_info import NeonTxInfo
 
 
@@ -30,17 +29,16 @@ class MPTxDict:
     def _get_time() -> int:
         return math.ceil(time.time())
 
-    def done_tx(self, neon_tx: NeonTx, exc: Optional[BaseException]) -> None:
-        if neon_tx.hex_tx_sig in self._neon_tx_dict:
+    def done_tx(self, neon_tx_info: NeonTxInfo, exc: Optional[BaseException]) -> None:
+        if neon_tx_info.sig in self._neon_tx_dict:
             return
 
         now = self._get_time()
         error = EthereumError(str(exc)) if exc is not None else None
 
-        neon_tx_info = NeonTxInfo.from_neon_tx(neon_tx)
         item = MPTxDict._Item(last_time=now, neon_tx=neon_tx_info, error=error)
         self._neon_tx_queue.append(item)
-        self._neon_tx_dict[neon_tx.sig] = item
+        self._neon_tx_dict[neon_tx_info.sig] = item
 
     def get_tx(self, neon_sig: str) -> Union[NeonTxInfo, EthereumError, None]:
         item = self._neon_tx_dict.get(neon_sig, None)

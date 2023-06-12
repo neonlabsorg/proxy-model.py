@@ -51,7 +51,7 @@ class HolderHandler:
         if op_res_info is None:
             return
 
-        holder_info = self._solana.get_holder_account_info(op_res_info.holder)
+        holder_info = self._solana.get_holder_account_info(op_res_info.holder_account)
         if holder_info is not None:
             print(f'Holder account {args.operator_key}:{args.holder_id} already exist', file=sys.stderr)
             return
@@ -68,9 +68,9 @@ class HolderHandler:
         if op_res_info is None:
             return
 
-        holder_info = self._solana.get_holder_account_info(op_res_info.holder)
+        holder_info = self._solana.get_holder_account_info(op_res_info.holder_account)
         if holder_info is None:
-            print(f'Holder account {args.holder_account} does not exist', file=sys.stderr)
+            print(f'Holder account {op_res_info.holder_account} does not exist', file=sys.stderr)
             return
 
         if holder_info.tag not in {FINALIZED_HOLDER_TAG, HOLDER_TAG}:

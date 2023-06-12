@@ -14,6 +14,7 @@ from ..common_neon.config import Config
 from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.solana_tx import SolPubKey
 from ..common_neon.utils.eth_proto import NeonTx
+from ..common_neon.utils.neon_tx_info import NeonTxInfo
 from ..common_neon.elf_params import ElfParams
 from ..common_neon.operator_resource_mng import OpResMng
 
@@ -53,6 +54,7 @@ def create_transfer_mp_request(*, req_id: str, nonce: int, gas: int, gas_price: 
     mp_tx_req = MPTxExecRequest(
         req_id=req_id,
         neon_tx=neon_tx,
+        neon_tx_info=NeonTxInfo.from_neon_tx(neon_tx),
         neon_tx_exec_cfg=neon_tx_exec_cfg,
         res_ident=OpResIdent(evm_program_id=evm_program_id, public_key='test', private_key=b'test'),
         elf_param_dict=ElfParams().elf_param_dict

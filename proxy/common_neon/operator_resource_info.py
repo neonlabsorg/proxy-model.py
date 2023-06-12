@@ -43,7 +43,7 @@ class OpResInfo:
     ident: OpResIdent
     signer: SolAccount
 
-    holder: SolPubKey
+    holder_account: SolPubKey
     holder_seed: bytes
 
     neon_address: NeonAddress
@@ -54,10 +54,16 @@ class OpResInfo:
         assert ident.public_key == str(signer.pubkey())
 
         holder_seed = perm_account_seed(b'holder-', ident.res_id)
-        holder = account_with_seed(ident.evm_program_id, signer.pubkey(), holder_seed)
+        holder_acct = account_with_seed(ident.evm_program_id, signer.pubkey(), holder_seed)
         neon_address = NeonAddress.from_private_key(signer.secret())
 
-        return OpResInfo(ident=ident, signer=signer, holder=holder, holder_seed=holder_seed, neon_address=neon_address)
+        return OpResInfo(
+            ident=ident,
+            signer=signer,
+            holder_account=holder_acct,
+            holder_seed=holder_seed,
+            neon_address=neon_address
+        )
 
     def __str__(self) -> str:
         return str(self.ident)

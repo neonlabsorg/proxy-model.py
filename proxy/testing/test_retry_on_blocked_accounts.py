@@ -123,7 +123,7 @@ class BlockedTest(unittest.TestCase):
             SolAccountMeta(pubkey=self.caller, is_signer=False, is_writable=True)
         ])
 
-        neon_ix_builder.init_iterative(resource.holder)
+        neon_ix_builder.init_iterative(resource.holder_account)
 
         sol_tx = SolLegacyTx(
             name='BlockAccount',

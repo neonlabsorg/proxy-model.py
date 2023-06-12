@@ -357,7 +357,7 @@ class BaseTxStepIxDecoder(BaseTxIxDecoder):
             cnt += 1
 
         if ix.is_already_finalized and (not tx.neon_tx_res.is_valid()):
-            tx.neon_tx_res.set_lost_res(1)  # unknown gas usage
+            tx.neon_tx_res.set_lost_res()
             LOG.warning('set lost result')
             self._decoding_done(tx, 'complete by lost result')
 

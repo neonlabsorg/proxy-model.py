@@ -506,7 +506,7 @@ class NeonIndexedBlockInfo:
                 continue
 
             LOG.warning(f'set lost result: {tx}')
-            tx.neon_tx_res.set_lost_res(1)
+            tx.neon_tx_res.set_lost_res()
             self.done_neon_tx(tx)
 
         self._failed_neon_tx_set = failed_tx_set

@@ -91,7 +91,7 @@ class NeonTxResultInfo:
         self.set_res(status=0, gas_used=gas_used)
         object.__setattr__(self, 'is_canceled', True)
 
-    def set_lost_res(self, gas_used: int) -> None:
+    def set_lost_res(self, gas_used=1) -> None:
         self.set_res(status=0, gas_used=gas_used)
         object.__setattr__(self, 'is_completed', False)
 

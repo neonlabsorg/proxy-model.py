@@ -146,7 +146,7 @@ class CancelTest(unittest.TestCase):
         neon_ix_builder.init_neon_tx(neon_tx)
         neon_ix_builder.init_neon_account_list(neon_account_list)
 
-        neon_ix_builder.init_iterative(resource.holder)
+        neon_ix_builder.init_iterative(resource.holder_account)
 
         return neon_ix_builder, resource.signer
 

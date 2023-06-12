@@ -5,7 +5,7 @@ import enum
 
 from typing import List, Dict, Set, Optional, Tuple, Generator, cast
 
-from ..common_neon.utils.eth_proto import NeonTx
+from ..common_neon.utils.neon_tx_info import NeonTxInfo
 from ..common_neon.utils.json_logger import logging_context
 
 from .mempool_api import MPTxRequest, MPTxSendResult, MPTxSendResultCode, MPSenderTxCntData, MPTxRequestList
@@ -410,9 +410,9 @@ class MPTxSchedule:
         sender_pool = self._find_sender_pool(sender_address)
         return None if sender_pool is None else sender_pool.last_nonce
 
-    def get_pending_tx_by_hash(self, neon_sig: str) -> Optional[NeonTx]:
+    def get_pending_tx_by_hash(self, neon_sig: str) -> Optional[NeonTxInfo]:
         tx = self._tx_dict.get_tx_by_hash(neon_sig)
-        return None if tx is None else tx.neon_tx
+        return None if tx is None else tx.neon_tx_info
 
     def _done_tx(self, tx: MPTxRequest) -> None:
         LOG.debug(f'Done tx {tx.sig} in pool {tx.sender_address}')

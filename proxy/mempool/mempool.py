@@ -11,7 +11,7 @@ from .executor_mng import MPExecutorMng
 from .mempool_api import (
     MPRequest, MPRequestType, MPTask, MPTxRequestList,
     MPResult, MPGasPriceResult,
-    MPTxExecResult, MPTxExecResultCode, MPTxRequest, MPTxExecRequest,
+    MPTxExecResult, MPTxExecResultCode, MPTxRequest, MPTxExecRequest, MPStuckTxInfo,
     MPTxSendResult, MPTxSendResultCode
 )
 
@@ -29,7 +29,7 @@ from .mempool_schedule import MPTxSchedule
 from ..common_neon.config import Config
 from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.elf_params import ElfParams
-from ..common_neon.errors import EthereumError
+from ..common_neon.errors import EthereumError, StuckTxError
 from ..common_neon.operator_resource_info import OpResIdent
 from ..common_neon.operator_resource_mng import OpResMng
 from ..common_neon.utils.neon_tx_info import NeonTxInfo
@@ -71,9 +71,9 @@ class MemPool:
             return
 
         self._op_res_get_list_task_loop = MPOpResGetListTaskLoop(executor_mng, self._op_res_mng)
-        self._op_res_init_task_loop = MPInitOpResTaskLoop(executor_mng, self._op_res_mng)
+        self._op_res_init_task_loop = MPInitOpResTaskLoop(executor_mng, self._op_res_mng, self._stuck_tx_dict)
         self._free_alt_queue_task_loop = MPFreeALTQueueTaskLoop(executor_mng, self._op_res_mng)
-        self._stuck_list_task_loop = MPStuckTxListLoop(executor_mng, )
+        self._stuck_list_task_loop = MPStuckTxListLoop(executor_mng, self._stuck_tx_dict)
 
         self._process_tx_result_task_loop = asyncio.get_event_loop().create_task(self._process_tx_result_loop())
         self._process_tx_schedule_task_loop = asyncio.get_event_loop().create_task(self._process_tx_schedule_loop())
@@ -137,9 +137,9 @@ class MemPool:
         return self._tx_schedule.get_last_tx_nonce(sender_addr)
 
     def get_pending_tx_by_hash(self, tx_hash: str) -> Union[NeonTxInfo, EthereumError, None]:
-        neon_tx = self._tx_schedule.get_pending_tx_by_hash(tx_hash)
-        if neon_tx is not None:
-            return NeonTxInfo.from_neon_tx(neon_tx)
+        neon_tx_info = self._tx_schedule.get_pending_tx_by_hash(tx_hash)
+        if neon_tx_info is not None:
+            return neon_tx_info
         return self._completed_tx_dict.get_tx(tx_hash)
 
     def get_gas_price(self) -> Optional[MPGasPriceResult]:
@@ -195,13 +195,14 @@ class MemPool:
                 self._stuck_tx_dict.skip_tx(stuck_tx)
                 continue
 
-            NeonTxExecCfg
-            MPTxExecRequest.from_stuck_tx(stuck_tx)
+            tx = self._attach_resource_to_tx(stuck_tx)
+            if tx is None:
+                return NeonTxBeginCode.Failed, None
 
             with logging_context(req_id=tx.req_id):
                 LOG.debug('Got tx from stuck queue')
             self._stuck_tx_dict.acquire_tx(stuck_tx)
-            return tx
+            return NeonTxBeginCode.Pushed, tx
 
     def _acquire_rescheduled_tx(self) -> Tuple[NeonTxBeginCode, Optional[MPTxExecRequest]]:
         if len(self._rescheduled_tx_queue) == 0:
@@ -234,13 +235,18 @@ class MemPool:
 
         return NeonTxBeginCode.Started, tx
 
-    def _attach_resource_to_tx(self, tx: MPTxRequest) -> Optional[MPTxExecRequest]:
+    def _attach_resource_to_tx(self, tx: Union[MPTxRequest, MPStuckTxInfo]) -> Optional[MPTxExecRequest]:
         with logging_context(req_id=tx.req_id):
-            resource = self._op_res_mng.get_resource(tx.sig)
-            if resource is None:
+            res_ident = self._op_res_mng.get_resource(tx.sig)
+            if res_ident is None:
                 return None
 
-        return MPTxExecRequest.from_tx_req(tx, resource, ElfParams().elf_param_dict)
+        if not isinstance(tx, MPStuckTxInfo):
+            return MPTxExecRequest.from_tx_req(tx, res_ident, ElfParams().elf_param_dict)
+
+        neon_exec_cfg = NeonTxExecCfg()
+        neon_exec_cfg.set_holder_account(False, tx.holder_account)
+        return MPTxExecRequest.from_stuck_tx(tx, neon_exec_cfg, res_ident, ElfParams().elf_param_dict)
 
     async def _process_tx_schedule_loop(self):
         while (not self.has_gas_price()) and (not ElfParams().has_params()):
@@ -339,6 +345,9 @@ class MemPool:
         elif mp_tx_res.code == MPTxExecResultCode.Failed:
             exc = cast(BaseException, mp_tx_res.data)
             return self._on_fail_tx(tx, exc)
+        elif mp_tx_res.code == MPTxExecResultCode.StuckTx:
+            exc = cast(StuckTxError, mp_tx_res.data)
+            return self._on_stuck_tx(tx, exc)
         elif mp_tx_res.code == MPTxExecResultCode.Done:
             return self._on_done_tx(tx)
 
@@ -360,7 +369,7 @@ class MemPool:
         LOG.debug('Got reschedule status')
         asyncio.get_event_loop().create_task(self._reschedule_tx(tx))
         cfg = tx.neon_tx_exec_cfg
-        if cfg.is_holder_used() or cfg.has_completed_receipt():
+        if cfg.is_resource_used() or cfg.has_completed_receipt():
             return NeonTxEndCode.Rescheduled
         return NeonTxEndCode.Canceled
 
@@ -373,7 +382,7 @@ class MemPool:
         with logging_context(req_id=tx.req_id):
             try:
                 cfg = tx.neon_tx_exec_cfg
-                if cfg.is_holder_used() or cfg.has_completed_receipt():
+                if cfg.is_resource_used() or cfg.has_completed_receipt():
                     self._op_res_mng.update_resource(tx.sig)
                     self._rescheduled_tx_queue.append(tx)
                 else:
@@ -387,16 +396,24 @@ class MemPool:
     def _on_done_tx(self, tx: MPTxRequest) -> NeonTxEndCode:
         self._release_resource(tx)
         self._tx_schedule.done_tx(tx)
-        self._completed_tx_dict.done_tx(tx.neon_tx, None)
+        self._completed_tx_dict.done_tx(tx.neon_tx_info, None)
         LOG.debug(f'Request {tx.sig} is done')
         return NeonTxEndCode.Done
 
     def _on_fail_tx(self, tx: MPTxRequest, exc: Optional[BaseException]) -> NeonTxEndCode:
         self._release_resource(tx)
         self._tx_schedule.fail_tx(tx)
-        self._completed_tx_dict.done_tx(tx.neon_tx, exc)
+        self._completed_tx_dict.done_tx(tx.neon_tx_info, exc)
         LOG.debug(f'Request {tx.sig} is failed - dropped away')
         return NeonTxEndCode.Failed
+
+    def _on_stuck_tx(self, tx: MPTxRequest, stuck_tx_error: StuckTxError) -> NeonTxEndCode:
+        self._release_resource(tx)
+
+        self._op_res_mng.get_resource(stuck_tx_error.neon_tx_sig)
+        self._stuck_tx_dict.add_own_tx(stuck_tx_error)
+
+        return self._on_cancel_tx(tx)
 
     def _release_resource(self, tx: MPTxRequest) -> Optional[OpResIdent]:
         resource = self._op_res_mng.release_resource(tx.sig)

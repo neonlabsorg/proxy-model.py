@@ -84,6 +84,9 @@ class NeonTxInfo:
     def from_neon_sig(neon_sig: str) -> NeonTxInfo:
         return NeonTxInfo(sig=neon_sig)
 
+    def has_chain_id(self) -> bool:
+        return self.v not in (0, 27, 28)
+
     def as_dict(self) -> Dict[str, Any]:
         return dataclasses.asdict(self)
 

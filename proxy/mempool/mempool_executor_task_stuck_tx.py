@@ -6,7 +6,7 @@ from .mempool_executor_task_base import MPExecutorBaseTask
 from ..common_neon.config import Config
 from ..common_neon.db.db_connect import DBConnection
 from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.solana_tx import SolCommit
+from ..common_neon.solana_tx import SolCommit, SolPubKey
 from ..common_neon.utils.neon_tx_info import NeonTxInfo
 
 from ..indexer.stuck_neon_txs_db import StuckNeonTxsDB
@@ -23,10 +23,11 @@ class MPExecutorStuckTxListTask(MPExecutorBaseTask):
         src_tx_list: List[Dict[str, Any]] = self._stuck_txs_db.get_tx_list(False, block_slot)
         dst_tx_list = [
             MPStuckTxInfo(
-                neon_tx=NeonTxInfo.from_dict(d),
-                account=d['account'],
-                start_time=d['start_slot_time']
+                neon_tx=NeonTxInfo.from_dict(tx),
+                holder_account=SolPubKey.from_string(tx['holder_account']),
+                alt_addr_list=list(),
+                start_time=tx['start_slot_time'],
             )
-            for d in src_tx_list
+            for tx in src_tx_list
         ]
         return MPGetStuckTxListResponse(stuck_tx_list=dst_tx_list)
