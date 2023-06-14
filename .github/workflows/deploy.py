@@ -79,15 +79,21 @@ def check_neon_evm_tag(tag):
             f"evm_loader image with {tag} tag isn't found. Response: {response.json()}")
 
 
-def update_neon_evm_tag_if_same_branch_exists(branch, neon_evm_tag):
-    if branch != "":
+def is_neon_evm_branch_exist(branch):
+    if branch != "" and branch is not None:
         proxy_branches_obj = requests.get(
             "https://api.github.com/repos/neonlabsorg/neon-evm/branches?per_page=100").json()
         proxy_branches = [item["name"] for item in proxy_branches_obj]
+
         if branch in proxy_branches:
             click.echo(f"The same branch {branch} is found in neon_evm repository")
-            neon_evm_tag = branch.split('/')[-1]
-            check_neon_evm_tag(neon_evm_tag)
+            return True
+    else:
+        return False
+def update_neon_evm_tag_if_same_branch_exists(branch, neon_evm_tag):
+    if is_neon_evm_branch_exist(branch):
+        neon_evm_tag = branch.split('/')[-1]
+        check_neon_evm_tag(neon_evm_tag)
     return neon_evm_tag
 
 
@@ -453,6 +459,36 @@ def trigger_dapps_tests(solana_ip, proxy_ip, token):
         click.echo("Dapps tests passed successfully")
     else:
         raise RuntimeError(f"Dapps tests failed! See {link}")
+
+
+@cli.command(help="Download test contracts from neon-evm repo")
+@click.option("--head_ref_branch", help="neon_evm branch name")
+def contracts(head_ref_branch):
+    branch = head_ref_branch if is_neon_evm_branch_exist(head_ref_branch) else "develop"
+    click.echo(f"Contracts would be downloaded from {branch} branch")
+
+    contract_path = pathlib.Path.cwd() / "contracts"
+    pathlib.Path(contract_path).mkdir(parents=True, exist_ok=True)
+
+    response = requests.get(
+        f"https://api.github.com/repos/neonlabsorg/neon-evm/contents/evm_loader/solidity?ref={branch}"
+    )
+    if response.status_code != 200:
+        raise click.ClickException(
+            f"The code is not 200. Responce: {response.json()}"
+        )
+
+    for item in response.json():
+        r = requests.get(
+            f"https://raw.githubusercontent.com/neonlabsorg/neon-evm/{branch}/evm_loader/solidity/{item['name']}"
+        )
+        if r.status_code == 200:
+            with open(contract_path / item["name"], "wb") as f:
+                f.write(r.content)
+        else:
+            raise click.ClickException(
+                f"The contract {item['name']} is not downloaded. Error: {r.text}"
+            )
 
 
 @cli.command(name="send_notification", help="Send notification to slack")
