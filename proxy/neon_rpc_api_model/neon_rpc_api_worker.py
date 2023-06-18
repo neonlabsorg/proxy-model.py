@@ -920,7 +920,7 @@ class NeonRpcApiWorker:
         except (Exception,):
             raise InvalidParamError(message='data is not hex string')
 
-        return keccak_256(data).hexdigest()
+        return '0x' + keccak_256(data).hexdigest()
 
     @staticmethod
     def eth_mining() -> bool:
