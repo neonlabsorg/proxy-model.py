@@ -67,10 +67,17 @@ class NeonLogTxEvent:
 
     @staticmethod
     def from_dict(src: Dict[str, Any]) -> NeonLogTxEvent:
+        src['address'] = bytes.fromhex(src['address'])
+        src['data'] = bytes.fromhex(src['data'])
+        src['topic_list'] = [bytes.fromhex(t) for t in src['topic_list']]
         return NeonLogTxEvent(**src)
 
     def as_dict(self) -> Dict[str, Any]:
-        return dataclass_asdict(self)
+        res = dataclass_asdict(self)
+        res['address'] = self.address.hex()
+        res['data'] = self.data.hex()
+        res['topic_list'] = [t.hex() for t in self.topic_list]
+        return res
 
     def is_exit_event_type(self) -> bool:
         return self.event_type in {

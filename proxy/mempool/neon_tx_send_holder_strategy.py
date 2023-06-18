@@ -16,6 +16,8 @@ class HolderNeonTxStrategy(IterativeNeonTxStrategy):
         self._prep_stage_list.append(self._write_holder_stage)
 
     def _validate(self) -> bool:
+        if self._ctx.is_stuck_tx():
+            self._write_holder_stage.validate_stuck_tx()
         return self._validate_tx_has_chainid()
 
     def _build_tx(self) -> SolLegacyTx:
@@ -37,6 +39,7 @@ class HolderNeonTxStrategy(IterativeNeonTxStrategy):
         if neon_tx_res.is_valid():
             return neon_tx_res
 
+        self._write_holder_stage.update_holder_tag()
         if self._write_holder_stage.holder_tag == FINALIZED_HOLDER_TAG:
             neon_tx_res.set_lost_res()
         return neon_tx_res

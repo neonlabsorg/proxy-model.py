@@ -11,16 +11,16 @@ class StuckNeonTxsDB(BaseDBTable):
     def __init__(self, db: DBConnection):
         super().__init__(
             db,
-            table_name='stuck_neon_txs',
+            table_name='stuck_neon_transactions',
             column_list=['is_finalized', 'block_slot', 'json_data_list'],
-            key_list=['is_finalize', 'block_slot']
+            key_list=['is_finalized', 'block_slot']
         )
 
         self._select_request = f'''
             SELECT {', '.join(['a.' + c for c in self._column_list])}
               FROM {self._table_name} AS a
              WHERE a.is_finalized = %s
-               AND a.block_slot < %s
+               AND a.block_slot > %s
         '''
 
         self._delete_request = f'''
@@ -40,8 +40,8 @@ class StuckNeonTxsDB(BaseDBTable):
         self._insert_row([is_finalized, block_slot, json_data])
 
     def get_tx_list(self, is_finalized: bool, block_slot: int) -> List[Dict[str, Any]]:
-        value_list = self._db.fetch_all(self._select_request, (is_finalized, block_slot,))
-        holder_list: List[Dict[str, Any]] = list()
-        if len(value_list):
-            holder_list = json.loads(self._get_column_value('json_data_list', value_list))
-        return holder_list
+        value_list = self._db.fetch_one(self._select_request, (is_finalized, block_slot,))
+        tx_list: List[Dict[str, Any]] = list()
+        if len(value_list) > 0:
+            tx_list = json.loads(self._get_column_value('json_data_list', value_list))
+        return tx_list

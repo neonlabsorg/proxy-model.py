@@ -27,6 +27,7 @@ class MPStuckTxDict:
             neon_tx_sig = stuck_tx.sig
             if neon_tx_sig in self._own_tx_dict:
                 self._own_tx_dict[neon_tx_sig] = stuck_tx
+
             elif neon_tx_sig in self._processed_tx_dict:
                 continue
             elif neon_tx_sig in self._completed_tx_dict:

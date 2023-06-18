@@ -717,7 +717,7 @@ class NeonRpcApiWorker:
                 'svmCyclesLimit': ix.max_bpf_cycle_cnt,
                 'svmCyclesUsed ': ix.used_bpf_cycle_cnt,
                 'neonInstructionCode': hex(ix.ix_code),
-                'neonInstructionName': EvmIxCodeName.get(ix.ix_code),
+                'neonInstructionName': EvmIxCodeName().get(ix.ix_code),
                 'neonStepLimit': ix.neon_step_cnt if ix.neon_step_cnt > 0 else None,
                 'neonAlanIncome': neon_income,
                 'neonGasUsed': ix.neon_gas_used,

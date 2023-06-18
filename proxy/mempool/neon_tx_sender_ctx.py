@@ -31,9 +31,12 @@ class NeonTxSendCtx:
         self._ix_builder.init_iterative(self.holder_account)
         if not mp_tx_req.is_stuck_tx():
             self._ix_builder.init_neon_tx(mp_tx_req.neon_tx)
+        else:
+            self._ix_builder.init_neon_tx_sig(mp_tx_req.sig)
 
         self._neon_meta_dict: Dict[str, SolAccountMeta] = dict()
-        self._build_account_list(self._neon_tx_exec_cfg.account_dict)
+        if not mp_tx_req.is_stuck_tx():
+            self._build_account_list(self._neon_tx_exec_cfg.account_dict)
 
     def _add_meta(self, pubkey: SolPubKey, is_writable: bool) -> None:
         key = str(pubkey)

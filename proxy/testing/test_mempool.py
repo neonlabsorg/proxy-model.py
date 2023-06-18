@@ -51,11 +51,13 @@ def create_transfer_mp_request(*, req_id: str, nonce: int, gas: int, gas_price: 
     neon_tx = NeonTx.from_string(bytearray(signed_tx_data.rawTransaction))
     neon_tx_exec_cfg = NeonTxExecCfg()
     neon_tx_exec_cfg.set_state_tx_cnt(0)
-    mp_tx_req = MPTxExecRequest(
-        req_id=req_id,
-        neon_tx=neon_tx,
-        neon_tx_info=NeonTxInfo.from_neon_tx(neon_tx),
-        neon_tx_exec_cfg=neon_tx_exec_cfg,
+
+    mp_tx_req = MPTxExecRequest.from_tx_req(
+        MPTxRequest.from_neon_tx(
+            req_id=req_id,
+            neon_tx=neon_tx,
+            neon_tx_exec_cfg=neon_tx_exec_cfg
+        ),
         res_ident=OpResIdent(evm_program_id=evm_program_id, public_key='test', private_key=b'test'),
         elf_param_dict=ElfParams().elf_param_dict
     )
@@ -185,6 +187,7 @@ class TestMemPool(unittest.IsolatedAsyncioTestCase):
         self._mempool._elf_param_dict_task_loop._task = task
         self._mempool._state_tx_cnt_task_loop._task = task
         self._mempool._free_alt_queue_task_loop._task = task
+        self._mempool._stuck_list_task_loop._task = task
 
     def _get_pending_tx_count(self, sender_address: str) -> int:
         sender_pool = self._mempool._tx_schedule._find_sender_pool(sender_address)
@@ -336,12 +339,12 @@ class TestMemPool(unittest.IsolatedAsyncioTestCase):
         """Checks if all mp_tx_requests are processed by the MemPool"""
         acct_count = 1_000
         from_acct_count = 90
-        nonce_count = 100
+        nonce_count = 101
         acct_list = [NeonAccount.create() for _ in range(acct_count)]
         req_list: List[MPTxExecRequest] = list()
 
         for acct_idx in range(0, from_acct_count):
-            for nonce in range(0, nonce_count):
+            for nonce in range(1, nonce_count):
                 req = create_transfer_mp_request(
                     from_acct=acct_list[acct_idx], to_acct=acct_list[randint(0, acct_count-1)],
                     req_id=str(acct_idx) + '-' + str(nonce), nonce=nonce,
@@ -352,7 +355,8 @@ class TestMemPool(unittest.IsolatedAsyncioTestCase):
         random.shuffle(req_list)
         for req in req_list:
             await self._mempool.enqueue_mp_request(req)
-        self.assertEqual(len(self._mempool._tx_schedule._tx_dict), self._mempool._tx_schedule._capacity)
+        self.assertEqual(self._mempool._tx_schedule._tx_cnt, self._mempool._tx_schedule._capacity)
+        self.assertEqual(submit_mp_request_mock.call_count, 0)
 
         is_available_mock.return_value = True
         for i in range(nonce_count):
@@ -365,6 +369,7 @@ class TestMemPool(unittest.IsolatedAsyncioTestCase):
                 update_tx_cnt_list.append(MPSenderTxCntData(sender=sender, state_tx_cnt=nonce))
             self._update_state_tx_cnt(update_tx_cnt_list)
 
+        self.assertEqual(self._mempool._tx_schedule._tx_cnt, 0)
         self.assertEqual(submit_mp_request_mock.call_count, self._mempool._tx_schedule._capacity)
 
     async def _enqueue_requests(self, req_data_list: List[Dict[str, Any]]) -> MPTxRequestList:
@@ -391,6 +396,8 @@ class TestMPSchedule(unittest.TestCase):
     @staticmethod
     def _acquire_top_tx(schedule: MPTxSchedule) -> Optional[MPTxRequest]:
         tx = schedule.peek_top_tx()
+        if tx is None:
+            return None
         return schedule.acquire_tx(tx)
 
     def test_capacity_oversized_simple(self):

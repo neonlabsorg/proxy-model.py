@@ -38,7 +38,7 @@ class StuckNeonHoldersDB(BaseDBTable):
         self._insert_row([block_slot, json_data])
 
     def get_holder_list(self, block_slot: int) -> List[Dict[str, Any]]:
-        value_list = self._db.fetch_all(self._select_request, (block_slot,))
+        value_list = self._db.fetch_one(self._select_request, (block_slot,))
         holder_list: List[Dict[str, Any]] = list()
         if len(value_list):
             holder_list = json.loads(self._get_column_value('json_data_list', value_list))

@@ -31,7 +31,7 @@ class DummyIxDecoder:
 
     @classmethod
     def name(cls) -> str:
-        return EvmIxCodeName.get(cls.ix_code(), 'UNKNOWN')
+        return EvmIxCodeName().get(cls.ix_code(), 'UNKNOWN')
 
     def __str__(self):
         if self._is_deprecated:
@@ -78,7 +78,7 @@ class BaseTxIxDecoder(DummyIxDecoder):
 
         ix = self.state.sol_neon_ix
         if ix.neon_tx_sig != neon_tx.sig:
-            self._decoding_skip(f'NeonTx.Hash "{neon_tx.sig}" != SolIx.Log.Hash "{ix.neon_tx_sig}"')
+            self._decoding_skip(f"NeonTx.Hash '{neon_tx.sig}' != SolIx.Log.Hash '{ix.neon_tx_sig}'")
             return None
 
         holder_account: Optional[str] = self._decode_holder_account()
@@ -105,11 +105,11 @@ class BaseTxIxDecoder(DummyIxDecoder):
         ix = self.state.sol_neon_ix
         neon_tx = NeonTxInfo.from_sig_data(data)
         if not neon_tx.is_valid():
-            self._decoding_skip(f'{data_name}.RLP.Error: "{neon_tx.error}"')
+            self._decoding_skip(f"{data_name}.RLP.Error: '{neon_tx.error}'")
             return None
         elif neon_tx.sig != ix.neon_tx_sig:
             # failed decoding ...
-            self._decoding_skip(f'NeonTx.Hash "{neon_tx.sig}" != SolIx.Log.Hash "{ix.neon_tx_sig}"')
+            self._decoding_skip(f"NeonTx.Hash '{neon_tx.sig}' != SolIx.Log.Hash '{ix.neon_tx_sig}'")
             return None
         return neon_tx
 
@@ -117,12 +117,12 @@ class BaseTxIxDecoder(DummyIxDecoder):
         neon_tx = self._decode_neon_tx_from_data('NeonHolder.Data', holder.data)
         if neon_tx is None:
             return None
-        elif holder.neon_tx_sig != neon_tx.sig[2:]:
+        elif holder.neon_tx_sig != neon_tx.sig:
             # failed decoding ...
-            self._decoding_skip(f'NeonTx.Hash "{neon_tx.sig}" != NeonHolder.Hash "{holder.neon_tx_sig}"')
+            self._decoding_skip(f"NeonTx.Hash '{neon_tx.sig}' != NeonHolder.Hash '{holder.neon_tx_sig}'")
             return None
 
-        self._decoding_done(holder, f'init NeonTx {neon_tx} from NeonHolder.Data')
+        self._decoding_done(holder, f'init NeonTx - {neon_tx} from NeonHolder.Data')
         return neon_tx
 
     def _decode_neon_tx_sig_from_ix_data(self, offset: int, min_len: int) -> Optional[str]:
@@ -134,7 +134,7 @@ class BaseTxIxDecoder(DummyIxDecoder):
 
         neon_tx_sig: str = '0x' + ix.ix_data[offset:(offset + 32)].hex().lower()
         if ix.neon_tx_sig != neon_tx_sig:
-            self._decoding_skip(f'NeonTx.Hash "{neon_tx_sig}" != SolIx.Log.Hash "{ix.neon_tx_sig}"')
+            self._decoding_skip(f"NeonTx.Hash '{neon_tx_sig}' != SolIx.Log.Hash '{ix.neon_tx_sig}'")
             return None
 
         return neon_tx_sig
@@ -424,7 +424,7 @@ class CancelWithHashIxDecoder(BaseTxStepIxDecoder):
 
         tx: Optional[NeonIndexedTxInfo] = self._get_neon_indexed_tx()
         if tx is None:
-            return self._decoding_skip(f'cannot find NeonTx "{neon_tx_sig}"')
+            return self._decoding_skip(f"cannot find NeonTx '{neon_tx_sig}'")
 
         if tx.neon_tx_res.is_completed:
             return self._decoding_skip(f'NeonTx {neon_tx_sig} is already has NeonReceipt')

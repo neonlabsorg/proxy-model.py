@@ -40,13 +40,14 @@ class NeonTxBeginCode(Enum):
     Failed = enum_auto()
     Started = enum_auto()
     Restarted = enum_auto()
-    Pushed = enum_auto()
+    StuckPushed = enum_auto()
 
 
 @dataclass
 class NeonTxBeginData:
     started_cnt: int = 0
     restarted_cnt: int = 0
+    stuck_pushed_cnt: int = 0
     total_cnt: int = 0
 
     def add_value(self, code: NeonTxBeginCode) -> None:
@@ -54,6 +55,8 @@ class NeonTxBeginData:
             self.started_cnt += 1
         elif code == NeonTxBeginCode.Restarted:
             self.restarted_cnt += 1
+        elif code == NeonTxBeginCode.StuckPushed:
+            self.stuck_pushed_cnt += 1
         else:
             return
         self.total_cnt += 1
@@ -66,6 +69,7 @@ class NeonTxEndCode(Enum):
     Unspecified = enum_auto()
     Unfinished = enum_auto()
     Done = enum_auto()
+    StuckDone = enum_auto()
     Failed = enum_auto()
     Rescheduled = enum_auto()
     Canceled = enum_auto()
@@ -74,6 +78,7 @@ class NeonTxEndCode(Enum):
 @dataclass
 class NeonTxEndData:
     done_cnt: int = 0
+    stuck_done_cnt: int = 0
     failed_cnt: int = 0
     rescheduled_cnt: int = 0
     canceled_cnt: int = 0
@@ -88,6 +93,8 @@ class NeonTxEndData:
             self.rescheduled_cnt += 1
         elif code == NeonTxEndCode.Canceled:
             self.canceled_cnt += 1
+        elif code == NeonTxEndCode.StuckDone:
+            self.stuck_done_cnt += 1
         else:
             return
         self.total_cnt += 1

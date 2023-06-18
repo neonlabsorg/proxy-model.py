@@ -20,7 +20,6 @@ class SimpleNeonTxStrategy(BaseNeonTxStrategy):
     def execute(self) -> NeonTxResultInfo:
         assert self.is_valid()
 
-        self._sol_tx_list_sender.clear()
         if not self._recheck_tx_list([self.name]):
             self._send_tx_list(self._build_tx_list())
 

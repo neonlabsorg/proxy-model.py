@@ -1,5 +1,7 @@
 from typing import List, Dict, Any
 
+import time
+
 from .mempool_api import MPGetStuckTxListRequest, MPGetStuckTxListResponse, MPStuckTxInfo
 from .mempool_executor_task_base import MPExecutorBaseTask
 
@@ -23,10 +25,10 @@ class MPExecutorStuckTxListTask(MPExecutorBaseTask):
         src_tx_list: List[Dict[str, Any]] = self._stuck_txs_db.get_tx_list(False, block_slot)
         dst_tx_list = [
             MPStuckTxInfo(
-                neon_tx=NeonTxInfo.from_dict(tx),
+                neon_tx=NeonTxInfo.from_dict(tx['neon_tx']),
                 holder_account=SolPubKey.from_string(tx['holder_account']),
                 alt_addr_list=list(),
-                start_time=tx['start_slot_time'],
+                start_time=time.time_ns(),
             )
             for tx in src_tx_list
         ]

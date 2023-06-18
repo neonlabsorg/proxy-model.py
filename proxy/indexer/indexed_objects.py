@@ -108,13 +108,13 @@ class NeonIndexedHolderInfo(BaseNeonIndexedObjInfo):
             return self._value
 
     def __init__(self, key: NeonIndexedHolderInfo.Key,
-                 data=bytes(),
+                 data: bytes = None,
                  data_size=0,
                  **kwargs) -> None:
         super().__init__(**kwargs)
         self._key = key
         self._data_size = data_size
-        self._data = data
+        self._data = data if data is not None else bytes()
 
     @staticmethod
     def from_dict(src: Dict[str, Any]) -> NeonIndexedHolderInfo:
@@ -184,11 +184,17 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
                  neon_tx: NeonTxInfo,
                  holder_account: str,
                  blocked_account_list: List[str],
-                 neon_tx_res=NeonTxResultInfo(),
+                 neon_tx_res: NeonTxResultInfo = None,
                  neon_event_list: List[NeonLogTxEvent] = None,
                  **kwargs):
         super().__init__(**kwargs)
         assert not key.is_empty()
+
+        if neon_tx_res is None:
+            neon_tx_res = NeonTxResultInfo()
+
+        if neon_event_list is None:
+            neon_event_list = list()
 
         self._key = key
         self._neon_receipt = NeonTxReceiptInfo(neon_tx, neon_tx_res)
@@ -196,7 +202,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
         self._holder_acct = holder_account
         self._blocked_acct_list = blocked_account_list
         self._is_done = False
-        self._neon_event_list: List[NeonLogTxEvent] = neon_event_list if neon_event_list is not None else list()
+        self._neon_event_list = neon_event_list
 
     @staticmethod
     def from_dict(src: Dict[str, Any]) -> NeonIndexedTxInfo:
@@ -544,7 +550,7 @@ class NeonIndexedBlockInfo:
             return
 
         def _new_stat(new_ix_code: EvmIxCode) -> NeonTxStatData:
-            tx_type = EvmIxCodeName.get(new_ix_code)
+            tx_type = EvmIxCodeName().get(new_ix_code)
             new_stat = NeonTxStatData(tx_type=tx_type)
             return new_stat
 
@@ -645,7 +651,7 @@ class NeonIndexedBlockInfo:
         stuck_block_slot = block_slot - config.stuck_object_blockout
 
         for tx in list(self._neon_tx_dict.values()):
-            if not tx.is_done():
+            if tx.is_done():
                 continue
 
             elif stuck_block_slot > tx.start_block_slot:

@@ -40,6 +40,7 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
     def _validate_holder_account(self) -> None:
         holder_info = self._get_holder_account_info()
         holder_acct = holder_info.holder_account
+        self._holder_tag = holder_info.tag
 
         if holder_info.tag == FINALIZED_HOLDER_TAG:
             if not self._ctx.has_sol_tx(self.name):
@@ -60,9 +61,10 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
             if builder.holder_msg != holder_info.neon_tx_data[:holder_msg_len]:
                 HolderContentError(str(holder_acct))
 
-    def _validate_stuck_tx(self) -> None:
+    def validate_stuck_tx(self) -> None:
         holder_info = self._get_holder_account_info()
         holder_acct = holder_info.holder_account
+        self._holder_tag = holder_info.tag
 
         if holder_info.tag == FINALIZED_HOLDER_TAG:
             pass
@@ -133,11 +135,14 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
 
         return [tx_list]
 
-    def update_after_emulate(self) -> None:
+    def update_holder_tag(self) -> None:
         if self._ctx.is_stuck_tx():
-            self._validate_stuck_tx()
+            self.validate_stuck_tx()
         else:
             self._validate_holder_account()
+
+    def update_after_emulate(self) -> None:
+        self.update_holder_tag()
 
 
 class ALTNeonTxPrepStage(BaseNeonTxPrepStage):
