@@ -363,7 +363,7 @@ class BaseTxStepIxDecoder(BaseTxIxDecoder):
             cnt += 1
 
         if ix.is_already_finalized and (not tx.neon_tx_res.is_valid()):
-            tx.neon_tx_res.set_lost_res()
+            tx.neon_tx_res.set_lost_res(tx.total_gas_used)
             LOG.warning('set lost result')
             self._decoding_done(tx, 'complete by lost result')
 
@@ -450,7 +450,9 @@ class CancelWithHashIxDecoder(BaseTxStepIxDecoder):
         return self._decoding_done(tx, 'cancel NeonTx')
 
     def _decode_neon_tx_return(self, tx: NeonIndexedTxInfo) -> bool:
-        tx.neon_tx_res.set_canceled_res(self.state.sol_neon_ix.neon_total_gas_used)
+        ix = self.state.sol_neon_ix
+        self._decode_neon_tx_from_holder_account(tx)
+        tx.neon_tx_res.set_canceled_res(ix.neon_total_gas_used)
         return True
 
 

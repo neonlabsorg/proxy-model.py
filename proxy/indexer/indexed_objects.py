@@ -256,6 +256,10 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
     def neon_tx_res(self) -> NeonTxResultInfo:
         return self._neon_receipt.neon_tx_res
 
+    @property
+    def total_gas_used(self) -> int:
+        return self._total_gas_used
+
     def is_done(self) -> bool:
         """Return true if indexer found the receipt for the tx"""
         return self._is_done
@@ -571,9 +575,8 @@ class NeonIndexedBlockInfo:
                 continue
 
             # Remove tx only if it appears two times in the failed set
-            LOG.warning(f'set lost result: {tx}')
-            tx.neon_tx_res.set_lost_res()
-            self.done_neon_tx(tx)
+            LOG.warning(f'skip lost: {tx}')
+            self._del_neon_tx(tx)
 
         # Replace old set with the new one - so it is not require to clone it
         self._failed_neon_tx_set = failed_tx_set
