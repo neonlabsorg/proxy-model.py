@@ -38,10 +38,16 @@ class DummyIxDecoder:
             return f'DEPRECATED 0x{self.ix_code():02x}:{self.name()} {self.state.sol_neon_ix}'
         return f'0x{self.ix_code():02x}:{self.name()} {self.state.sol_neon_ix}'
 
+    def is_stuck(self) -> bool:
+        return False
+
     def execute(self) -> bool:
         """ By default, skip the instruction without parsing. """
         ix = self.state.sol_neon_ix
         return self._decoding_skip(f'no logic to decode the instruction {self}({ix.ix_data.hex()[:8]})')
+
+    def decode_failed_neon_tx_event_list(self) -> None:
+        pass
 
     @property
     def state(self) -> SolNeonTxDecoderState:
@@ -361,6 +367,17 @@ class BaseTxStepIxDecoder(BaseTxIxDecoder):
             LOG.warning('set lost result')
             self._decoding_done(tx, 'complete by lost result')
 
+    def is_stuck(self) -> bool:
+        block = self.state.neon_block
+        if block.stuck_block_slot <= block.block_slot:
+            return False
+
+        ix = self.state.sol_neon_ix
+        tx = block.find_neon_tx(ix)
+        if tx is not None:
+            return tx.is_stuck()
+        return False
+
 
 class TxStepFromDataIxDecoder(BaseTxStepIxDecoder):
     _ix_code = EvmIxCode.TxStepFromData
@@ -447,7 +464,7 @@ class WriteHolderAccountIx(BaseTxIxDecoder):
 
         if ix.account_cnt < 1:
             return self._decoding_skip(f'no enough SolIx.Accounts(len={ix.account_cnt}) to get NeonHolder.Account')
-        holder_account = ix.get_account(0)
+        holder_acct = ix.get_account(0)
 
         # 1  byte  - ix
         # 32 bytes - tx hash
@@ -465,9 +482,9 @@ class WriteHolderAccountIx(BaseTxIxDecoder):
         if (tx is not None) and tx.neon_tx.is_valid():
             return self._decoding_success(tx, f'add surplus NeonTx.Data.Chunk to NeonTx')
 
-        holder: Optional[NeonIndexedHolderInfo] = block.find_neon_tx_holder(holder_account, ix)
+        holder: Optional[NeonIndexedHolderInfo] = block.find_neon_tx_holder(holder_acct, ix)
         if holder is None:
-            holder = block.add_neon_tx_holder(holder_account, ix)
+            holder = block.add_neon_tx_holder(holder_acct, ix)
 
         # Write the received chunk into the holder account buffer
         holder.add_data_chunk(chunk)
@@ -481,6 +498,22 @@ class WriteHolderAccountIx(BaseTxIxDecoder):
             tx.set_neon_tx(neon_tx, holder)
 
         return True
+
+    def is_stuck(self) -> bool:
+        block = self.state.neon_block
+        if block.stuck_block_slot <= block.block_slot:
+            return False
+
+        ix = self.state.sol_neon_ix
+        if ix.account_cnt < 1:
+            return False
+
+        holder_acct = ix.get_account(0)
+        holder = block.find_neon_tx_holder(holder_acct, ix)
+
+        if holder is not None:
+            return holder.is_stuck()
+        return False
 
 
 class CreateAccount3IxDecoder(DummyIxDecoder):

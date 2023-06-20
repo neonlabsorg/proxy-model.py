@@ -1,4 +1,4 @@
-from typing import Optional, Iterator, List, Dict, Any
+from typing import Optional, Iterator, List, Dict, Any, Tuple
 
 from ..common_neon.utils import NeonTxReceiptInfo, SolBlockInfo
 from ..common_neon.db.db_connect import DBConnection
@@ -82,12 +82,11 @@ class IndexerDB:
 
     def _finalize_block(self, neon_block: NeonIndexedBlockInfo) -> None:
         block_slot_list = [neon_block.block_slot]
-        if len(block_slot_list) > 0:
-            for db_table in self._db_table_list:
-                db_table.finalize_block_list(self._finalized_block_slot, block_slot_list)
+        for db_table in self._db_table_list:
+            db_table.finalize_block_list(self._finalized_block_slot, block_slot_list)
 
-        self._stuck_neon_holders_db.set_holder_list(neon_block.block_slot, neon_block.iter_stuck_neon_holder())
-        self._stuck_neon_txs_db.set_tx_list(True, neon_block.block_slot, neon_block.iter_stuck_neon_tx())
+        self._stuck_neon_holders_db.set_holder_list(neon_block.stuck_block_slot, neon_block.iter_stuck_neon_holder())
+        self._stuck_neon_txs_db.set_tx_list(True, neon_block.stuck_block_slot, neon_block.iter_stuck_neon_tx())
 
         self._finalized_block_slot = neon_block.block_slot
         self._constants_db['finalized_block_slot'] = neon_block.block_slot
@@ -176,8 +175,8 @@ class IndexerDB:
     def get_cost_list_by_sol_sig_list(self, sol_sig_list: List[str]) -> List[SolTxCostInfo]:
         return self._sol_tx_costs_db.get_cost_list_by_sol_sig_list(sol_sig_list)
 
-    def get_stuck_neon_holder_list(self, block_slot: int) -> List[Dict[str, Any]]:
+    def get_stuck_neon_holder_list(self, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
         return self._stuck_neon_holders_db.get_holder_list(block_slot)
 
-    def get_stuck_neon_tx_list(self, is_finalized: bool, block_slot: int) -> List[Dict[str, Any]]:
+    def get_stuck_neon_tx_list(self, is_finalized: bool, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
         return self._stuck_neon_txs_db.get_tx_list(is_finalized, block_slot)

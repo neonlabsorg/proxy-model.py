@@ -74,6 +74,9 @@ class Indexer(IndexerBase):
         elif self._stuck_objs_last_validate_slot == 0:
             self._stuck_objs_last_validate_slot = block_slot
             return
+        elif neon_block.stuck_block_slot > neon_block.block_slot:
+            self._stuck_objs_last_validate_slot = block_slot
+            return
 
         failed_holder_list: List[NeonIndexedHolderInfo] = list()
         for holder in neon_block.iter_stuck_neon_holder():
@@ -175,9 +178,26 @@ class Indexer(IndexerBase):
         if not state.is_finalized():
             return NeonIndexedBlockInfo(sol_block)
 
-        neon_holder_list = self._db.get_stuck_neon_holder_list(sol_block.block_slot)
-        neon_tx_list = self._db.get_stuck_neon_tx_list(True, sol_block.block_slot)
-        return NeonIndexedBlockInfo.from_stuck_data(sol_block, neon_holder_list, neon_tx_list)
+        stuck_block_slot = sol_block.block_slot
+        holder_block_slot, neon_holder_list = self._db.get_stuck_neon_holder_list(sol_block.block_slot)
+        tx_block_slot, neon_tx_list = self._db.get_stuck_neon_tx_list(True, sol_block.block_slot)
+
+        if (holder_block_slot is not None) and (tx_block_slot is not None) and (holder_block_slot != tx_block_slot):
+            LOG.warning(f'Holder stuck block {holder_block_slot} != tx stuck block {tx_block_slot}')
+            neon_holder_list.clear()
+            neon_tx_list.clear()
+        elif tx_block_slot is not None:
+            stuck_block_slot = tx_block_slot
+        elif holder_block_slot is not None:
+            stuck_block_slot = holder_block_slot
+        return NeonIndexedBlockInfo.from_stuck_data(sol_block, stuck_block_slot, neon_holder_list, neon_tx_list)
+
+    @staticmethod
+    def _clone_neon_block(state: SolNeonTxDecoderState, sol_block: SolBlockInfo) -> NeonIndexedBlockInfo:
+        if sol_block.parent_block_slot != state.neon_block.block_slot:
+            raise SolHistoryNotFound(f'Bad child {sol_block.block_slot} for the block {state.neon_block.block_slot}')
+
+        return NeonIndexedBlockInfo.from_block(state.neon_block, sol_block)
 
     def _locate_neon_block(self, state: SolNeonTxDecoderState, block_slot: int) -> Optional[NeonIndexedBlockInfo]:
         # The same block
@@ -197,12 +217,7 @@ class Indexer(IndexerBase):
                 return None
 
             if state.has_neon_block():
-                if sol_block.parent_block_slot != state.neon_block.block_slot:
-                    raise SolHistoryNotFound(
-                        f'Bad child {sol_block.block_slot} for the block {state.neon_block.block_slot}'
-                    )
-
-                neon_block = state.neon_block.clone(sol_block)
+                neon_block = self._clone_neon_block(state, sol_block)
             else:
                 neon_block = self._new_neon_block(state, sol_block)
 
@@ -230,12 +245,14 @@ class Indexer(IndexerBase):
 
                 for sol_neon_ix in state.iter_sol_neon_ix():
                     with logging_context(sol_neon_ix=sol_neon_ix.req_id):
-                        neon_block.add_sol_neon_ix(sol_neon_ix)
                         SolNeonIxDecoder = self._sol_neon_ix_decoder_dict.get(sol_neon_ix.ix_code, DummyIxDecoder)
                         sol_neon_ix_decoder = SolNeonIxDecoder(state)
+                        if sol_neon_ix_decoder.is_stuck():
+                            continue
+
+                        neon_block.add_sol_neon_ix(sol_neon_ix)
                         if is_error:
-                            if hasattr(sol_neon_ix_decoder, 'decode_failed_neon_tx_event_list'):
-                                sol_neon_ix_decoder.decode_failed_neon_tx_event_list()
+                            sol_neon_ix_decoder.decode_failed_neon_tx_event_list()
                             # LOG.debug('failed tx')
                             continue
                         sol_neon_ix_decoder.execute()

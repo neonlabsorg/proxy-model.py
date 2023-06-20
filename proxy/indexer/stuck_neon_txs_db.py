@@ -1,5 +1,6 @@
 import json
-from typing import List, Dict, Any, Iterator
+
+from typing import List, Dict, Any, Iterator, Tuple, Optional
 
 from ..common_neon.db.base_db_table import BaseDBTable
 from ..common_neon.db.db_connect import DBConnection
@@ -39,9 +40,14 @@ class StuckNeonTxsDB(BaseDBTable):
         json_data = json.dumps(neon_tx_list)
         self._insert_row([is_finalized, block_slot, json_data])
 
-    def get_tx_list(self, is_finalized: bool, block_slot: int) -> List[Dict[str, Any]]:
+    def get_tx_list(self, is_finalized: bool, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
         value_list = self._db.fetch_one(self._select_request, (is_finalized, block_slot,))
+
         tx_list: List[Dict[str, Any]] = list()
+        tx_block_slot: Optional[int] = None
+
         if len(value_list) > 0:
+            tx_block_slot = self._get_column_value('block_slot', value_list)
             tx_list = json.loads(self._get_column_value('json_data_list', value_list))
-        return tx_list
+
+        return tx_block_slot, tx_list

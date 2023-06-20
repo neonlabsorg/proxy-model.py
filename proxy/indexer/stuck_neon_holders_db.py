@@ -1,5 +1,6 @@
 import json
-from typing import List, Dict, Any, Iterator
+
+from typing import List, Dict, Any, Iterator, Tuple, Optional
 
 from ..common_neon.db.base_db_table import BaseDBTable
 from ..common_neon.db.db_connect import DBConnection
@@ -37,9 +38,14 @@ class StuckNeonHoldersDB(BaseDBTable):
         json_data = json.dumps(neon_holder_list)
         self._insert_row([block_slot, json_data])
 
-    def get_holder_list(self, block_slot: int) -> List[Dict[str, Any]]:
+    def get_holder_list(self, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
         value_list = self._db.fetch_one(self._select_request, (block_slot,))
+
+        holder_block_slot: Optional[int] = None
         holder_list: List[Dict[str, Any]] = list()
+
         if len(value_list):
+            holder_block_slot = self._get_column_value('block_slot', value_list)
             holder_list = json.loads(self._get_column_value('json_data_list', value_list))
-        return holder_list
+
+        return holder_block_slot, holder_list
