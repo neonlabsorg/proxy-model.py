@@ -4,6 +4,7 @@ import sys
 from .account import AccountHandler
 from .info import InfoHandler
 from .holder import HolderHandler
+from .neon import NeonHandler
 
 
 if __name__ == '__main__':
@@ -13,6 +14,7 @@ if __name__ == '__main__':
     account_handler = AccountHandler.init_args_parser(subparsers)
     info_handler = InfoHandler.init_args_parser(subparsers)
     holder_handler = HolderHandler.init_args_parser(subparsers)
+    neon_handler = NeonHandler.init_args_parser(subparsers)
 
     args = parser.parse_args()
     if args.command == account_handler.command:
@@ -25,5 +27,11 @@ if __name__ == '__main__':
             info_handler.execute(args)
         else:
             holder_handler.execute(args)
+    elif args.command == neon_handler.command:
+        if args.subcommand == 'list':
+            args.subcommand = 'neon-accounts'
+            info_handler.execute(args)
+        else:
+            neon_handler.execute(args)
     else:
         print(f'Unknown command {args.command}', file=sys.stderr)
