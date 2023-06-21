@@ -824,6 +824,11 @@ class NeonIndexedBlockDict:
     def stat(self) -> NeonIndexedBlockDict.Stat:
         return self._stat
 
+    def clear(self):
+        self._neon_block_dict.clear()
+        self._finalized_neon_block = None
+        self._stat = NeonIndexedBlockDict.Stat.init_empty()
+
     def find_neon_block(self, block_slot: int) -> Optional[NeonIndexedBlockInfo]:
         return self._neon_block_dict.get(block_slot, None)
 

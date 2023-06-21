@@ -262,7 +262,7 @@ class Indexer(IndexerBase):
             else:
                 self._print_stat(state)
 
-        with logging_context(ident=f'end-{state.sol_commit}'):
+        with logging_context(ident=f'end-{state.start_block_slot}-{state.sol_commit}'):
             self._locate_neon_block(state, state.stop_block_slot)
             self._complete_neon_block(state)
 
@@ -291,7 +291,17 @@ class Indexer(IndexerBase):
             state = SolNeonTxDecoderState(self._config, SolCommit.Finalized, start_block_slot, finalized_neon_block)
             self._collect_neon_txs(state, tracer_max_slot)
         except SolHistoryNotFound as err:
-            LOG.debug(f'skip parsing of finalized history: {str(err)}')
+            first_slot = self._solana.get_first_available_block()
+            LOG.warning(f'first slot: {first_slot}, skip parsing of finalized history: {str(err)}')
+
+            # Skip history if it was cleaned by the Solana Node
+            finalized_neon_block = self._neon_block_dict.finalized_neon_block
+            if finalized_neon_block is None:
+                return
+
+            if first_slot > finalized_neon_block.block_slot:
+                self._neon_block_dict.clear()
+                self._start_slot = first_slot + 512
             return
 
         # If there were a lot of transactions in the finalized state,

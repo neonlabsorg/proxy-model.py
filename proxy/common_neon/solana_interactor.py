@@ -388,6 +388,10 @@ class SolInteractor:
             tx_receipt_list=net_block.get('transactions', list())
         )
 
+    def get_first_available_block(self) -> int:
+        response = self._send_rpc_request('getFirstAvailableBlock')
+        return response.get('result', 0)
+
     def get_block_info(self, block_slot: int, commitment=SolCommit.Confirmed, full=False) -> SolBlockInfo:
         opts = {
             'commitment': SolCommit.to_solana(commitment),
@@ -404,7 +408,7 @@ class SolInteractor:
 
         return self._decode_block_info(block_slot, net_block)
 
-    def get_block_info_list(self, block_slot_list: List[int], commitment=SolCommit.Confirmed) -> List[SolBlockInfo]:
+    def get_block_info_list(self, block_slot_list: List[int], commitment=SolCommit.Confirmed, full=False) -> List[SolBlockInfo]:
         block_list = list()
         if len(block_slot_list) == 0:
             return block_list
@@ -412,7 +416,8 @@ class SolInteractor:
         opts = {
             'commitment': SolCommit.to_solana(commitment),
             'encoding': 'json',
-            'transactionDetails': 'none',
+            'transactionDetails': 'full' if full else 'none',
+            'maxSupportedTransactionVersion': 0,
             'rewards': False
         }
 
