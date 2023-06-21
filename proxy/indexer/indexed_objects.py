@@ -484,6 +484,7 @@ class NeonIndexedBlockInfo:
             self._stuck_block_slot = self._sol_block.block_slot
 
         self._neon_holder_dict = copy.deepcopy(self._neon_holder_dict)
+
         self._neon_tx_dict = copy.deepcopy(self._neon_tx_dict)
 
     def add_sol_tx_cost(self, sol_tx_cost: SolTxCostInfo) -> None:
@@ -709,6 +710,7 @@ class NeonIndexedBlockInfo:
 
         block_slot = self.block_slot
         stuck_block_slot = block_slot - config.stuck_object_blockout
+        self._stuck_neon_holder_list = list()
 
         for holder in list(self._neon_holder_dict.values()):
             if (holder.last_block_slot < block_slot) and (holder.account in self._modified_neon_acct_set):
@@ -725,7 +727,7 @@ class NeonIndexedBlockInfo:
         self._modified_neon_acct_set.clear()
 
     def _check_stuck_txs(self, config: Config) -> None:
-        # the were the restart with stuck txs
+        # there were the restart with stuck txs
         if self._stuck_block_slot > self._sol_block.block_slot:
             return
         # if was no changes
@@ -736,6 +738,7 @@ class NeonIndexedBlockInfo:
 
         block_slot = self.block_slot
         stuck_block_slot = block_slot - config.stuck_object_blockout
+        self._stuck_neon_tx_list = list()
 
         for tx in list(self._neon_tx_dict.values()):
             if tx.is_done():

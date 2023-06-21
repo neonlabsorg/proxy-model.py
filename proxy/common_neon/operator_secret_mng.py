@@ -83,7 +83,7 @@ class OpSecretMng:
         LOG.debug('Read secret keys from filesystem...')
 
         res = SolanaCli(self._config).call('config', 'get')
-        LOG.debug(f"Got solana config: {res}")
+        LOG.debug(f"Read solana config with the length {len(res)}")
         substr = "Keypair Path: "
         path = ""
         for line in res.splitlines():

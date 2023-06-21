@@ -13,6 +13,7 @@ from ..common_neon.solana_tx_error_parser import SolTxErrorParser
 from ..common_neon.utils.json_logger import logging_context
 from ..common_neon.utils.solana_block import SolBlockInfo
 from ..common_neon.metrics_logger import MetricsLogger
+from ..common_neon.constants import FINALIZED_HOLDER_TAG
 
 from ..statistic.data import NeonBlockStatData
 from ..statistic.indexer_client import IndexerStatClient
@@ -101,7 +102,9 @@ class Indexer(IndexerBase):
         if holder_info is None:
             return False
 
-        return holder_info.neon_tx_sig == neon_tx_sig
+        if holder_info.neon_tx_sig == neon_tx_sig:
+            return holder_info.tag != FINALIZED_HOLDER_TAG
+        return False
 
     def _save_checkpoint(self) -> None:
         cache_stat = self._neon_block_dict.stat
