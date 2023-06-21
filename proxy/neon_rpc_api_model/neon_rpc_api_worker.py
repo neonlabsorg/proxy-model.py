@@ -88,6 +88,12 @@ class NeonRpcApiWorker:
             raise EthereumError(message='Failed to calculate gas price. Try again later')
         return cast(MPGasPriceResult, self._gas_price_value)
 
+    def neon_proxy_verion(self) -> str:
+        return self.neon_proxyVersion()
+
+    def neon_cli_version(self) -> str:
+        return self.neon_cliVersion()
+
     @staticmethod
     def neon_proxyVersion() -> str:
         return 'Neon-proxy/v' + NEON_PROXY_PKG_VERSION + '-' + NEON_PROXY_REVISION
