@@ -241,7 +241,7 @@ jobs:
           echo "value=${tag}" >> $GITHUB_OUTPUT
       - name: Run docker container
         run: |
-          image = ${{ env.NEON_TEST_IMAGE }}:${{ steps.neon_test_tag.outputs.value }}
+          image="${{ env.NEON_TEST_IMAGE }}:${{ steps.neon_test_tag.outputs.value }}"
           docker pull $image
           docker run -i -d -e PROXY_IP=${{ env.PROXY_IP }} -e SOLANA_IP=${{ env.SOLANA_IP }} \
           --name=${{ env.CONTAINER }} $image /bin/bash
