@@ -225,7 +225,7 @@ jobs:
       - name: Define test image tag
         id: neon_test_tag
         run: |
-          if [[${{ needs.build-image.outputs.is_version_proxy_branch }}]]; then
+          if ${{ needs.build-image.outputs.is_version_proxy_branch }}; then
             tag=${github_ref/refs\/heads\//}
 
           elif [[ $github_ref == *"refs/tags/"* ]]; then
