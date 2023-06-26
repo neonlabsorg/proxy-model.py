@@ -26,7 +26,6 @@ from ..common_neon.layouts import NeonAccountInfo
 from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.neon_instruction import EvmIxCodeName, AltIxCodeName
 
-
 from ..mempool import MemPoolClient, MP_SERVICE_ADDR, MPTxSendResult, MPTxSendResultCode, MPGasPriceResult
 
 from ..gas_tank.gas_less_accounts_db import GasLessAccountsDB
@@ -332,7 +331,7 @@ class NeonRpcApiWorker:
 
     def _get_zero_balance(self, account: str, neon_account_info: Optional[NeonAccountInfo]) -> str:
         nonce = neon_account_info.nonce if neon_account_info is not None else 0
-        if self._has_gas_less_tx_permit(account, nonce, 0):
+        if self._has_gas_less_tx_permit(account.lower(), nonce, 0):
             return hex(1)
         return hex(0)
 
