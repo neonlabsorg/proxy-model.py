@@ -222,7 +222,7 @@ class MemPool:
     def _acquire_scheduled_tx(self, tx: Optional[MPTxRequest] = None) -> Tuple[NeonTxBeginCode, Optional[MPTxExecRequest]]:
         if tx is None:
             tx = self._tx_schedule.peek_top_tx()
-            if (tx is None) or (tx.gas_price < self._gas_price.min_gas_price):
+            if (tx is None) or (tx.gas_price < self._gas_price.min_executable_gas_price):
                 return NeonTxBeginCode.Failed, None
 
             tx = self._attach_resource_to_tx(tx)

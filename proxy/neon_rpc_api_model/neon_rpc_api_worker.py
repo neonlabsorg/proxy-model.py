@@ -133,9 +133,14 @@ class NeonRpcApiWorker:
         return hex(self._gas_price.suggested_gas_price)
 
     def neon_gasPrice(self, param: Dict[str, Any]) -> str:
+        full = param.get('full', False)
+        if not isinstance(full, bool):
+            raise InvalidParamError('full has wrong type, not boolean')
+
         account = param.get('from', None)
         if account is None:
-            return self.eth_gasPrice()
+            return self._format_gas_price(self._gas_price.suggested_gas_price, full)
+
         account = self._normalize_address(account, 'from-address').lower()
 
         state_tx_cnt = self._solana.get_state_tx_cnt(account)
@@ -151,9 +156,28 @@ class NeonRpcApiWorker:
         tx_gas = self._normalize_hex(tx_gas, 'gas')
 
         if self._has_gas_less_tx_permit(account, tx_nonce, tx_gas):
-            return hex(0)
+            return self._format_gas_price(0, full)
 
-        return self.eth_gasPrice()
+        return self._format_gas_price(self._gas_price.suggested_gas_price, full)
+
+    def _format_gas_price(self, gas_price: int, full: bool) -> Union[str, Dict[str, str]]:
+        if not full:
+            return hex(gas_price)
+
+        gas_price_info = self._gas_price
+        return dict(
+            gas_price=hex(gas_price),
+            suggested_gas_price=hex(gas_price_info.suggested_gas_price),
+            min_acceptable_gas_price=hex(gas_price_info.min_acceptable_gas_price),
+            min_executable_gas_price=hex(gas_price_info.min_executable_gas_price),
+            min_wo_chainid_acceptable_gas_price=hex(gas_price_info.min_wo_chainid_acceptable_gas_price),
+            allow_underpriced_tx_wo_chainid=gas_price_info.allow_underpriced_tx_wo_chainid,
+            accept_reverted_tx_into_mempool=gas_price_info.accept_reverted_tx_into_mempool,
+            sol_price_usd=hex(gas_price_info.sol_price_usd),
+            neon_price_usd=hex(gas_price_info.neon_price_usd),
+            operator_fee=hex(gas_price_info.operator_fee),
+            gas_price_slippage=hex(gas_price_info.gas_price_slippage)
+        )
 
     @staticmethod
     def _normalize_hex(value: Union[str, int], name: str) -> int:
@@ -945,7 +969,7 @@ class NeonRpcApiWorker:
         if neon_tx.gasPrice == 0:
             gas_less_permit = self._has_gas_less_tx_permit(neon_tx.hex_sender, neon_tx.nonce, neon_tx.gasLimit)
 
-        min_gas_price = self._gas_price.min_gas_price
+        min_gas_price = self._gas_price.min_executable_gas_price
         neon_tx_validator = NeonTxValidator(self._config, self._solana, neon_tx, gas_less_permit, min_gas_price)
         neon_tx_exec_cfg = neon_tx_validator.precheck()
 
