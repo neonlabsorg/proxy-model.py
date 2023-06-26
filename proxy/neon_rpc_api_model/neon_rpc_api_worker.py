@@ -19,12 +19,12 @@ from ..common_neon.environment_utils import NeonCli
 from ..common_neon.errors import EthereumError, InvalidParamError, RescheduleError, NonceTooLowError
 from ..common_neon.keys_storage import KeyStorage
 from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptShortInfo, SolTxCostInfo
+from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptShortInfo, SolTxCostInfo, SolAltIxInfo
 from ..common_neon.solana_tx import SolCommit
 from ..common_neon.utils import SolBlockInfo, NeonTxReceiptInfo, NeonTxInfo, NeonTxResultInfo
 from ..common_neon.layouts import NeonAccountInfo
 from ..common_neon.utils.eth_proto import NeonTx
-from ..common_neon.neon_instruction import EvmIxCodeName
+from ..common_neon.neon_instruction import EvmIxCodeName, AltIxCodeName
 
 
 from ..mempool import MemPoolClient, MP_SERVICE_ADDR, MPTxSendResult, MPTxSendResultCode, MPGasPriceResult
@@ -680,12 +680,14 @@ class NeonRpcApiWorker:
         receipt['solanaTransactions'] = result_tx_list
         receipt['neonCosts'] = result_cost_list
 
-        sol_ix_list: List[SolNeonIxReceiptShortInfo] = self._db.get_sol_ix_info_list_by_neon_sig(tx.neon_tx.sig)
-        if not len(sol_ix_list):
+        sol_neon_ix_list: List[SolNeonIxReceiptShortInfo] = self._db.get_sol_ix_info_list_by_neon_sig(tx.neon_tx.sig)
+        if not len(sol_neon_ix_list):
             LOG.warning(f'Cannot find Solana txs for the Neon tx {tx.neon_tx.sig}')
             return
 
-        sol_tx_cost_dict: Dict[str, SolTxCostInfo] = self._get_sol_tx_cost_dict(sol_ix_list)
+        sol_alt_ix_list: List[SolAltIxInfo] = self._db.get_sol_alt_tx_list_by_neon_sig(tx.neon_tx.sig)
+
+        sol_tx_cost_dict: Dict[str, SolTxCostInfo] = self._get_sol_tx_cost_dict(sol_neon_ix_list)
         full_log_dict: Dict[str, List[Dict[str, Any]]] = self._get_full_log_dict(tx)
 
         sol_sig = ''
@@ -693,51 +695,76 @@ class NeonRpcApiWorker:
         result_ix_list: List[Dict[str, Any]] = list()
         result_cost_dict: Dict[str, OpCostInfo] = dict()
 
-        for ix in sol_ix_list:
-            if ix.sol_sig != sol_sig:
-                sol_sig = ix.sol_sig
+        for neon_ix in sol_neon_ix_list:
+            if neon_ix.sol_sig != sol_sig:
+                sol_sig = neon_ix.sol_sig
                 tx_cost: Optional[SolTxCostInfo] = sol_tx_cost_dict.get(sol_sig, None)
-                op_cost: OpCostInfo = result_cost_dict.setdefault(tx_cost.operator, OpCostInfo())
+                op_cost = result_cost_dict.setdefault(tx_cost.operator, OpCostInfo())
 
                 if tx_cost is None:
-                    LOG.warning(f'Cannot find the cost for the Solana tx {ix.block_slot}{sol_sig}')
+                    LOG.warning(f'Cannot find the cost for the Solana tx {neon_ix.block_slot}{sol_sig}')
                 else:
                     op_cost.sol_spent += tx_cost.sol_spent
 
                 result_ix_list: List[Dict[str, Any]] = list()
                 result_tx_list.append({
                     'solanaTransactionHash': sol_sig,
-                    'solanaTransactionIsSuccess': ix.is_success,
-                    'solanaBlockNumber': ix.block_slot,
-                    'solanaLamportSpent': tx_cost.sol_spent if tx_cost is not None else None,
+                    'solanaTransactionIsSuccess': neon_ix.is_success,
+                    'solanaBlockNumber': hex(neon_ix.block_slot),
+                    'solanaLamportSpent': hex(tx_cost.sol_spent) if tx_cost is not None else None,
                     'solanaOperator': tx_cost.operator if tx_cost is not None else None,
                     'solanaInstructions': result_ix_list
                 })
 
-            neon_income = ix.neon_gas_used * tx.neon_tx.gas_price
+            neon_income = neon_ix.neon_gas_used * tx.neon_tx.gas_price
             op_cost.neon_income += neon_income
-            log_list_key = ':'.join([sol_sig, str(ix.idx), str(ix.inner_idx)])
+            log_list_key = ':'.join([sol_sig, str(neon_ix.idx), str(neon_ix.inner_idx)])
 
             result_ix_list.append({
-                'solanaInstructionIndex': ix.idx,
-                'solanaInnerInstructionIndex': ix.inner_idx,
-                'svmHeapSizeLimit': ix.max_heap_size,
-                'svmHeapSizeUsed': ix.used_heap_size,
-                'svmCyclesLimit': ix.max_bpf_cycle_cnt,
-                'svmCyclesUsed ': ix.used_bpf_cycle_cnt,
-                'neonInstructionCode': hex(ix.ix_code),
-                'neonInstructionName': EvmIxCodeName().get(ix.ix_code),
-                'neonStepLimit': ix.neon_step_cnt if ix.neon_step_cnt > 0 else None,
-                'neonAlanIncome': neon_income,
-                'neonGasUsed': ix.neon_gas_used,
-                'neonTotalGasUsed': ix.neon_total_gas_used,
+                'solanaInstructionIndex': hex(neon_ix.idx),
+                'solanaInnerInstructionIndex': hex(neon_ix.inner_idx) if neon_ix.inner_idx is not None else None,
+                'svmHeapSizeLimit': hex(neon_ix.max_heap_size),
+                'svmHeapSizeUsed': hex(neon_ix.used_heap_size),
+                'svmCyclesLimit': hex(neon_ix.max_bpf_cycle_cnt),
+                'svmCyclesUsed ': hex(neon_ix.used_bpf_cycle_cnt),
+                'neonInstructionCode': hex(neon_ix.ix_code),
+                'neonInstructionName': EvmIxCodeName().get(neon_ix.ix_code),
+                'neonStepLimit': hex(neon_ix.neon_step_cnt) if neon_ix.neon_step_cnt > 0 else None,
+                'neonAlanIncome': hex(neon_income),
+                'neonGasUsed': hex(neon_ix.neon_gas_used),
+                'neonTotalGasUsed': hex(neon_ix.neon_total_gas_used),
                 'neonLogs': full_log_dict.get(log_list_key, None),
+            })
+
+        sol_sig = ''
+        for alt_ix in sol_alt_ix_list:
+            if alt_ix.sol_sig != sol_sig:
+                sol_sig = alt_ix.sol_sig
+                tx_cost = alt_ix.sol_tx_cost
+                op_cost = result_cost_dict.setdefault(tx_cost.operator, OpCostInfo())
+                op_cost.sol_spent += tx_cost.sol_spent
+
+                result_ix_list: List[Dict[str, Any]] = list()
+                result_tx_list.append({
+                    'solanaTransactionHash': sol_sig,
+                    'solanaTransactionIsSuccess': alt_ix.is_success,
+                    'solanaBlockNumber': hex(alt_ix.block_slot),
+                    'solanaLamportSpent': hex(tx_cost.sol_spent) if tx_cost is not None else None,
+                    'solanaOperator': tx_cost.operator if tx_cost is not None else None,
+                    'solanaInstructions': result_ix_list
+                })
+
+            result_ix_list.append({
+                'solanaInstructionIndex': hex(alt_ix.idx),
+                'altInstructionCode': hex(alt_ix.ix_code),
+                'altInstructionName': AltIxCodeName().get(alt_ix.ix_code),
+                'altAddress': alt_ix.alt_address,
             })
 
         result_cost_list.extend([{
                 'solanaOperator': op,
-                'solanaLamportSpent': cost.sol_spent,
-                'neonAlanIncome': cost.neon_income
+                'solanaLamportSpent': hex(cost.sol_spent),
+                'neonAlanIncome': hex(cost.neon_income)
             }
             for op, cost in result_cost_dict.items()
         ])

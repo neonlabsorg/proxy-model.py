@@ -78,6 +78,7 @@ class Config(DBConfig):
         self._neon_cli_debug_log = self._env_bool("NEON_CLI_DEBUG_LOG", False)
         self._stuck_obj_blockout = self._env_int('STUCK_OBJECT_BLOCKOUT', 16, 64)
         self._stuck_obj_validate_blockout = self._env_int('STUCK_OBJECT_VALIDATE_BLOCKOUT', 512, 1024)
+        self._alt_freeing_depth = self._env_int('ALT_FREEING_DEPTH', 512, 512 + 16)
         self._gather_statistics = self._env_bool("GATHER_STATISTICS", False)
         self._hvac_url = os.environ.get('HVAC_URL', None)
         self._hvac_token = os.environ.get('HVAC_TOKEN', None)
@@ -317,6 +318,10 @@ class Config(DBConfig):
         return self._stuck_obj_validate_blockout
 
     @property
+    def alt_freeing_depth(self) -> int:
+        return self._alt_freeing_depth
+
+    @property
     def operator_account_set(self) -> Set[str]:
         return self._op_acct_set
 
@@ -396,6 +401,7 @@ class Config(DBConfig):
             'NEON_CLI_DEBUG_LOG': self.neon_cli_debug_log,
             'STUCK_OBJECT_BLOCKOUT': self.stuck_object_blockout,
             'STUCK_OBJECT_VALIDATE_BLOCKOUT': self.stuck_object_validate_blockout,
+            'ALT_FREEING_DEPTH': self.alt_freeing_depth,
             'OPERATOR_ACCOUNT_LIST': ';'.join(list(self.operator_account_set)),
             'GATHER_STATISTICS': self.gather_statistics,
 
