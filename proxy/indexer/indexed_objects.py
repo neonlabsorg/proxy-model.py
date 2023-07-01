@@ -6,7 +6,7 @@ import time
 
 from collections import deque
 from dataclasses import dataclass
-from typing import Iterator, Generator, List, Optional, Dict, Set, Deque, Tuple, Any, cast
+from typing import Iterator, Generator, List, Optional, Dict, Set, Deque, Any, cast
 
 from ..common_neon.config import Config
 from ..common_neon.neon_instruction import EvmIxCode, EvmIxCodeName
@@ -968,7 +968,7 @@ class SolNeonTxDecoderState:
         self._sol_tx_cost: Optional[SolTxCostInfo] = None
         self._sol_neon_ix: Optional[SolNeonIxReceiptInfo] = None
 
-        self._neon_block_deque: Deque[Tuple[NeonIndexedBlockInfo, bool]] = deque()
+        self._neon_block_deque: Deque[NeonIndexedBlockInfo] = deque()
         if neon_block is not None:
             self.set_neon_block(neon_block)
 
@@ -982,9 +982,9 @@ class SolNeonTxDecoderState:
         self._stop_block_slot = block_slot
 
     def set_neon_block(self, neon_block: NeonIndexedBlockInfo) -> None:
-        if (len(self._neon_block_deque) > 0) and self._neon_block_deque[0][1]:
+        if (len(self._neon_block_deque) > 0) and self._neon_block_deque[0].is_finalized:
             self._neon_block_deque.popleft()
-        self._neon_block_deque.append((neon_block, self._is_finalized))
+        self._neon_block_deque.append(neon_block)
 
     @property
     def process_time_ms(self) -> float:
@@ -999,7 +999,7 @@ class SolNeonTxDecoderState:
         return self._stop_block_slot
 
     @property
-    def sol_commit(self) -> str:
+    def sol_commit(self) -> SolCommit.Type:
         return self._sol_commit
 
     @property
@@ -1026,11 +1026,7 @@ class SolNeonTxDecoderState:
     @property
     def neon_block(self) -> NeonIndexedBlockInfo:
         assert self.has_neon_block()
-        return self._neon_block_deque[-1][0]
-
-    def is_neon_block_finalized(self) -> bool:
-        assert self.has_neon_block()
-        return self._neon_block_deque[-1][1]
+        return self._neon_block_deque[-1]
 
     def iter_sol_tx_meta(self, sol_block: SolBlockInfo) -> Generator[SolTxMetaInfo, None, None]:
         try:
@@ -1113,5 +1109,5 @@ class SolNeonTxDecoderState:
             self._sol_neon_ix = None
 
     def iter_neon_block(self) -> Generator[NeonIndexedBlockInfo, None, None]:
-        for neon_block, _ in self._neon_block_deque:
+        for neon_block in self._neon_block_deque:
             yield neon_block

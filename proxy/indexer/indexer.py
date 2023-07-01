@@ -14,8 +14,8 @@ from .indexer_base import IndexerBase
 from .indexer_db import IndexerDB
 from .neon_ix_decoder import DummyIxDecoder, get_neon_ix_decoder_list
 from .neon_ix_decoder_deprecate import get_neon_ix_decoder_deprecated_list
-from .solana_tx_meta_collector import SolHistoryNotFound
 from .tracer_api_client import TracerAPIClient
+from .solana_block_net_cache import SolBlockNetCache
 
 from ..common_neon.config import Config
 from ..common_neon.constants import FINALIZED_HOLDER_TAG, ADDRESS_LOOKUP_TABLE_ID
@@ -33,6 +33,10 @@ from ..statistic.indexer_client import IndexerStatClient
 
 
 LOG = logging.getLogger(__name__)
+
+
+class SolHistoryNotFound(RuntimeError):
+    pass
 
 
 class Indexer(IndexerBase):
@@ -55,6 +59,8 @@ class Indexer(IndexerBase):
         self._last_confirmed_block_slot = 0
         self._last_finalized_block_slot = 0
         self._neon_block_dict = NeonIndexedBlockDict()
+
+        self._sol_block_net_cache = SolBlockNetCache(config, self._solana)
 
         sol_neon_ix_decoder_list: List[Type[DummyIxDecoder]] = list()
         sol_neon_ix_decoder_list.extend(get_neon_ix_decoder_list())
@@ -204,9 +210,9 @@ class Indexer(IndexerBase):
         if neon_block.is_finalized:
             return
 
-        is_last_confirmed = state.is_last_block(neon_block) and not state.is_finalized()
+        is_finalized = state.is_finalized()
+        is_last_confirmed = state.is_last_block(neon_block) and (not is_finalized)
 
-        is_finalized = state.is_neon_block_finalized()
         neon_block.set_finalized(is_finalized)
         if not neon_block.is_completed:
             self._collect_alt_ixs(neon_block)
@@ -227,6 +233,7 @@ class Indexer(IndexerBase):
         self._neon_block_dict.add_neon_block(neon_block)
         if is_finalized:
             self._neon_block_dict.finalize_neon_block(neon_block)
+            self._sol_block_net_cache.finalize_block(neon_block.block_slot)
             self._commit_tx_stat(neon_block)
             self._save_checkpoint()
 
@@ -307,7 +314,7 @@ class Indexer(IndexerBase):
             pass  # The parsed block from cache
         else:
             # A new block with history from the Solana network
-            sol_block = self._solana.get_block_info(block_slot, state.sol_commit, True)
+            sol_block = self._sol_block_net_cache.get_block_info(block_slot, state.stop_block_slot, state.sol_commit)
             if sol_block.is_empty():
                 return None
 
@@ -354,7 +361,7 @@ class Indexer(IndexerBase):
             else:
                 self._print_stat(state)
 
-        with logging_context(ident=f'end-{state.start_block_slot}-{state.sol_commit}'):
+        with logging_context(sol_neon_ix=f'end-{state.sol_commit}-{state.start_block_slot}'):
             self._locate_neon_block(state, state.stop_block_slot)
             self._complete_neon_block(state)
 
@@ -383,17 +390,19 @@ class Indexer(IndexerBase):
             state = SolNeonTxDecoderState(self._config, SolCommit.Finalized, start_block_slot, finalized_neon_block)
             self._collect_neon_txs(state, tracer_max_slot)
         except SolHistoryNotFound as err:
+            self._sol_block_net_cache.mark_recache_block_list()
+
             first_slot = self._solana.get_first_available_block()
             LOG.warning(f'first slot: {first_slot}, skip parsing of finalized history: {str(err)}')
 
+            first_slot += 512
+            if self._start_slot < first_slot:
+                self._start_slot = first_slot
+
             # Skip history if it was cleaned by the Solana Node
             finalized_neon_block = self._neon_block_dict.finalized_neon_block
-            if finalized_neon_block is None:
-                return
-
-            if first_slot > finalized_neon_block.block_slot:
+            if (finalized_neon_block is not None) and (first_slot > finalized_neon_block.block_slot):
                 self._neon_block_dict.clear()
-                self._start_slot = first_slot + 512
             return
 
         # If there were a lot of transactions in the finalized state,
@@ -408,6 +417,7 @@ class Indexer(IndexerBase):
                 # Save confirmed block only after successfully parsing
                 self._confirmed_block_slot = state.stop_block_slot
             except SolHistoryNotFound as err:
+                self._sol_block_net_cache.mark_recache_block_list()
                 LOG.debug(f'skip parsing of confirmed history: {str(err)}')
 
     def _print_stat(self, state: SolNeonTxDecoderState) -> None:

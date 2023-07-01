@@ -31,7 +31,7 @@ class MetricsLogger:
             self._item_value_dict[key] = value
         self._counter += 1
 
-        if self._counter % config.indexer_log_skip_cnt != 0:
+        if self._counter % config.metrics_log_skip_cnt != 0:
             return
 
         msg = ''

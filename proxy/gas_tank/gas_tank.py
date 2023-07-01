@@ -6,6 +6,7 @@ from typing import Dict, Any, Union, List, Tuple
 from .gas_less_accounts_db import GasLessAccountsDB
 from .gas_less_usages_db import GasLessUsagesDB
 from .gas_tank_types import GasTankNeonTxAnalyzer, GasTankSolTxAnalyzer, GasTankTxInfo, GasLessPermit, GasLessUsage
+from .solana_tx_meta_collector import SolTxMetaDict, FinalizedSolTxMetaCollector
 
 from ..common_neon.address import NeonAddress
 from ..common_neon.config import Config
@@ -20,7 +21,6 @@ from ..common_neon.utils.neon_tx_info import NeonTxInfo
 
 from ..indexer.indexed_objects import NeonIndexedHolderInfo
 from ..indexer.indexer_base import IndexerBase
-from ..indexer.solana_tx_meta_collector import SolTxMetaDict, FinalizedSolTxMetaCollector
 
 LOG = logging.getLogger(__name__)
 
