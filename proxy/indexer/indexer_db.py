@@ -16,6 +16,7 @@ from .stuck_neon_holders_db import StuckNeonHoldersDB
 from .stuck_neon_txs_db import StuckNeonTxsDB
 from .solana_alt_infos_db import SolAltInfosDB
 from .solana_alt_txs_db import SolAltTxsDB
+from .gas_less_usages_db import GasLessUsagesDB
 
 
 class IndexerDB:
@@ -25,8 +26,9 @@ class IndexerDB:
         self._sol_tx_costs_db = SolTxCostsDB(self._db)
         self._neon_txs_db = NeonTxsDB(self._db)
         self._sol_neon_txs_db = SolNeonTxsDB(self._db)
-        self._sol_alt_txs_db = SolAltTxsDB(self._db)
         self._neon_tx_logs_db = NeonTxLogsDB(self._db)
+        self._gas_less_usages_db = GasLessUsagesDB(self._db)
+        self._sol_alt_txs_db = SolAltTxsDB(self._db)
         self._stuck_neon_holders_db = StuckNeonHoldersDB(self._db)
         self._stuck_neon_txs_db = StuckNeonTxsDB(self._db)
         self._sol_alt_infos_db = SolAltInfosDB(self._db)
@@ -90,6 +92,7 @@ class IndexerDB:
         for db_table in self._db_table_list:
             db_table.finalize_block_list(self._finalized_block_slot, block_slot_list)
 
+        self._gas_less_usages_db.set_tx_list(neon_block.iter_done_neon_tx())
         self._stuck_neon_holders_db.set_holder_list(neon_block.stuck_block_slot, neon_block.iter_stuck_neon_holder())
         self._stuck_neon_txs_db.set_tx_list(True, neon_block.stuck_block_slot, neon_block.iter_stuck_neon_tx())
         self._sol_alt_infos_db.set_alt_list(neon_block.stuck_block_slot, neon_block.iter_alt_info())

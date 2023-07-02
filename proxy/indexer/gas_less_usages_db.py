@@ -3,7 +3,7 @@ from typing import List, Iterator, Any
 from ..common_neon.db.base_db_table import BaseDBTable
 from ..common_neon.db.db_connect import DBConnection
 
-from .gas_tank_types import GasLessUsage
+from .indexed_objects import NeonIndexedTxInfo
 
 
 class GasLessUsagesDB(BaseDBTable):
@@ -17,13 +17,16 @@ class GasLessUsagesDB(BaseDBTable):
             key_list=list()
         )
 
-    def add_gas_less_usage_list(self, usage_list: Iterator[GasLessUsage]) -> None:
+    def set_tx_list(self, iter_neon_tx: Iterator[NeonIndexedTxInfo]) -> None:
         row_list: List[List[Any]] = list()
-        for usage in usage_list:
+        for tx in iter_neon_tx:
+            if tx.neon_tx.gas_price != 0:
+                continue
+
             row_list.append([
-                str(usage.account),
-                usage.block_slot, usage.neon_sig, usage.nonce, str(usage.to_addr),
-                usage.operator, usage.neon_total_gas_usage
+                tx.neon_tx.addr,
+                tx.neon_tx_res.block_slot, tx.neon_tx_sig, tx.neon_tx.nonce, tx.neon_tx.to_addr,
+                tx.operator, tx.total_gas_used
             ])
 
         self._insert_row_list(row_list)

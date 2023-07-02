@@ -75,7 +75,7 @@ class NeonTxsDB(BaseDBTable):
         return NeonTxReceiptInfo(neon_tx=neon_tx, neon_tx_res=neon_tx_res)
 
     def set_tx_list(self, iter_neon_tx: Iterator[NeonIndexedTxInfo]) -> None:
-        value_list_list: List[List[Any]] = []
+        row_list: List[List[Any]] = []
         for tx in iter_neon_tx:
             value_list: List[Any] = []
             for idx, column in enumerate(self._column_list):
@@ -95,9 +95,9 @@ class NeonTxsDB(BaseDBTable):
                     value_list.append(getattr(tx.neon_tx_res, column))
                 else:
                     raise RuntimeError(f'Wrong usage {self._table_name}: {idx} -> {column}!')
-            value_list_list.append(value_list)
+            row_list.append(value_list)
 
-        self._insert_row_list(value_list_list)
+        self._insert_row_list(row_list)
 
     def get_tx_by_neon_sig(self, neon_sig: str) -> Optional[NeonTxReceiptInfo]:
         request = self._base_request_hdr + '''

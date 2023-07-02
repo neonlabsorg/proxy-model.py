@@ -190,6 +190,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
                  neon_tx: NeonTxInfo,
                  holder_account: str,
                  blocked_account_list: List[str],
+                 operator: Optional[str] = None,
                  neon_tx_res: NeonTxResultInfo = None,
                  neon_tx_event_list: List[NeonLogTxEvent] = None,
                  gas_used=0,
@@ -211,6 +212,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
         self._blocked_acct_list = blocked_account_list
         self._is_done = False
         self._neon_event_list = neon_tx_event_list
+        self._operator = operator
         self._gas_used = gas_used
         self._total_gas_used = total_gas_used
 
@@ -220,11 +222,13 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
         neon_tx = NeonTxInfo.from_dict(src.pop('neon_tx'))
         neon_res_info = NeonTxResultInfo.from_dict(src.pop('neon_tx_res'))
         neon_event_list = [NeonLogTxEvent.from_dict(s) for s in src.pop('neon_tx_event_list')]
+        operator = src.pop('operator', None)
         return NeonIndexedTxInfo(
             key=key,
             neon_tx=neon_tx,
             neon_tx_res=neon_res_info,
             neon_tx_event_list=neon_event_list,
+            operator=operator,
             **src
         )
 
@@ -260,6 +264,10 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
         return self._neon_receipt.neon_tx_res
 
     @property
+    def operator(self) -> Optional[str]:
+        return self._operator
+
+    @property
     def total_gas_used(self) -> int:
         return self._total_gas_used
 
@@ -280,6 +288,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
             neon_tx_sig=self._key.value,
             holder_account=self._holder_acct,
             blocked_account_list=self._blocked_acct_list,
+            operator=self._operator,
             gas_used=self._gas_used,
             total_gas_used=self._total_gas_used,
             neon_tx=self._neon_receipt.neon_tx.as_dict(),
@@ -304,6 +313,8 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
         self._gas_used += sol_neon_ix.neon_gas_used
         if sol_neon_ix.neon_total_gas_used > self._total_gas_used:
             self._total_gas_used = sol_neon_ix.neon_total_gas_used
+        if self._operator is None:
+            self._operator = sol_neon_ix.sol_tx_cost.operator
 
     def add_neon_event(self, event: NeonLogTxEvent) -> None:
         self._neon_event_list.append(event)

@@ -42,7 +42,7 @@ class NeonTxLogsDB(BaseDBTable):
         self._topic_column_list = ['log_topic1', 'log_topic2', 'log_topic3', 'log_topic4']
 
     def set_tx_list(self, iter_neon_tx: Iterator[NeonIndexedTxInfo]) -> None:
-        value_list_list: List[List[Any]] = list()
+        row_list: List[List[Any]] = list()
         for tx in iter_neon_tx:
             for log in tx.neon_tx_res.log_list:
                 topic_list = log['topics']
@@ -67,9 +67,9 @@ class NeonTxLogsDB(BaseDBTable):
                         if (value is not None) and (key in self._hex_field_set):
                             value = int(value[2:], 16)
                         value_list.append(value)
-                value_list_list.append(value_list)
+                row_list.append(value_list)
 
-        self._insert_row_list(value_list_list)
+        self._insert_row_list(row_list)
 
     def _log_from_value(self, value_list: List[Any]) -> Optional[Dict[str, Any]]:
         log: Dict[str, Any] = dict()
