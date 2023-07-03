@@ -39,7 +39,7 @@ class GasTank(IndexerBase):
         self._latest_gas_tank_slot = self._start_slot
         self._current_slot = 0
 
-        self._counted_logger = MetricsLogger()
+        self._counted_logger = MetricsLogger(config)
 
         sol_tx_meta_dict = SolTxMetaDict()
         self._sol_tx_collector = FinalizedSolTxMetaCollector(config, self._solana, sol_tx_meta_dict, self._start_slot)
@@ -310,7 +310,6 @@ class GasTank(IndexerBase):
 
         with logging_context(ident='stat'):
             self._counted_logger.print(
-                self._config,
                 list_value_dict={},
                 latest_value_dict={
                     'Latest slot': self._last_block_slot,

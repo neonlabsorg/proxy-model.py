@@ -1,9 +1,9 @@
-from typing import List, Iterator, Any
+from typing import List, Any
 
 from ..common_neon.db.base_db_table import BaseDBTable
 from ..common_neon.db.db_connect import DBConnection
 
-from .indexed_objects import NeonIndexedTxInfo
+from .indexed_objects import NeonIndexedBlockInfo
 
 
 class GasLessUsagesDB(BaseDBTable):
@@ -17,16 +17,20 @@ class GasLessUsagesDB(BaseDBTable):
             key_list=list()
         )
 
-    def set_tx_list(self, iter_neon_tx: Iterator[NeonIndexedTxInfo]) -> None:
+    def set_tx_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
         row_list: List[List[Any]] = list()
-        for tx in iter_neon_tx:
-            if tx.neon_tx.gas_price != 0:
+        for neon_block in neon_block_queue:
+            if neon_block.is_done:
                 continue
 
-            row_list.append([
-                tx.neon_tx.addr,
-                tx.neon_tx_res.block_slot, tx.neon_tx_sig, tx.neon_tx.nonce, tx.neon_tx.to_addr,
-                tx.operator, tx.total_gas_used
-            ])
+            for tx in neon_block.iter_done_neon_tx():
+                if tx.neon_tx.gas_price != 0:
+                    continue
+
+                row_list.append([
+                    tx.neon_tx.addr,
+                    tx.neon_tx_res.block_slot, tx.neon_tx_sig, tx.neon_tx.nonce, tx.neon_tx.to_addr,
+                    tx.operator, tx.total_gas_used
+                ])
 
         self._insert_row_list(row_list)

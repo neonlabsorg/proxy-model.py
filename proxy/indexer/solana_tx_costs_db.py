@@ -1,8 +1,10 @@
-from typing import List, Any, Iterator
+from typing import List, Any
 
 from ..common_neon.solana_neon_tx_receipt import SolTxCostInfo
 from ..common_neon.db.base_db_table import BaseDBTable
 from ..common_neon.db.db_connect import DBConnection
+
+from .indexed_objects import NeonIndexedBlockInfo
 
 
 class SolTxCostsDB(BaseDBTable):
@@ -14,16 +16,20 @@ class SolTxCostsDB(BaseDBTable):
             key_list=['sol_sig', 'block_slot']
         )
 
-    def set_cost_list(self, iter_sol_tx_cost: Iterator[SolTxCostInfo]) -> None:
+    def set_cost_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
         row_list: List[List[Any]] = list()
-        for cost in iter_sol_tx_cost:
-            value_list: List[Any] = list()
-            for idx, column in enumerate(self._column_list):
-                if hasattr(cost, column):
-                    value_list.append(getattr(cost, column))
-                else:
-                    raise RuntimeError(f'Wrong usage {self._table_name}: {idx} -> {column}!')
-            row_list.append(value_list)
+        for neon_block in neon_block_queue:
+            if neon_block.is_done:
+                continue
+
+            for cost in neon_block.iter_sol_tx_cost():
+                value_list: List[Any] = list()
+                for idx, column in enumerate(self._column_list):
+                    if hasattr(cost, column):
+                        value_list.append(getattr(cost, column))
+                    else:
+                        raise RuntimeError(f'Wrong usage {self._table_name}: {idx} -> {column}!')
+                row_list.append(value_list)
 
         self._insert_row_list(row_list)
 

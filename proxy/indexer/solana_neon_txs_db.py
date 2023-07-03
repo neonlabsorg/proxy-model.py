@@ -1,8 +1,10 @@
-from typing import List, Any, Iterator, Set
+from typing import List, Any, Set
 
 from ..common_neon.db.base_db_table import BaseDBTable
 from ..common_neon.db.db_connect import DBConnection
-from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptInfo, SolNeonIxReceiptShortInfo
+from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptShortInfo
+
+from .indexed_objects import NeonIndexedBlockInfo
 
 
 class SolNeonTxsDB(BaseDBTable):
@@ -18,26 +20,30 @@ class SolNeonTxsDB(BaseDBTable):
             key_list=['sol_sig', 'block_slot', 'idx', 'inner_idx']
         )
 
-    def set_tx_list(self, iter_sol_neon_ix: Iterator[SolNeonIxReceiptInfo]) -> None:
+    def set_tx_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
         row_list: List[List[Any]] = list()
-        for ix in iter_sol_neon_ix:
-            value_list: List[Any] = list()
-            is_success = (ix.status == ix.Status.Success)
-            for idx, column in enumerate(self._column_list):
-                if column == 'neon_sig':
-                    value_list.append(ix.neon_tx_sig)
-                elif column == 'neon_total_gas_used':
-                    neon_total_gas_used = ix.neon_total_gas_used
-                    if (ix.neon_total_gas_used == 0) and (not is_success):
-                        neon_total_gas_used = 9199999999999999999
-                    value_list.append(neon_total_gas_used)
-                elif column == 'is_success':
-                    value_list.append(is_success)
-                elif hasattr(ix, column):
-                    value_list.append(getattr(ix, column))
-                else:
-                    raise RuntimeError(f'Wrong usage {self._table_name}: {idx} -> {column}!')
-            row_list.append(value_list)
+        for neon_block in neon_block_queue:
+            if neon_block.is_done:
+                continue
+
+            for ix in neon_block.iter_sol_neon_ix():
+                value_list: List[Any] = list()
+                is_success = (ix.status == ix.Status.Success)
+                for idx, column in enumerate(self._column_list):
+                    if column == 'neon_sig':
+                        value_list.append(ix.neon_tx_sig)
+                    elif column == 'neon_total_gas_used':
+                        neon_total_gas_used = ix.neon_total_gas_used
+                        if (ix.neon_total_gas_used == 0) and (not is_success):
+                            neon_total_gas_used = 9199999999999999999
+                        value_list.append(neon_total_gas_used)
+                    elif column == 'is_success':
+                        value_list.append(is_success)
+                    elif hasattr(ix, column):
+                        value_list.append(getattr(ix, column))
+                    else:
+                        raise RuntimeError(f'Wrong usage {self._table_name}: {idx} -> {column}!')
+                row_list.append(value_list)
 
         self._insert_row_list(row_list)
 

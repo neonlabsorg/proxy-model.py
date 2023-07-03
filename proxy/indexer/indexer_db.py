@@ -1,4 +1,4 @@
-from typing import Optional, Iterator, List, Dict, Any, Tuple
+from typing import Optional, List, Dict, Any, Tuple
 
 from ..common_neon.utils import NeonTxReceiptInfo, SolBlockInfo
 from ..common_neon.db.db_connect import DBConnection
@@ -33,7 +33,7 @@ class IndexerDB:
         self._stuck_neon_txs_db = StuckNeonTxsDB(self._db)
         self._sol_alt_infos_db = SolAltInfosDB(self._db)
 
-        self._db_table_list = [
+        self._finalized_db_list = [
             self._sol_blocks_db,
             self._sol_tx_costs_db,
             self._neon_txs_db,
@@ -46,10 +46,10 @@ class IndexerDB:
             if k not in self._constants_db:
                 self._constants_db[k] = 0
 
-        self._starting_block = SolBlockInfo(block_slot=0)
+        self._starting_block_slot = self.get_starting_block_slot()
+        self._min_receipt_block_slot = self.get_min_receipt_block_slot()
         self._latest_block_slot = self.get_latest_block_slot()
         self._finalized_block_slot = self.get_finalized_block_slot()
-        self._min_receipt_block_slot = self.get_min_receipt_block_slot()
 
     @property
     def db_connection(self) -> DBConnection:
@@ -58,74 +58,103 @@ class IndexerDB:
     def is_healthy(self) -> bool:
         return self._db.is_connected()
 
-    def submit_block(self, neon_block: NeonIndexedBlockInfo,
-                     iter_active_neon_block: Optional[Iterator[NeonIndexedBlockInfo]]) -> None:
+    def submit_block_list(self, min_receipt_block_slot: int,
+                          neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
         self._db.run_tx(
-            lambda: self._submit_block(neon_block, iter_active_neon_block)
+            lambda: self._submit_block_list(min_receipt_block_slot, neon_block_queue)
         )
 
-    def finalize_block(self, neon_block: NeonIndexedBlockInfo) -> None:
-        self._db.run_tx(
-            lambda: self._finalize_block(neon_block)
-        )
+    def _submit_block_list(self, min_receipt_block_slot: int,
+                           neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
+        first_block = neon_block_queue[0]
+        last_block = neon_block_queue[-1]
 
-    def _submit_block(self, neon_block: NeonIndexedBlockInfo,
-                      iter_active_neon_block: Optional[Iterator[NeonIndexedBlockInfo]]) -> None:
-        self._sol_blocks_db.set_block(neon_block.sol_block)
-        if neon_block.is_finalized:
-            self._finalize_block(neon_block)
-        elif iter_active_neon_block:
-            self._activate_block_list(iter_active_neon_block)
-            self._stuck_neon_txs_db.set_tx_list(False, neon_block.block_slot, neon_block.iter_stuck_neon_tx())
+        if first_block.is_finalized:
+            self._finalize_block_list(neon_block_queue)
+        else:
+            self._activate_block_list(neon_block_queue)
+            self._stuck_neon_txs_db.set_tx_list(False, last_block.block_slot, last_block.iter_stuck_neon_tx())
 
-        self._neon_txs_db.set_tx_list(neon_block.iter_done_neon_tx())
-        self._neon_tx_logs_db.set_tx_list(neon_block.iter_done_neon_tx())
-        self._sol_neon_txs_db.set_tx_list(neon_block.iter_sol_neon_ix())
-        self._sol_alt_txs_db.set_tx_list(neon_block.iter_sol_alt_ix())
-        self._sol_tx_costs_db.set_cost_list(neon_block.iter_sol_tx_cost())
+        self._sol_blocks_db.set_block_list(neon_block_queue)
+        self._neon_txs_db.set_tx_list(neon_block_queue)
+        self._neon_tx_logs_db.set_tx_list(neon_block_queue)
+        self._sol_neon_txs_db.set_tx_list(neon_block_queue)
+        self._sol_alt_txs_db.set_tx_list(neon_block_queue)
+        self._sol_tx_costs_db.set_cost_list(neon_block_queue)
 
-        if self.get_starting_block().block_slot == 0:
-            self._constants_db['starting_block_slot'] = neon_block.block_slot
+        self._set_min_receipt_block_slot(min_receipt_block_slot)
+        self._set_starting_block_slot(first_block.block_slot)
+        self._set_latest_block_slot(last_block.block_slot)
 
-    def _finalize_block(self, neon_block: NeonIndexedBlockInfo) -> None:
-        block_slot_list = [neon_block.block_slot]
-        for db_table in self._db_table_list:
+        for block in neon_block_queue:
+            block.mark_done()
+
+    def _finalize_block_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
+        last_block = neon_block_queue[-1]
+        block_slot_list = [block.block_slot for block in neon_block_queue]
+        for db_table in self._finalized_db_list:
             db_table.finalize_block_list(self._finalized_block_slot, block_slot_list)
 
-        self._gas_less_usages_db.set_tx_list(neon_block.iter_done_neon_tx())
-        self._stuck_neon_holders_db.set_holder_list(neon_block.stuck_block_slot, neon_block.iter_stuck_neon_holder())
-        self._stuck_neon_txs_db.set_tx_list(True, neon_block.stuck_block_slot, neon_block.iter_stuck_neon_tx())
-        self._sol_alt_infos_db.set_alt_list(neon_block.stuck_block_slot, neon_block.iter_alt_info())
+        self._gas_less_usages_db.set_tx_list(neon_block_queue)
 
-        self._finalized_block_slot = neon_block.block_slot
-        self._constants_db['finalized_block_slot'] = neon_block.block_slot
-        self._set_latest_block_slot(neon_block.block_slot)
+        self._stuck_neon_holders_db.set_holder_list(last_block.stuck_block_slot, last_block.iter_stuck_neon_holder())
+        self._stuck_neon_txs_db.set_tx_list(True, last_block.stuck_block_slot, last_block.iter_stuck_neon_tx())
+        self._sol_alt_infos_db.set_alt_list(last_block.stuck_block_slot, last_block.iter_alt_info())
 
-    def _set_latest_block_slot(self, block_slot: int) -> None:
-        if self._latest_block_slot > block_slot:
-            return
-        self._latest_block_slot = block_slot
-        self._constants_db['latest_block_slot'] = block_slot
+        self._set_finalized_block_slot(last_block.block_slot)
 
-    def _activate_block_list(self, iter_neon_block: Iterator[NeonIndexedBlockInfo]) -> None:
-        block_slot_list = [b.block_slot for b in iter_neon_block if not b.is_finalized]
+    def _activate_block_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
+        block_slot_list = [block.block_slot for block in neon_block_queue if not block.is_finalized]
         if not len(block_slot_list):
             return
 
         self._sol_blocks_db.activate_block_list(self._finalized_block_slot, block_slot_list)
-        self._set_latest_block_slot(block_slot_list[-1])
+
+    def _set_finalized_block_slot(self, block_slot: int) -> None:
+        if self._finalized_block_slot >= block_slot:
+            return
+
+        self._finalized_block_slot = block_slot
+        self._constants_db['finalized_block_slot'] = block_slot
+
+    def _set_latest_block_slot(self, block_slot: int) -> None:
+        if self._latest_block_slot >= block_slot:
+            return
+
+        self._latest_block_slot = block_slot
+        self._constants_db['latest_block_slot'] = block_slot
+
+    def _set_min_receipt_block_slot(self, block_slot: int) -> None:
+        if self._min_receipt_block_slot >= block_slot:
+            return
+
+        self._min_receipt_block_slot = block_slot
+        self._constants_db['min_receipt_block_slot'] = block_slot
+
+    def _set_starting_block_slot(self, block_slot: int) -> None:
+        if self._starting_block_slot <= block_slot:
+            return
+
+        self._starting_block = block_slot
+        self._constants_db['starting_block_slot'] = block_slot
 
     def get_block_by_slot(self, block_slot: int) -> SolBlockInfo:
-        return self._sol_blocks_db.get_block_by_slot(block_slot, self.get_latest_block_slot())
+        return self._get_block_by_slot(
+            block_slot,
+            self.get_starting_block_slot(),
+            self.get_latest_block_slot(),
+        )
+
+    def _get_block_by_slot(self, block_slot: int, starting_block_slot: int, latest_block_slot: int) -> SolBlockInfo:
+        if starting_block_slot <= block_slot <= latest_block_slot:
+            return self._sol_blocks_db.get_block_by_slot(block_slot, latest_block_slot)
+        return SolBlockInfo(block_slot=0)
 
     def get_block_by_hash(self, block_hash: str) -> SolBlockInfo:
         return self._sol_blocks_db.get_block_by_hash(block_hash, self.get_latest_block_slot())
 
-    def get_latest_block(self) -> SolBlockInfo:
-        block_slot = self.get_latest_block_slot()
-        if block_slot == 0:
-            return SolBlockInfo(block_slot=0)
-        return self.get_block_by_slot(block_slot)
+    def get_starting_block_slot(self) -> int:
+        return self._constants_db['starting_block_slot']
 
     def get_latest_block_slot(self) -> int:
         return self._constants_db['latest_block_slot']
@@ -133,34 +162,23 @@ class IndexerDB:
     def get_finalized_block_slot(self) -> int:
         return self._constants_db['finalized_block_slot']
 
-    def get_finalized_block(self) -> SolBlockInfo:
-        block_slot = self.get_finalized_block_slot()
-        if block_slot == 0:
-            return SolBlockInfo(block_slot=0)
-        return self.get_block_by_slot(block_slot)
-
-    def get_starting_block(self) -> SolBlockInfo:
-        if self._starting_block.block_slot != 0:
-            return self._starting_block
-
-        block_slot = self._constants_db['starting_block_slot']
-        if block_slot == 0:
-            return SolBlockInfo(block_slot=0)
-        self._starting_block = self.get_block_by_slot(block_slot)
-        return self._starting_block
-
-    def get_starting_block_slot(self) -> int:
-        return self.get_starting_block().block_slot
-
     def get_min_receipt_block_slot(self) -> int:
         return self._constants_db['min_receipt_block_slot']
 
-    def set_min_receipt_block_slot(self, block_slot: int) -> None:
-        if self._min_receipt_block_slot >= block_slot:
-            return
+    def get_latest_block(self) -> SolBlockInfo:
+        starting_block_slot = self.get_starting_block_slot()
+        block_slot = self.get_latest_block_slot()
+        return self._get_block_by_slot(block_slot, starting_block_slot, block_slot)
 
-        self._min_receipt_block_slot = block_slot
-        self._constants_db['min_receipt_block_slot'] = block_slot
+    def get_finalized_block(self) -> SolBlockInfo:
+        starting_block_slot = self.get_starting_block_slot()
+        block_slot = self.get_finalized_block_slot()
+        return self._get_block_by_slot(block_slot, starting_block_slot, block_slot)
+
+    def get_starting_block(self) -> SolBlockInfo:
+        block_slot = self.get_starting_block_slot()
+        latest_block_slot = self.get_latest_block_slot()
+        return self._get_block_by_slot(block_slot, block_slot, latest_block_slot)
 
     def get_log_list(self, from_block: Optional[int], to_block: Optional[int],
                      address_list: List[str], topic_list: List[List[str]]) -> List[Dict[str, Any]]:

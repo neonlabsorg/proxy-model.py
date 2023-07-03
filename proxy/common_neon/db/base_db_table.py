@@ -20,6 +20,7 @@ class BaseDBTable:
         self._db = db
         self._table_name = table_name
         self._blocks_table_name = 'solana_blocks'
+        self._tx_costs_table_name = 'solana_transaction_costs'
 
         self._column_list = column_list
         self._column_dict: Dict[str, int] = {name: idx for idx, name in enumerate(column_list)}
