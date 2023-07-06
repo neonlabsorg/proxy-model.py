@@ -19,9 +19,6 @@ class SolTxCostsDB(BaseDBTable):
     def set_cost_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
         row_list: List[List[Any]] = list()
         for neon_block in neon_block_queue:
-            if neon_block.is_done:
-                continue
-
             for cost in neon_block.iter_sol_tx_cost():
                 value_list: List[Any] = list()
                 for idx, column in enumerate(self._column_list):

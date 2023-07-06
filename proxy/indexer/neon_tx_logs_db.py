@@ -44,9 +44,6 @@ class NeonTxLogsDB(BaseDBTable):
     def set_tx_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
         row_list: List[List[Any]] = list()
         for neon_block in neon_block_queue:
-            if neon_block.is_done:
-                continue
-
             for tx in neon_block.iter_done_neon_tx():
                 for log in tx.neon_tx_res.log_list:
                     topic_list = log['topics']

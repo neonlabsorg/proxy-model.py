@@ -66,6 +66,7 @@
         operator TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_gas_less_usages ON gas_less_usages(address);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_gas_less_usages_neon_sig ON gas_less_usages(neon_sig);
 
     CREATE TABLE IF NOT EXISTS solana_blocks (
         block_slot BIGINT,

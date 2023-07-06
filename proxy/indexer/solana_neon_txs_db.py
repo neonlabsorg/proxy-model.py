@@ -23,9 +23,6 @@ class SolNeonTxsDB(BaseDBTable):
     def set_tx_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
         row_list: List[List[Any]] = list()
         for neon_block in neon_block_queue:
-            if neon_block.is_done:
-                continue
-
             for ix in neon_block.iter_sol_neon_ix():
                 value_list: List[Any] = list()
                 is_success = (ix.status == ix.Status.Success)

@@ -77,9 +77,6 @@ class NeonTxsDB(BaseDBTable):
     def set_tx_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
         row_list: List[List[Any]] = []
         for neon_block in neon_block_queue:
-            if neon_block.is_done:
-                continue
-
             for tx in neon_block.iter_done_neon_tx():
                 value_list: List[Any] = []
                 for idx, column in enumerate(self._column_list):

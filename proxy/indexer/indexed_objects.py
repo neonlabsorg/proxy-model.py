@@ -430,6 +430,7 @@ class NeonIndexedBlockInfo:
         self._is_cloned = True
         self._is_done = False
         self._has_corrupted_tx = False
+        self._is_stuck_completed = False
 
         self._neon_holder_dict: Dict[str, NeonIndexedHolderInfo] = dict()
         self._modified_neon_acct_set: Set[str] = set()
@@ -459,7 +460,7 @@ class NeonIndexedBlockInfo:
         if len(src_block._neon_tx_dict) or len(src_block._neon_holder_dict):
             new_block._min_block_slot = src_block._min_block_slot
 
-        if len(src_block._stuck_neon_holder_list) or len(src_block._stuck_neon_tx_list):
+        if src_block._stuck_block_slot > new_block.block_slot:
             new_block._stuck_block_slot = src_block._stuck_block_slot
 
         new_block._neon_holder_dict = src_block._neon_holder_dict
@@ -633,10 +634,12 @@ class NeonIndexedBlockInfo:
             self._sol_alt_ix_list.append(alt_ix)
         self._alt_info_dict.pop(alt_info.alt_key)
 
-    def iter_stuck_neon_holder(self) -> Iterator[NeonIndexedHolderInfo]:
+    def iter_stuck_neon_holder(self, config: Config) -> Iterator[NeonIndexedHolderInfo]:
+        self._check_stuck_objs(config)
         return iter(self._stuck_neon_holder_list)
 
-    def iter_stuck_neon_tx(self) -> Iterator[NeonIndexedTxInfo]:
+    def iter_stuck_neon_tx(self, config: Config) -> Iterator[NeonIndexedTxInfo]:
+        self._check_stuck_objs(config)
         return iter(self._stuck_neon_tx_list)
 
     def fail_neon_holder_list(self, failed_holder_list: List[NeonIndexedHolderInfo]) -> None:
@@ -772,15 +775,10 @@ class NeonIndexedBlockInfo:
             if alt_ix.sol_tx_cost.operator in config.operator_account_set:
                 stat.op_sol_spent += sol_spent
 
-    def complete_block(self, config: Config) -> None:
+    def complete_block(self) -> None:
         if self._is_completed:
             return
         self._is_completed = True
-
-        self._check_stuck_holders(config)
-        self._check_stuck_txs(config)
-        self._check_stuck_alts(config)
-
         self._finalize_log_list()
 
     def _finalize_log_list(self) -> None:
@@ -800,6 +798,14 @@ class NeonIndexedBlockInfo:
             sum_gas_used += tx.neon_tx_res.gas_used
             log_idx = tx.neon_tx_res.set_block_info(self._sol_block, tx.neon_tx.sig, tx_idx, log_idx, sum_gas_used)
             tx_idx += 1
+
+    def _check_stuck_objs(self, config: Config) -> None:
+        if self._is_stuck_completed:
+            return
+        self._is_stuck_completed = True
+        self._check_stuck_holders(config)
+        self._check_stuck_txs(config)
+        self._check_stuck_alts(config)
 
     def _check_stuck_holders(self, config: Config) -> None:
         # there were the restart with stuck holders

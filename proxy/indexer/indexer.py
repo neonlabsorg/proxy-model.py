@@ -85,14 +85,14 @@ class Indexer(IndexerBase):
             return
 
         failed_holder_list: List[NeonIndexedHolderInfo] = list()
-        for holder in neon_block.iter_stuck_neon_holder():
+        for holder in neon_block.iter_stuck_neon_holder(self._config):
             if holder.last_block_slot > last_block_slot:
                 pass
             elif not self._is_valid_holder(holder.account, holder.neon_tx_sig):
                 failed_holder_list.append(holder)
 
         failed_tx_list: List[NeonIndexedTxInfo] = list()
-        for tx in neon_block.iter_stuck_neon_tx():
+        for tx in neon_block.iter_stuck_neon_tx(self._config):
             if tx.last_block_slot > last_block_slot:
                 continue
             elif not self._is_valid_holder(tx.holder_account, tx.neon_tx.sig):
@@ -225,7 +225,7 @@ class Indexer(IndexerBase):
         neon_block = state.neon_block
         if is_finalized:
             neon_block.mark_finalized()
-        neon_block.complete_block(self._config)
+        neon_block.complete_block()
         self._neon_block_dict.add_neon_block(neon_block)
 
         state.complete_neon_block()

@@ -21,6 +21,7 @@ from .gas_less_usages_db import GasLessUsagesDB
 
 class IndexerDB:
     def __init__(self, config: Config):
+        self._config = config
         self._db = DBConnection(config)
         self._sol_blocks_db = SolBlocksDB(self._db)
         self._sol_tx_costs_db = SolTxCostsDB(self._db)
@@ -69,11 +70,16 @@ class IndexerDB:
         first_block = neon_block_queue[0]
         last_block = neon_block_queue[-1]
 
-        if first_block.is_finalized:
+        if last_block.is_finalized:
             self._finalize_block_list(neon_block_queue)
         else:
             self._activate_block_list(neon_block_queue)
-            self._stuck_neon_txs_db.set_tx_list(False, last_block.block_slot, last_block.iter_stuck_neon_tx())
+            self._stuck_neon_txs_db.set_tx_list(
+                False, last_block.block_slot,
+                last_block.iter_stuck_neon_tx(self._config)
+            )
+
+        neon_block_queue = [block for block in neon_block_queue if not block.is_done]
 
         self._sol_blocks_db.set_block_list(neon_block_queue)
         self._neon_txs_db.set_tx_list(neon_block_queue)
@@ -81,6 +87,7 @@ class IndexerDB:
         self._sol_neon_txs_db.set_tx_list(neon_block_queue)
         self._sol_alt_txs_db.set_tx_list(neon_block_queue)
         self._sol_tx_costs_db.set_cost_list(neon_block_queue)
+        self._gas_less_usages_db.set_tx_list(neon_block_queue)
 
         self._set_min_receipt_block_slot(min_receipt_block_slot)
         self._set_starting_block_slot(first_block.block_slot)
@@ -95,10 +102,14 @@ class IndexerDB:
         for db_table in self._finalized_db_list:
             db_table.finalize_block_list(self._finalized_block_slot, block_slot_list)
 
-        self._gas_less_usages_db.set_tx_list(neon_block_queue)
-
-        self._stuck_neon_holders_db.set_holder_list(last_block.stuck_block_slot, last_block.iter_stuck_neon_holder())
-        self._stuck_neon_txs_db.set_tx_list(True, last_block.stuck_block_slot, last_block.iter_stuck_neon_tx())
+        self._stuck_neon_holders_db.set_holder_list(
+            last_block.stuck_block_slot,
+            last_block.iter_stuck_neon_holder(self._config)
+        )
+        self._stuck_neon_txs_db.set_tx_list(
+            True, last_block.stuck_block_slot,
+            last_block.iter_stuck_neon_tx(self._config)
+        )
         self._sol_alt_infos_db.set_alt_list(last_block.stuck_block_slot, last_block.iter_alt_info())
 
         self._set_finalized_block_slot(last_block.block_slot)

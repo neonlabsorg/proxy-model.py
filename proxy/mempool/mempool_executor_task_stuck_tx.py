@@ -1,5 +1,3 @@
-from typing import List, Dict, Any
-
 import time
 
 from .mempool_api import MPGetStuckTxListRequest, MPGetStuckTxListResponse, MPStuckTxInfo
@@ -21,8 +19,9 @@ class MPExecutorStuckTxListTask(MPExecutorBaseTask):
         self._stuck_txs_db = StuckNeonTxsDB(db)
 
     def read_stuck_tx_list(self, _: MPGetStuckTxListRequest) -> MPGetStuckTxListResponse:
-        block_slot = self._solana.get_block_slot(SolCommit.Finalized)
+        block_slot = self._solana.get_block_slot(SolCommit.Finalized) - 2
         _, src_tx_list = self._stuck_txs_db.get_tx_list(False, block_slot)
+
         dst_tx_list = [
             MPStuckTxInfo(
                 neon_tx=NeonTxInfo.from_dict(tx['neon_tx']),
