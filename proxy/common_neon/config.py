@@ -4,6 +4,7 @@ import os
 from decimal import Decimal
 from typing import Optional
 from urllib.parse import urlparse
+from typing import Optional, Set
 
 from .db.db_config import DBConfig
 from .environment_data import EVM_LOADER_ID
@@ -41,7 +42,7 @@ class Config(DBConfig):
         self._mempool_executor_limit_cnt = self._env_int('MEMPOOL_EXECUTOR_LIMIT_CNT', 4, 1024)
         self._mempool_cache_life_sec = self._env_int('MEMPOOL_CACHE_LIFE_SEC', 15, 30 * 60)
         self._accept_reverted_tx_into_mempool = self._env_bool('ACCEPT_REVERTED_TX_INTO_MEMPOOL', False)
-        self._holder_size = self._env_int("HOLDER_SIZE", 1024, 131072)  # 128*1024
+        self._holder_size = self._env_int("HOLDER_SIZE", 1024, 262144)  # 256*1024
         self._min_op_balance_to_warn = self._env_int("MIN_OPERATOR_BALANCE_TO_WARN", 9000000000, 9000000000)
         self._min_op_balance_to_err = self._env_int("MIN_OPERATOR_BALANCE_TO_ERR", 1000000000, 1000000000)
         self._perm_account_id = self._env_int("PERM_ACCOUNT_ID", 1, 1)
@@ -53,17 +54,15 @@ class Config(DBConfig):
         self._enable_send_tx_api = self._env_bool("ENABLE_SEND_TX_API", True)
         self._use_earliest_block_if_0_passed = self._env_bool("USE_EARLIEST_BLOCK_IF_0_PASSED", False)
         self._account_permission_update_int = self._env_int("ACCOUNT_PERMISSION_UPDATE_INT", 10, 60 * 5)
-        self._allow_underpriced_tx_wo_chainid = self._env_bool("ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID", False)
-        self._extra_gas_pct = self._env_decimal("EXTRA_GAS_PCT", "0.0")
-        self._operator_fee = self._env_decimal("OPERATOR_FEE", "0.1")
+        self._allow_underpriced_tx_wo_chainid = self._env_bool('ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID', False)
+        self._operator_fee = self._env_decimal('OPERATOR_FEE', "0.1")
+        self._gas_price_slippage = self._env_decimal('GAS_PRICE_SLIPPAGE', "0.01")
         self._slot_processing_delay = self._env_int("SLOT_PROCESSING_DELAY", 0, 0)
-        self._gas_price_suggested_pct = self._env_decimal("GAS_PRICE_SUGGEST_PCT", "0.01")
         self._min_gas_price = self._env_int("MINIMAL_GAS_PRICE", 0, 1) * (10 ** 9)
         self._min_wo_chainid_gas_price = self._env_int("MINIMAL_WO_CHAINID_GAS_PRICE", 0, 10) * (10 ** 9)
         self._gas_less_tx_max_nonce = self._env_int("GAS_LESS_MAX_TX_NONCE", 0, 5)
         self._gas_less_tx_max_gas = self._env_int("GAS_LESS_MAX_GAS", 0, 20_000_000)  # Estimated gas on Mora = 18 mln
         self._neon_price_usd = Decimal('0.25')
-        self._neon_decimals = self._env_int('NEON_DECIMALS', 1, 9)
         self._start_slot = os.environ.get('START_SLOT', '0')
         self._indexer_parallel_request_cnt = self._env_int("INDEXER_PARALLEL_REQUEST_COUNT", 1, 10)
         self._indexer_poll_cnt = self._env_int("INDEXER_POLL_COUNT", 1, 1000)
@@ -75,9 +74,9 @@ class Config(DBConfig):
         self._max_evm_step_cnt_emulate = self._env_int("MAX_EVM_STEP_COUNT_TO_EMULATE", 1000, 500000)
         self._neon_cli_timeout = self._env_decimal("NEON_CLI_TIMEOUT", "2.5")
         self._neon_cli_debug_log = self._env_bool("NEON_CLI_DEBUG_LOG", False)
-        self._cancel_timeout = self._env_int("CANCEL_TIMEOUT", 1, 60)
-        self._skip_cancel_timeout = self._env_int("SKIP_CANCEL_TIMEOUT", 1, 1000)
-        self._holder_timeout = self._env_int("HOLDER_TIMEOUT", 1, 216000)  # 1 day by default
+        self._stuck_obj_blockout = self._env_int('STUCK_OBJECT_BLOCKOUT', 16, 64)
+        self._stuck_obj_validate_blockout = self._env_int('STUCK_OBJECT_VALIDATE_BLOCKOUT', 512, 1024)
+        self._alt_freeing_depth = self._env_int('ALT_FREEING_DEPTH', 512, 512 + 16)
         self._gather_statistics = self._env_bool("GATHER_STATISTICS", False)
         self._hvac_url = os.environ.get('HVAC_URL', None)
         self._hvac_token = os.environ.get('HVAC_TOKEN', None)
@@ -94,17 +93,23 @@ class Config(DBConfig):
             self._pyth_mapping_account = None
         self._update_pyth_mapping_period_sec = self._env_int('UPDATE_PYTH_MAPPING_PERIOD_SEC', 10, 60 * 60)
 
+        op_acct_list = os.environ.get('OPERATOR_ACCOUNT_LIST', '')
+        self._op_acct_set = set([acct for acct in op_acct_list.split(' ;,') if len(acct) > 0])
+
         self._validate()
 
     def _validate(self) -> None:
         self._commit_level = SolCommit.Type(self._commit_level.lower())
         assert SolCommit.level(self._commit_level) >= SolCommit.level(SolCommit.Confirmed)
 
-        assert (self._operator_fee > 0) and (self._operator_fee < 1)
-        assert (self._gas_price_suggested_pct >= 0) and (self._gas_price_suggested_pct < 1)
-        assert (self._extra_gas_pct >= 0) and (self._extra_gas_pct < 1)
+        assert (self._operator_fee > 0) and (self._operator_fee <= 1)
+        assert (self._gas_price_slippage >= 0) and (self._gas_price_slippage < 1)
         assert (self._slot_processing_delay < 32)
         assert (self._fuzz_fail_pct >= 0) and (self._fuzz_fail_pct < 100)
+
+        for acct in self._op_acct_set:
+            pubkey = SolPubKey.from_string(acct)
+            assert str(pubkey) == acct, f'Invalid operator account {acct}'
 
     @staticmethod
     def _env_bool(name: str, default_value: bool) -> bool:
@@ -215,21 +220,17 @@ class Config(DBConfig):
         return self._allow_underpriced_tx_wo_chainid
 
     @property
-    def extra_gas_pct(self) -> Decimal:
-        return self._extra_gas_pct
-
-    @property
     def operator_fee(self) -> Decimal:
         return self._operator_fee
+
+    @property
+    def gas_price_slippage(self) -> Decimal:
+        return self._gas_price_slippage
 
     @property
     def slot_processing_delay(self) -> int:
         """Slot processing delay relative to the last confirmed slot on Tracer API node"""
         return self._slot_processing_delay
-
-    @property
-    def gas_price_suggested_pct(self) -> Decimal:
-        return self._gas_price_suggested_pct
 
     @property
     def min_gas_price(self) -> int:
@@ -252,10 +253,6 @@ class Config(DBConfig):
     @property
     def neon_price_usd(self) -> Decimal:
         return self._neon_price_usd
-
-    @property
-    def neon_decimals(self) -> int:
-        return self._neon_decimals
 
     @property
     def start_slot(self) -> str:
@@ -302,16 +299,20 @@ class Config(DBConfig):
         return self._neon_cli_debug_log
 
     @property
-    def cancel_timeout(self) -> int:
-        return self._cancel_timeout
+    def stuck_object_blockout(self) -> int:
+        return self._stuck_obj_blockout
 
     @property
-    def skip_cancel_timeout(self) -> int:
-        return self._skip_cancel_timeout
+    def stuck_object_validate_blockout(self) -> int:
+        return self._stuck_obj_validate_blockout
 
     @property
-    def holder_timeout(self) -> int:
-        return self._holder_timeout
+    def alt_freeing_depth(self) -> int:
+        return self._alt_freeing_depth
+
+    @property
+    def operator_account_set(self) -> Set[str]:
+        return self._op_acct_set
 
     @property
     def gather_statistics(self) -> bool:
@@ -366,16 +367,14 @@ class Config(DBConfig):
             'ENABLE_SEND_TX_API': self.enable_send_tx_api,
             'USE_EARLIEST_BLOCK_IF_0_PASSED': self.use_earliest_block_if_0_passed,
             'ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID': self.allow_underpriced_tx_wo_chainid,
-            'EXTRA_GAS_PCT': self.extra_gas_pct,
             'OPERATOR_FEE': self.operator_fee,
             'SLOT_PROCESSING_DELAY': self.slot_processing_delay,
-            'GAS_PRICE_SUGGEST_PCT': self.gas_price_suggested_pct,
+            'GAS_PRICE_SLIPPAGE': self.gas_price_slippage,
             'MINIMAL_GAS_PRICE': self.min_gas_price,
             'MINIMAL_WO_CHAINID_GAS_PRICE': self.min_wo_chainid_gas_price,
             'GAS_LESS_MAX_TX_NONCE': self.gas_less_tx_max_nonce,
             'GAS_LESS_MAX_GAS': self.gas_less_tx_max_gas,
             'NEON_PRICE_USD': self.neon_price_usd,
-            'NEON_DECIMALS': self.neon_decimals,
             'START_SLOT': self.start_slot,
             'INDEXER_PARALLEL_REQUEST_COUNT': self.indexer_parallel_request_cnt,
             'INDEXER_POLL_COUNT': self.indexer_poll_cnt,
@@ -387,12 +386,13 @@ class Config(DBConfig):
             'MAX_EVM_STEP_COUNT_TO_EMULATE': self.max_evm_step_cnt_emulate,
             'NEON_CLI_TIMEOUT': self.neon_cli_timeout,
             'NEON_CLI_DEBUG_LOG': self.neon_cli_debug_log,
-            'CANCEL_TIMEOUT': self.cancel_timeout,
-            'SKIP_CANCEL_TIMEOUT': self.skip_cancel_timeout,
-            'HOLDER_TIMOUT': self.holder_timeout,
+            'STUCK_OBJECT_BLOCKOUT': self.stuck_object_blockout,
+            'STUCK_OBJECT_VALIDATE_BLOCKOUT': self.stuck_object_validate_blockout,
+            'ALT_FREEING_DEPTH': self.alt_freeing_depth,
+            'OPERATOR_ACCOUNT_LIST': ';'.join(list(self.operator_account_set)),
             'GATHER_STATISTICS': self.gather_statistics,
 
-            'GENESIS_BLOCK_TIMESTAMP': self.genesis_timestamp,
+            'GENESIS_BLOCK_TIMESTAMP=': self.genesis_timestamp,
             'COMMIT_LEVEL': self.commit_level,
 
             # Don't print accesses to the logs
