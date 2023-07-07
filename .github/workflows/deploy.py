@@ -45,7 +45,7 @@ TFSTATE_KEY_PREFIX = "tests/test-"
 TFSTATE_REGION = "us-east-2"
 IMAGE_NAME = "neonlabsorg/proxy"
 
-UNISWAP_V2_CORE_COMMIT = 'stable'
+UNISWAP_V2_CORE_COMMIT = 'latest'
 UNISWAP_V2_CORE_IMAGE = f'neonlabsorg/uniswap-v2-core:{UNISWAP_V2_CORE_COMMIT}'
 
 FAUCET_COMMIT = 'latest'
