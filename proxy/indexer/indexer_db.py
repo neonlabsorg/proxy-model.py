@@ -67,6 +67,17 @@ class IndexerDB:
 
     def _submit_block_list(self, min_receipt_block_slot: int,
                            neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
+        new_neon_block_queue = [block for block in neon_block_queue if not block.is_done]
+
+        if len(new_neon_block_queue) > 0:
+            self._sol_blocks_db.set_block_list(new_neon_block_queue)
+            self._neon_txs_db.set_tx_list(new_neon_block_queue)
+            self._neon_tx_logs_db.set_tx_list(new_neon_block_queue)
+            self._sol_neon_txs_db.set_tx_list(new_neon_block_queue)
+            self._sol_alt_txs_db.set_tx_list(new_neon_block_queue)
+            self._sol_tx_costs_db.set_cost_list(new_neon_block_queue)
+            self._gas_less_usages_db.set_tx_list(new_neon_block_queue)
+
         first_block = neon_block_queue[0]
         last_block = neon_block_queue[-1]
 
@@ -74,20 +85,6 @@ class IndexerDB:
             self._finalize_block_list(neon_block_queue)
         else:
             self._activate_block_list(neon_block_queue)
-            self._stuck_neon_txs_db.set_tx_list(
-                False, last_block.block_slot,
-                last_block.iter_stuck_neon_tx(self._config)
-            )
-
-        neon_block_queue = [block for block in neon_block_queue if not block.is_done]
-
-        self._sol_blocks_db.set_block_list(neon_block_queue)
-        self._neon_txs_db.set_tx_list(neon_block_queue)
-        self._neon_tx_logs_db.set_tx_list(neon_block_queue)
-        self._sol_neon_txs_db.set_tx_list(neon_block_queue)
-        self._sol_alt_txs_db.set_tx_list(neon_block_queue)
-        self._sol_tx_costs_db.set_cost_list(neon_block_queue)
-        self._gas_less_usages_db.set_tx_list(neon_block_queue)
 
         self._set_min_receipt_block_slot(min_receipt_block_slot)
         self._set_starting_block_slot(first_block.block_slot)
@@ -97,10 +94,18 @@ class IndexerDB:
             block.mark_done()
 
     def _finalize_block_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
-        last_block = neon_block_queue[-1]
-        block_slot_list = [block.block_slot for block in neon_block_queue]
+        block_slot_list = [
+            block.block_slot
+            for block in neon_block_queue
+            if block.is_done and (block.block_slot > self._finalized_block_slot)
+        ]
+        if len(block_slot_list) == 0:
+            return
+
         for db_table in self._finalized_db_list:
             db_table.finalize_block_list(self._finalized_block_slot, block_slot_list)
+
+        last_block = neon_block_queue[-1]
 
         self._stuck_neon_holders_db.set_holder_list(
             last_block.stuck_block_slot,
@@ -115,6 +120,13 @@ class IndexerDB:
         self._set_finalized_block_slot(last_block.block_slot)
 
     def _activate_block_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
+        last_block = neon_block_queue[-1]
+        if not last_block.is_done:
+            self._stuck_neon_txs_db.set_tx_list(
+                False, last_block.block_slot,
+                last_block.iter_stuck_neon_tx(self._config)
+            )
+
         block_slot_list = [block.block_slot for block in neon_block_queue if not block.is_finalized]
         if not len(block_slot_list):
             return
