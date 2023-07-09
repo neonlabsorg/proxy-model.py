@@ -2,28 +2,23 @@ from __future__ import annotations
 
 import logging
 import time
-import base58
 
-from typing import List, Optional, Dict, Type, Any
+from typing import List, Optional, Dict, Type
 
-from .indexed_objects import (
-    NeonIndexedBlockInfo, NeonIndexedBlockDict, SolNeonTxDecoderState,
-    NeonIndexedHolderInfo, NeonIndexedTxInfo, NeonIndexedAltInfo
-)
+from .indexed_objects import NeonIndexedBlockInfo, NeonIndexedBlockDict, SolNeonTxDecoderState
 from .indexer_base import IndexerBase
 from .indexer_db import IndexerDB
 from .neon_ix_decoder import DummyIxDecoder, get_neon_ix_decoder_list
 from .neon_ix_decoder_deprecate import get_neon_ix_decoder_deprecated_list
 from .tracer_api_client import TracerAPIClient
 from .solana_block_net_cache import SolBlockNetCache
+from .indexer_validate_stuck_objs import StuckObjectValidator
+from .indexer_alt_ix_collector import AltIxCollector
 
 from ..common_neon.config import Config
-from ..common_neon.constants import FINALIZED_HOLDER_TAG, ADDRESS_LOOKUP_TABLE_ID
-from ..common_neon.layouts import ALTAccountInfo
 from ..common_neon.metrics_logger import MetricsLogger
 from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.solana_neon_tx_receipt import SolAltIxInfo, SolTxMetaInfo
-from ..common_neon.solana_tx import SolPubKey, SolCommit
+from ..common_neon.solana_tx import SolCommit
 from ..common_neon.solana_tx_error_parser import SolTxErrorParser
 from ..common_neon.utils.json_logger import logging_context
 from ..common_neon.utils.solana_block import SolBlockInfo
@@ -53,13 +48,14 @@ class Indexer(IndexerBase):
         self._stat_client.start()
         self._last_stat_time = 0.0
 
-        self._stuck_objs_last_validate_slot = 0
         self._confirmed_block_slot: Optional[int] = None
 
         self._last_confirmed_block_slot = 0
         self._last_finalized_block_slot = 0
         self._neon_block_dict = NeonIndexedBlockDict()
 
+        self._stuck_obj_validator = StuckObjectValidator(config, self._solana)
+        self._alt_ix_collector = AltIxCollector(config, self._solana)
         self._sol_block_net_cache = SolBlockNetCache(config, self._solana)
 
         sol_neon_ix_decoder_list: List[Type[DummyIxDecoder]] = list()
@@ -72,143 +68,17 @@ class Indexer(IndexerBase):
             assert ix_code not in self._sol_neon_ix_decoder_dict
             self._sol_neon_ix_decoder_dict[ix_code] = decoder
 
-    def _validate_stuck_objs(self, neon_block: NeonIndexedBlockInfo) -> None:
-        block_slot = neon_block.block_slot
-        last_block_slot = block_slot - self._config.stuck_object_validate_blockout
-        if last_block_slot < self._stuck_objs_last_validate_slot:
-            return
-        elif self._stuck_objs_last_validate_slot == 0:
-            self._stuck_objs_last_validate_slot = block_slot
-            return
-        elif neon_block.stuck_block_slot > neon_block.block_slot:
-            self._stuck_objs_last_validate_slot = block_slot
-            return
-
-        failed_holder_list: List[NeonIndexedHolderInfo] = list()
-        for holder in neon_block.iter_stuck_neon_holder(self._config):
-            if holder.last_block_slot > last_block_slot:
-                pass
-            elif not self._is_valid_holder(holder.account, holder.neon_tx_sig):
-                failed_holder_list.append(holder)
-
-        failed_tx_list: List[NeonIndexedTxInfo] = list()
-        for tx in neon_block.iter_stuck_neon_tx(self._config):
-            if tx.last_block_slot > last_block_slot:
-                continue
-            elif not self._is_valid_holder(tx.holder_account, tx.neon_tx.sig):
-                failed_tx_list.append(tx)
-
-        neon_block.fail_neon_holder_list(failed_holder_list)
-        neon_block.fail_neon_tx_list(failed_tx_list)
-        self._stuck_objs_last_validate_slot = block_slot
-
-    def _is_valid_holder(self, holder_acct: str, neon_tx_sig: str) -> bool:
-        holder_info = self._solana.get_holder_account_info(SolPubKey.from_string(holder_acct))
-        if holder_info is None:
-            return False
-
-        if holder_info.neon_tx_sig == neon_tx_sig:
-            return holder_info.tag != FINALIZED_HOLDER_TAG
-        return False
-
-    def _collect_alt_ixs(self, neon_block: NeonIndexedBlockInfo) -> None:
-        freeing_depth = self._config.alt_freeing_depth * 2
-        check_slot = neon_block.block_slot - freeing_depth
-        check_done_slot = neon_block.block_slot - 64
-        if check_slot < 0:
-            return
-
-        for alt_info in list(neon_block.iter_alt_info()):
-            if alt_info.block_slot > check_slot:
-                continue
-            elif alt_info.done_block_slot > check_done_slot:
-                continue
-            elif alt_info.done_block_slot > 0:
-                pass
-            elif not self._is_done_alt(neon_block, alt_info):
-                continue
-            else:
-                # wait for transaction indexing
-                alt_info.set_done_block_slot(neon_block.block_slot)
-                continue
-
-            alt_key = SolPubKey.from_string(alt_info.alt_key)
-            sig_block_list = self._solana.get_sig_list_for_address(alt_key, None, 1000, SolCommit.Finalized)
-            sig_list = [sig_block.get('signature', None) for sig_block in sig_block_list]
-            tx_receipt_list = self._solana.get_tx_receipt_list(sig_list, SolCommit.Finalized)
-
-            alt_ix_list = self._decode_alt_ixs(alt_info, tx_receipt_list)
-            neon_block.done_alt_info(alt_info, alt_ix_list)
-
-    def _is_done_alt(self, neon_block: NeonIndexedBlockInfo, alt_info: NeonIndexedAltInfo) -> bool:
-        alt_address = SolPubKey.from_string(alt_info.alt_key)
-        acct_info = self._solana.get_account_info(alt_address, commitment=SolCommit.Finalized)
-        if acct_info is None:
-            return True
-
-        alt_acct_info = ALTAccountInfo.from_account_info(acct_info)
-        if alt_acct_info is None:
-            return True
-        elif alt_acct_info.authority is None:
-            LOG.warning(f'ALT {alt_info.alt_key} is frozen')
-            return True
-
-        if alt_acct_info.authority in self._config.operator_account_set:
-            return False
-
-        # don't wait for ALTs from other operators
-        check_block_slot = neon_block.block_slot - self._config.alt_freeing_depth * 10
-        if alt_info.block_slot < check_block_slot:
-            return True
-        return False
-
-    @staticmethod
-    def _decode_alt_ixs(alt_info: NeonIndexedAltInfo, tx_receipt_list: List[Dict[str, Any]]) -> List[SolAltIxInfo]:
-        alt_program_key = str(ADDRESS_LOOKUP_TABLE_ID)
-        alt_ix_list: List[SolAltIxInfo] = list()
-        for tx_receipt in tx_receipt_list:
-            if tx_receipt is None:
-                continue
-
-            has_alt_ix = False
-            tx_meta = SolTxMetaInfo.from_tx_receipt(None, tx_receipt)
-            for idx, ix in enumerate(tx_meta.ix_list):
-                if not tx_meta.is_program(ix, alt_program_key):
-                    continue
-
-                try:
-                    ix_data = base58.b58decode(ix.get('data', None))
-                    ix_code = int.from_bytes(ix_data[:4], 'little')
-                    has_alt_ix = True
-                except BaseException as exc:
-                    LOG.warning(
-                        f'failed to decode ALT instruction data '
-                        f'in Solana tx {tx_meta.sol_sig}:{tx_meta.block_slot}',
-                        exc_info=exc
-                    )
-                    continue
-
-                alt_ix_info = SolAltIxInfo.from_tx_meta(
-                    tx_meta, idx, ix_code, alt_info.alt_key,
-                    alt_info.neon_tx_sig
-                )
-                alt_ix_list.append(alt_ix_info)
-
-            if not has_alt_ix:
-                LOG.warning(f'ALT instruction does not exist in Solana tx {tx_meta.sol_sig}:{tx_meta.block_slot}')
-        return alt_ix_list
-
     def _save_checkpoint(self, state: SolNeonTxDecoderState) -> None:
         if state.is_neon_block_queue_empty():
             return
 
         neon_block_queue = state.neon_block_queue
         neon_block = neon_block_queue[-1]
-        self._collect_alt_ixs(neon_block)
+        self._alt_ix_collector.collect_in_block(neon_block)
 
         # validate stuck objects only on the last confirmed block
         if not neon_block.is_finalized:
-            self._validate_stuck_objs(neon_block)
+            self._stuck_obj_validator.validate_block(neon_block)
         else:
             self._neon_block_dict.finalize_neon_block(neon_block)
             self._sol_block_net_cache.finalize_block(neon_block.block_slot)
