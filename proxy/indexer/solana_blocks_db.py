@@ -168,8 +168,6 @@ class SolBlocksDB(BaseDBTable):
         row_list: List[List[Any]] = list()
 
         for neon_block in neon_block_queue:
-            LOG.debug(f'save block {neon_block.sol_block.block_slot}')
-
             block = neon_block.sol_block
             row_list.append([
                 block.block_slot,
