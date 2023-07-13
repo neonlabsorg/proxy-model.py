@@ -27,7 +27,10 @@ class SolNeonTxsDB(BaseDBTable):
                 value_list: List[Any] = list()
                 is_success = (ix.status == ix.Status.Success)
                 for idx, column in enumerate(self._column_list):
-                    if column == 'neon_sig':
+                    if column == 'inner_idx':
+                        # Postgres version < 14 doesn't work correctly with NULLs in UNIQUE keys
+                        value_list.append(ix.inner_idx if ix.inner_idx is not None else -1)
+                    elif column == 'neon_sig':
                         value_list.append(ix.neon_tx_sig)
                     elif column == 'neon_total_gas_used':
                         neon_total_gas_used = ix.neon_total_gas_used
@@ -52,7 +55,7 @@ class SolNeonTxsDB(BaseDBTable):
                 ON b.block_slot = a.block_slot
                AND b.is_active = True
              WHERE a.neon_sig = %s
-          ORDER BY a.block_slot, a.neon_total_gas_used, a.sol_sig
+          ORDER BY a.block_slot, a.neon_total_gas_used, a.sol_sig, a.idx, a.inner_idx
         '''
 
         row_list = self._db.fetch_all(request, (neon_sig,))
@@ -90,13 +93,16 @@ class SolNeonTxsDB(BaseDBTable):
         for value_list in row_list:
             sol_sig = self._get_column_value('sol_sig', value_list)
             block_slot = self._get_column_value('block_slot', value_list)
+            inner_idx = self._get_column_value('inner_idx', value_list)
+            if inner_idx == -1:
+                inner_idx = None
             operator = value_list[-2]
             sol_spent = value_list[-1]
             ix_info = SolNeonIxReceiptShortInfo(
                 sol_sig=sol_sig,
                 block_slot=block_slot,
                 idx=self._get_column_value('idx', value_list),
-                inner_idx=self._get_column_value('inner_idx', value_list),
+                inner_idx=inner_idx,
                 ix_code=self._get_column_value('ix_code', value_list),
                 is_success=self._get_column_value('is_success', value_list),
                 neon_step_cnt=self._get_column_value('neon_step_cnt', value_list),

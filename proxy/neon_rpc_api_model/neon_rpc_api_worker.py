@@ -716,10 +716,10 @@ class NeonRpcApiWorker:
         result_ix_list: List[Dict[str, Any]] = list()
         result_cost_dict: Dict[str, OpCostInfo] = dict()
 
-        def _fill_sol_tx(ix: Union[SolNeonIxReceiptShortInfo, SolAltIxInfo]) -> List[Dict[str, Any]]:
+        def _fill_sol_tx(ix: Union[SolNeonIxReceiptShortInfo, SolAltIxInfo]):
             tx_cost = ix.sol_tx_cost
-            op_cost = result_cost_dict.setdefault(tx_cost.operator, OpCostInfo())
-            op_cost.sol_spent += tx_cost.sol_spent
+            new_op_cost = result_cost_dict.setdefault(tx_cost.operator, OpCostInfo())
+            new_op_cost.sol_spent += tx_cost.sol_spent
 
             new_ix_list: List[Dict[str, Any]] = list()
             result_tx_list.append({
@@ -730,12 +730,12 @@ class NeonRpcApiWorker:
                 'solanaOperator': tx_cost.operator,
                 'solanaInstructions': new_ix_list,
             })
-            return result_ix_list
+            return new_ix_list, new_op_cost
 
         for neon_ix in sol_neon_ix_list:
             if neon_ix.sol_sig != sol_sig:
                 sol_sig = neon_ix.sol_sig
-                result_ix_list = _fill_sol_tx(neon_ix)
+                result_ix_list, op_cost = _fill_sol_tx(neon_ix)
 
             neon_income = neon_ix.neon_gas_used * tx.neon_tx.gas_price
             op_cost.neon_income += neon_income
@@ -762,7 +762,7 @@ class NeonRpcApiWorker:
         for alt_ix in sol_alt_ix_list:
             if alt_ix.sol_sig != sol_sig:
                 sol_sig = alt_ix.sol_sig
-                result_ix_list = _fill_sol_tx(alt_ix)
+                result_ix_list, op_cost = _fill_sol_tx(alt_ix)
 
             result_ix_list.append({
                 'solanaProgram': 'AddressLookupTable',
