@@ -78,7 +78,7 @@ class BaseDBTable:
     def _encode_list(self, v: List[Any]) -> Optional[bytes]:
         return None if (not v) or (len(v) == 0) else self._encode(v)
 
-    def _insert_row(self, value_list: Union[Tuple[Any,...], List[Any]]) -> None:
+    def _insert_row(self, value_list: Union[Tuple[Any, ...], List[Any]]) -> None:
         assert len(self._column_list) == len(value_list)
         self._db.update_row(self._insert_row_request, value_list)
 

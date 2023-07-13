@@ -2,7 +2,7 @@ from typing import List, Any, Set
 
 from ..common_neon.db.base_db_table import BaseDBTable
 from ..common_neon.db.db_connect import DBConnection
-from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptShortInfo
+from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptShortInfo, SolTxCostInfo
 
 from .indexed_objects import NeonIndexedBlockInfo
 
@@ -71,11 +71,14 @@ class SolNeonTxsDB(BaseDBTable):
 
     def get_sol_ix_info_list_by_neon_sig(self, neon_sig: str) -> List[SolNeonIxReceiptShortInfo]:
         request = f'''
-            SELECT {', '.join(f'a.{c}' for c in self._column_list)}
+            SELECT {', '.join(f'a.{c}' for c in self._column_list)},
+                   c.operator, c.sol_spent
               FROM {self._table_name} a
         INNER JOIN {self._blocks_table_name} AS b
                 ON b.block_slot = a.block_slot
                AND b.is_active = True
+        INNER JOIN {self._tx_costs_table_name} AS c
+                ON c.sol_sig = a.sol_sig
              WHERE a.neon_sig = %s
           ORDER BY a.block_slot, a.neon_total_gas_used
         '''
@@ -85,9 +88,13 @@ class SolNeonTxsDB(BaseDBTable):
         sol_ix_list: List[SolNeonIxReceiptShortInfo] = list()
 
         for value_list in row_list:
+            sol_sig = self._get_column_value('sol_sig', value_list)
+            block_slot = self._get_column_value('block_slot', value_list)
+            operator = value_list[-2]
+            sol_spent = value_list[-1]
             ix_info = SolNeonIxReceiptShortInfo(
-                sol_sig=self._get_column_value('sol_sig', value_list),
-                block_slot=self._get_column_value('block_slot', value_list),
+                sol_sig=sol_sig,
+                block_slot=block_slot,
                 idx=self._get_column_value('idx', value_list),
                 inner_idx=self._get_column_value('inner_idx', value_list),
                 ix_code=self._get_column_value('ix_code', value_list),
@@ -99,6 +106,12 @@ class SolNeonTxsDB(BaseDBTable):
                 used_heap_size=self._get_column_value('used_heap_size', value_list),
                 max_bpf_cycle_cnt=self._get_column_value('max_bpf_cycle_cnt', value_list),
                 used_bpf_cycle_cnt=self._get_column_value('used_bpf_cycle_cnt', value_list),
+                sol_tx_cost=SolTxCostInfo(
+                    sol_sig=sol_sig,
+                    block_slot=block_slot,
+                    operator=operator,
+                    sol_spent=sol_spent
+                )
             )
             sol_ix_list.append(ix_info)
 

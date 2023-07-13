@@ -42,7 +42,9 @@ class GasTank(IndexerBase):
         self._counted_logger = MetricsLogger(config)
 
         sol_tx_meta_dict = SolTxMetaDict()
-        self._sol_tx_collector = FinalizedSolTxMetaCollector(config, self._solana, sol_tx_meta_dict, self._start_slot)
+        self._sol_tx_collector = FinalizedSolTxMetaCollector(
+            self._db, config, self._solana, sol_tx_meta_dict, self._start_slot
+        )
 
         self._neon_holder_dict: Dict[str, NeonIndexedHolderInfo] = dict()
         self._neon_processed_tx_dict: Dict[str, GasTankTxInfo] = dict()
@@ -231,8 +233,7 @@ class GasTank(IndexerBase):
 
         self._process_finalized_tx_list(tx_receipt_info.block_slot)
 
-        evm_program_id = str(self._config.evm_program_id)
-        for sol_neon_ix in tx_receipt_info.iter_sol_ix(evm_program_id):
+        for sol_neon_ix in tx_receipt_info.iter_sol_ix(self._config.evm_program_id):
             ix_code = sol_neon_ix.ix_data[0]
             LOG.debug(f'instruction: {ix_code} {sol_neon_ix.neon_tx_sig}')
             if ix_code == EvmIxCode.HolderWrite:

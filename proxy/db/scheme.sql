@@ -168,14 +168,16 @@
         sol_sig TEXT,
         block_slot BIGINT,
         idx INT,
+        inner_idx INT,
         ix_code INT,
         alt_address TEXT,
         is_success BOOLEAN,
 
         neon_sig TEXT
     );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_solana_alt_transactions_sig_slot_idx ON solana_alt_transactions(sol_sig, block_slot, idx);
+    ALTER TABLE solana_alt_transactions ADD COLUMN IF NOT EXISTS inner_idx INT DEFAULT NULL;
+    DROP INDEX IF EXISTS idx_solana_alt_transactions_sig_slot_idx;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_solana_alt_transactions_sig_slot_idx_inner ON solana_alt_transactions(sol_sig, block_slot, idx, inner_idx);
     CREATE INDEX IF NOT EXISTS idx_solana_alt_transactions_neon_sig ON solana_alt_transactions(neon_sig, block_slot);
     CREATE INDEX IF NOT EXISTS idx_solana_alt_transactions_slot ON solana_alt_transactions(block_slot);
 

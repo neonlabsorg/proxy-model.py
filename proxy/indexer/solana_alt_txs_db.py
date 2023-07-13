@@ -13,9 +13,9 @@ class SolAltTxsDB(BaseDBTable):
             db,
             table_name='solana_alt_transactions',
             column_list=[
-                'sol_sig', 'block_slot', 'idx', 'is_success', 'ix_code', 'alt_address', 'neon_sig'
+                'sol_sig', 'block_slot', 'idx', 'inner_idx', 'is_success', 'ix_code', 'alt_address', 'neon_sig'
             ],
-            key_list=['sol_sig', 'block_slot', 'idx']
+            key_list=['sol_sig', 'block_slot', 'idx', 'inner_idx']
         )
 
         self._select_request = f'''
@@ -60,6 +60,7 @@ class SolAltTxsDB(BaseDBTable):
                 sol_sig=sol_sig,
                 block_slot=block_slot,
                 idx=self._get_column_value('idx', value_list),
+                inner_idx=self._get_column_value('inner_idx', value_list),
                 ix_code=self._get_column_value('ix_code', value_list),
                 alt_address=self._get_column_value('alt_address', value_list),
                 is_success=self._get_column_value('is_success', value_list),
@@ -73,3 +74,22 @@ class SolAltTxsDB(BaseDBTable):
             )
             alt_ix_list.append(ix_info)
         return alt_ix_list
+
+    def get_alt_sig_list_by_neon_sig(self, neon_sig: str) -> List[str]:
+        request = f'''
+            SELECT DISTINCT a.sol_sig
+              FROM {self._table_name} AS a
+        INNER JOIN {self._blocks_table_name} AS b
+                ON b.block_slot = a.block_slot
+               AND b.is_active = True
+             WHERE a.neon_sig = %s
+          ORDER BY a.block_slot, a.sol_sig
+        '''
+
+        row_list = self._db.fetch_all(request, (neon_sig,))
+
+        alt_sig_list: List[str] = list()
+        for value_list in row_list:
+            sol_sig = value_list[0]
+            alt_sig_list.append(sol_sig)
+        return alt_sig_list

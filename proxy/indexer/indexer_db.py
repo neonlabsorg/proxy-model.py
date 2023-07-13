@@ -219,14 +219,14 @@ class IndexerDB:
     def get_sol_sig_list_by_neon_sig(self, neon_sig: str) -> List[str]:
         return self._sol_neon_txs_db.get_sol_sig_list_by_neon_sig(neon_sig)
 
+    def get_alt_sig_list_by_neon_sig(self, neon_sig: str) -> List[str]:
+        return self._sol_alt_txs_db.get_alt_sig_list_by_neon_sig(neon_sig)
+
     def get_sol_ix_info_list_by_neon_sig(self, neon_sig: str) -> List[SolNeonIxReceiptShortInfo]:
         return self._sol_neon_txs_db.get_sol_ix_info_list_by_neon_sig(neon_sig)
 
     def get_sol_alt_tx_list_by_neon_sig(self, neon_sig: str) -> List[SolAltIxInfo]:
         return self._sol_alt_txs_db.get_alt_ix_list_by_neon_sig(neon_sig)
-
-    def get_cost_list_by_sol_sig_list(self, sol_sig_list: List[str]) -> List[SolTxCostInfo]:
-        return self._sol_tx_costs_db.get_cost_list_by_sol_sig_list(sol_sig_list)
 
     def get_stuck_neon_holder_list(self, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
         return self._stuck_neon_holders_db.get_holder_list(block_slot)

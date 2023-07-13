@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import dataclasses
 import logging
 import time
 
@@ -389,29 +390,28 @@ class NeonIndexedAltInfo:
     alt_key: str
     neon_tx_sig: str
     block_slot: int
-    is_stuck: bool
-    done_block_slot: int
+    next_check_slot: int = 0
+    last_ix_slot: int = 0
+    is_stuck: bool = False
 
     @staticmethod
     def from_dict(src: Dict[str, Any]) -> NeonIndexedAltInfo:
-        return NeonIndexedAltInfo(**src)
+        next_check_slot = src.pop('next_check_slot', src.pop('done_block_slot', None))
+        return NeonIndexedAltInfo(**src, next_check_slot=next_check_slot)
 
     def __str__(self) -> str:
         return str_fmt_object(self)
 
     def as_dict(self) -> Dict[str, Any]:
-        return dict(
-            alt_key=self.alt_key,
-            neon_tx_sig=self.neon_tx_sig,
-            block_slot=self.block_slot,
-            is_stuck=self.is_stuck,
-            done_block_slot=self.done_block_slot
-        )
+        return dataclasses.asdict(self)
 
-    def set_done_block_slot(self, block_slot: int) -> None:
-        if self.done_block_slot > 0:
-            return
-        object.__setattr__(self, 'done_block_slot', block_slot)
+    def set_next_check_slot(self, block_slot: int) -> None:
+        if block_slot > self.next_check_slot:
+            object.__setattr__(self, 'next_check_slot', block_slot)
+
+    def set_last_ix_slot(self, block_slot: int) -> None:
+        if block_slot > self.last_ix_slot:
+            object.__setattr__(self, 'last_ix_slot', block_slot)
 
     def mark_stuck(self) -> None:
         if self.is_stuck:
@@ -611,7 +611,7 @@ class NeonIndexedBlockInfo:
         for alt_key in sol_neon_ix.iter_alt_key():
             if alt_key in self._sol_alt_info_dict:
                 continue
-            alt_info = NeonIndexedAltInfo(alt_key, tx.neon_tx_sig, sol_neon_ix.block_slot, False, 0)
+            alt_info = NeonIndexedAltInfo(alt_key, tx.neon_tx_sig, sol_neon_ix.block_slot)
             self._sol_alt_info_dict[alt_key] = alt_info
 
     def _del_neon_tx(self, tx: NeonIndexedTxInfo) -> None:
@@ -629,10 +629,16 @@ class NeonIndexedBlockInfo:
     def done_alt_info(self, alt_info: NeonIndexedAltInfo, alt_ix_list: List[SolAltIxInfo]) -> None:
         assert alt_info.alt_key in self._sol_alt_info_dict
 
+        self.add_alt_ix_list(alt_info, alt_ix_list)
+        self._sol_alt_info_dict.pop(alt_info.alt_key)
+
+    def add_alt_ix_list(self, alt_info: NeonIndexedAltInfo, alt_ix_list: List[SolAltIxInfo]) -> None:
+        assert alt_info.alt_key in self._sol_alt_info_dict
+
         for alt_ix in alt_ix_list:
             self._sol_tx_cost_list.append(alt_ix.sol_tx_cost)
             self._sol_alt_ix_list.append(alt_ix)
-        self._sol_alt_info_dict.pop(alt_info.alt_key)
+            alt_info.set_last_ix_slot(alt_ix.block_slot)
 
     def iter_stuck_neon_holder(self, config: Config) -> Iterator[NeonIndexedHolderInfo]:
         self._check_stuck_objs(config)
@@ -1030,7 +1036,6 @@ class SolNeonDecoderState:
         self._stop_block_slot = start_block_slot - 1
         self._sol_commit = SolCommit.NotProcessed
         self._is_finalized = False
-        self._evm_program_id = str(self._config.evm_program_id)
 
         self._sol_tx: Optional[SolTxReceiptInfo] = None
         self._sol_tx_meta: Optional[SolTxMetaInfo] = None
@@ -1115,7 +1120,7 @@ class SolNeonDecoderState:
 
         account_key_list = msg.get('accountKeys', list())
         for account_idx, account in enumerate(account_key_list):
-            if account == self._evm_program_id:
+            if account == str(self._config.evm_program_id):
                 evm_program_idx = account_idx
                 break
         else:
@@ -1156,7 +1161,7 @@ class SolNeonDecoderState:
         try:
             sol_tx_cost = self.sol_tx_cost
             self._sol_tx = SolTxReceiptInfo.from_tx_meta(self._sol_tx_meta, sol_tx_cost)
-            for self._sol_neon_ix in self._sol_tx.iter_sol_ix(self._evm_program_id):
+            for self._sol_neon_ix in self._sol_tx.iter_sol_ix(self._config.evm_program_id):
                 self._stat.inc_sol_neon_ix_cnt()
                 yield self._sol_neon_ix
         finally:
