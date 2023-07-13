@@ -19,7 +19,7 @@ on:
     tags:
       - "*"
 env:
-  NEON_EVM_TAG: "v0.15.13"
+  NEON_EVM_TAG: "v1.0.0"
   AWS_ACCESS_KEY_ID: ${{secrets.AWS_ACCESS_KEY_ID}}
   AWS_DEFAULT_REGION: ${{secrets.AWS_DEFAULT_REGION}}
   AWS_SECRET_ACCESS_KEY: ${{secrets.AWS_SECRET_ACCESS_KEY}}
@@ -225,7 +225,7 @@ jobs:
       - name: Define test image tag
         id: neon_test_tag
         run: |
-          tag='v0.15.x'
+          tag='v1.0.x'
           echo "value=${tag}"
           echo "value=${tag}" >> $GITHUB_OUTPUT
       - name: Run docker container
