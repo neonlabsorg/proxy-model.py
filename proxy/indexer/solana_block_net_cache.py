@@ -34,7 +34,7 @@ class SolBlockNetCache:
             self._recache_block_list(sol_commit)
 
         if (block_slot > self._stop_block_slot) or (not len(self._block_list)):
-            assert block_slot > self._stop_block_slot
+            assert block_slot >= self._stop_block_slot
             self._cache_block_list(block_slot, stop_block_slot, sol_commit)
 
         idx = block_slot - self._start_block_slot
