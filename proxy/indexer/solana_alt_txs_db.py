@@ -83,7 +83,7 @@ class SolAltTxsDB(BaseDBTable):
 
     def get_alt_sig_list_by_neon_sig(self, neon_sig: str) -> List[str]:
         request = f'''
-            SELECT DISTINCT a.sol_sig
+            SELECT DISTINCT a.block_slot, a.sol_sig
               FROM {self._table_name} AS a
         INNER JOIN {self._blocks_table_name} AS b
                 ON b.block_slot = a.block_slot
@@ -96,6 +96,6 @@ class SolAltTxsDB(BaseDBTable):
 
         alt_sig_list: List[str] = list()
         for value_list in row_list:
-            sol_sig = value_list[0]
+            sol_sig = value_list[1]
             alt_sig_list.append(sol_sig)
         return alt_sig_list
