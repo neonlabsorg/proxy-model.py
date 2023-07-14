@@ -19,7 +19,7 @@ class SolAltTxsDB(BaseDBTable):
         )
 
         self._select_request = f'''
-            SELECT {', '.join(f'a.{c}' for c in self._column_list)},
+            SELECT DISTINCT {', '.join(f'a.{c}' for c in self._column_list)},
                    c.operator, c.sol_spent
               FROM {self._table_name} a
         INNER JOIN {self._blocks_table_name} AS b
@@ -27,7 +27,7 @@ class SolAltTxsDB(BaseDBTable):
         INNER JOIN {self._tx_costs_table_name} AS c
                 ON c.sol_sig = a.sol_sig
              WHERE a.neon_sig = %s
-          ORDER BY a.block_slot, a.sol_sig
+          ORDER BY a.block_slot, a.sol_sig, a.idx, a.inner_idx
         '''
 
     def set_tx_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
@@ -89,7 +89,7 @@ class SolAltTxsDB(BaseDBTable):
                 ON b.block_slot = a.block_slot
                AND b.is_active = True
              WHERE a.neon_sig = %s
-          ORDER BY a.block_slot, a.sol_sig, a.idx, a.inner_idx
+          ORDER BY a.block_slot, a.sol_sig
         '''
 
         row_list = self._db.fetch_all(request, (neon_sig,))

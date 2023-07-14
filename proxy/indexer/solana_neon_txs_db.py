@@ -74,7 +74,7 @@ class SolNeonTxsDB(BaseDBTable):
 
     def get_sol_ix_info_list_by_neon_sig(self, neon_sig: str) -> List[SolNeonIxReceiptShortInfo]:
         request = f'''
-            SELECT {', '.join(f'a.{c}' for c in self._column_list)},
+            SELECT DISTINCT {', '.join(f'a.{c}' for c in self._column_list)},
                    c.operator, c.sol_spent
               FROM {self._table_name} a
         INNER JOIN {self._blocks_table_name} AS b
@@ -83,7 +83,7 @@ class SolNeonTxsDB(BaseDBTable):
         INNER JOIN {self._tx_costs_table_name} AS c
                 ON c.sol_sig = a.sol_sig
              WHERE a.neon_sig = %s
-          ORDER BY a.block_slot, a.neon_total_gas_used
+          ORDER BY a.block_slot, a.neon_total_gas_used, a.idx, a.inner_idx
         '''
 
         row_list = self._db.fetch_all(request, (neon_sig,))
