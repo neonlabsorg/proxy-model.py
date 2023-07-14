@@ -261,7 +261,7 @@ class Indexer(IndexerBase):
 
         except SolHistoryNotFound as err:
             self._save_checkpoint(state)  # store all parsed finalized blocks
-            self._sol_block_net_cache.mark_recache_block_list()  # indexer faced with error of absent block
+            self._sol_block_net_cache.clear()  # indexer faced with error of absent block
 
             first_slot = self._solana.get_first_available_block()
             LOG.warning(f'first slot: {first_slot}, skip parsing of finalized history: {str(err)}')

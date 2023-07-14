@@ -20,7 +20,7 @@ class SolBlockNetCache:
     def finalize_block(self, block_slot: int) -> None:
         assert block_slot >= self._start_block_slot
         if block_slot > self._stop_block_slot:
-            self._clear()
+            self.clear()
             return
 
         while len(self._block_list) and (self._start_block_slot <= block_slot):
@@ -45,7 +45,7 @@ class SolBlockNetCache:
     def mark_recache_block_list(self) -> None:
         self._need_to_recache_block_list = True
 
-    def _clear(self) -> None:
+    def clear(self) -> None:
         self._start_block_slot = 0
         self._stop_block_slot = 0
         self._block_list.clear()
