@@ -89,12 +89,14 @@ class SolInteractor:
                 # Hide the Solana URL
                 str_err = str(exc).replace(self._endpoint_uri, 'XXXXX')
 
-                if retry <= self._config.retry_on_fail:
+                if retry <= 3600:
                     LOG.debug(
                         f'Receive connection error {str_err} on connection to Solana. '
                         f'Attempt {retry + 1} to send the request to Solana node...'
                     )
                     time.sleep(1)
+                    self._session = requests.sessions.Session()
+                    self._request_cnt = itertools.count()
                     continue
 
                 LOG.warning(f'Connection exception on send request to Solana. Retry {retry}: {str_err}')
