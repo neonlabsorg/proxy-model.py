@@ -36,7 +36,7 @@ from .nonce_validator import NeonTxNonceValidator
 from .transaction_validator import NeonTxValidator
 
 
-NEON_PROXY_PKG_VERSION = '1.1.3'
+NEON_PROXY_PKG_VERSION = '1.1.4'
 NEON_PROXY_REVISION = 'NEON_PROXY_REVISION_TO_BE_REPLACED'
 LOG = logging.getLogger(__name__)
 
