@@ -132,12 +132,7 @@ jobs:
     needs:
       - build-image
     if: |
-      contains(fromJSON('["extendedFullTestSuite", "fullTestSuite"]'), needs.build-image.outputs.test_set) ||
-      (contains(github.event.pull_request.labels.*.name, 'FullTestSuite') && ! github.event.pull_request.draft) ||
-      (github.ref_name =='develop' && !startsWith(github.event.inputs.neon_evm_branch , 'refs/pull')) ||
-      github.ref_name =='master' ||
-      startsWith(github.ref , 'refs/tags/') ||
-      (needs.build-image.outputs.is_version_proxy_branch == 'true' && github.event.inputs.neon_evm_commit == '')
+      (contains(fromJSON('["extendedFullTestSuite", "fullTestSuite"]'), needs.build-image.outputs.test_set))
     runs-on: test-runner
     steps:
       - uses: actions/checkout@v3
