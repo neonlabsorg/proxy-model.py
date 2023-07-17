@@ -105,7 +105,7 @@ class SolTxMetaInfo:
     @property
     def ix_meta_list(self) -> List[SolIxMetaInfo]:
         if self._ix_meta_list is None:
-            raw_ix_list = self.tx['transaction']['message']['instructions']
+            raw_ix_list = self.tx['transaction']['message'].get('instructions', list())
             ix_meta_list = [
                 SolIxMetaInfo.from_tx_meta(self, idx, None, ix)
                 for idx, ix in enumerate(raw_ix_list)
@@ -115,7 +115,7 @@ class SolTxMetaInfo:
 
     def inner_ix_meta_list(self, ix_meta: SolIxMetaInfo) -> List[SolIxMetaInfo]:
         if self._inner_ix_meta_list is None:
-            raw_inner_ix_list = self.tx['meta']['innerInstructions']
+            raw_inner_ix_list = self.tx['meta'].get('innerInstructions', list())
             inner_ix_meta_list: List[List[SolIxMetaInfo]] = [list() for _ in self.ix_meta_list]
             for raw_inner_ix in raw_inner_ix_list:
                 idx = raw_inner_ix['index']
