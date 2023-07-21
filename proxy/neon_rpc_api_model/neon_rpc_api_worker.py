@@ -170,6 +170,7 @@ class NeonRpcApiWorker:
         return dict(
             gas_price=hex(gas_price),
             suggested_gas_price=hex(gas_price_info.suggested_gas_price),
+            is_const_gas_price=gas_price_info.is_const_gas_price,
             min_acceptable_gas_price=hex(gas_price_info.min_acceptable_gas_price),
             min_executable_gas_price=hex(gas_price_info.min_executable_gas_price),
             min_wo_chainid_acceptable_gas_price=hex(gas_price_info.min_wo_chainid_acceptable_gas_price),

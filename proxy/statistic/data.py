@@ -34,6 +34,7 @@ class NeonGasPriceData:
     sol_price_usd: Decimal
     neon_price_usd: Decimal
     operator_fee: Decimal
+    gas_price_slippage: Decimal
 
 
 class NeonTxBeginCode(Enum):

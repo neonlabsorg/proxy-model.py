@@ -60,6 +60,7 @@ class Config(DBConfig):
         self._slot_processing_delay = self._env_int("SLOT_PROCESSING_DELAY", 0, 0)
         self._min_gas_price = self._env_int("MINIMAL_GAS_PRICE", 0, 1) * (10 ** 9)
         self._min_wo_chainid_gas_price = self._env_int("MINIMAL_WO_CHAINID_GAS_PRICE", 0, 10) * (10 ** 9)
+        self._const_gas_price = self._env_int('CONST_GAS_PRICE', -1, -1) * (10 ** 9)
         self._gas_less_tx_max_nonce = self._env_int("GAS_LESS_MAX_TX_NONCE", 0, 5)
         self._gas_less_tx_max_gas = self._env_int("GAS_LESS_MAX_GAS", 0, 20_000_000)  # Estimated gas on Mora = 18 mln
         self._start_slot = os.environ.get('START_SLOT', '0')
@@ -102,7 +103,10 @@ class Config(DBConfig):
         self._commit_level = SolCommit.Type(self._commit_level.lower())
         assert SolCommit.level(self._commit_level) >= SolCommit.level(SolCommit.Confirmed)
 
-        assert (self._operator_fee > 0) and (self._operator_fee <= 1)
+        assert (self._operator_fee > 0) and (self._operator_fee <= 100)
+        assert (self._min_gas_price >= 0)
+        assert (self._min_wo_chainid_gas_price >= 0)
+        assert (self._const_gas_price < 0) or (self._const_gas_price >= self._min_gas_price)
         assert (self._gas_price_slippage >= 0) and (self._gas_price_slippage < 1)
         assert (self._slot_processing_delay < 32)
         assert (self._fuzz_fail_pct >= 0) and (self._fuzz_fail_pct < 100)
@@ -243,6 +247,12 @@ class Config(DBConfig):
         return self._min_wo_chainid_gas_price
 
     @property
+    def const_gas_price(self) -> Optional[int]:
+        if self._const_gas_price < 0:
+            return None
+        return self._const_gas_price
+
+    @property
     def gas_less_tx_max_nonce(self) -> int:
         return self._gas_less_tx_max_nonce
 
@@ -372,6 +382,7 @@ class Config(DBConfig):
             'GAS_PRICE_SLIPPAGE': self.gas_price_slippage,
             'MINIMAL_GAS_PRICE': self.min_gas_price,
             'MINIMAL_WO_CHAINID_GAS_PRICE': self.min_wo_chainid_gas_price,
+            'CONST_GAS_PRICE': self.const_gas_price,
             'GAS_LESS_MAX_TX_NONCE': self.gas_less_tx_max_nonce,
             'GAS_LESS_MAX_GAS': self.gas_less_tx_max_gas,
             'START_SLOT': self.start_slot,

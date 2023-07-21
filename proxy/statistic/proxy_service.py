@@ -110,7 +110,7 @@ class ProxyStatService(StatService):
         self._metr_usd_price_sol = Gauge('usd_price_sol', 'Sol Price USD', registry=self._registry)
         self._metr_usd_price_neon = Gauge('usd_price_neon', 'Neon Price USD', registry=self._registry)
         self._metr_operator_fee = Gauge('operator_fee', 'Operator Fee', registry=self._registry)
-        self._metr_suggested_pct = Gauge('suggested_pct', 'Suggested Percent', registry=self._registry)
+        self._metr_gas_price_slippage = Gauge('gas_price_slippage', 'Gas Price Slippage', registry=self._registry)
 
         self._metr_db_health = Gauge('db_health', 'DB status', registry=self._registry)
         self._metr_solana_rpc_health = Gauge('solana_rpc_health', 'Solana Node status', registry=self._registry)
@@ -156,6 +156,7 @@ class ProxyStatService(StatService):
         self._metr_usd_price_neon.set({}, float(gas_price.neon_price_usd))
         self._metr_usd_price_sol.set({}, float(gas_price.sol_price_usd))
         self._metr_operator_fee.set({}, float(gas_price.operator_fee))
+        self._metr_gas_price_slippage.set({}, float(gas_price.gas_price_slippage))
 
     def commit_op_res_list(self, op_list: NeonOpResListData) -> None:
         self._data_peeker.set_op_account_list(op_list)
