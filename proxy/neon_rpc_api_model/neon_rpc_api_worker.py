@@ -107,7 +107,7 @@ class NeonRpcApiWorker:
         return 'Neon/v' + ElfParams().neon_evm_version + '-' + ElfParams().neon_evm_revision
 
     def neon_cliVersion(self) -> str:
-        return NeonCli(self._config).version()
+        return NeonCli(self._config, False).version()
 
     def neon_solanaVersion(self) -> str:
         return 'Solana/v' + self._solana.get_solana_version()
@@ -544,7 +544,7 @@ class NeonRpcApiWorker:
         account = self._normalize_address(account)
 
         try:
-            value = NeonCli(self._config).call('get-storage-at', account, position)
+            value = NeonCli(self._config, False).call('get-storage-at', account, position)
             return '0x' + (value or 64 * '0')
         except (Exception,):
             # LOG.error(f"eth_getStorageAt: Neon-cli failed to execute: {err}")
