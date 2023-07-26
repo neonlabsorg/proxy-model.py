@@ -287,6 +287,7 @@ jobs:
       - openzeppelin-tests
       - basic-tests
       - dapps-tests
+      - build-image
     runs-on: test-runner
     if: ${{always() && needs.prepare-infrastructure.result != 'skipped'}}
     env:
