@@ -58,7 +58,7 @@ class SolNeonTxsDB(BaseDBTable):
           ORDER BY a.block_slot, a.neon_total_gas_used, a.sol_sig, a.idx, a.inner_idx
         '''
 
-        row_list = self._db.fetch_all(request, (neon_sig,))
+        row_list = self._fetch_all(request, (neon_sig,))
 
         done_sig_set: Set[str] = set()
         sol_sig_list: List[str] = list()
@@ -86,7 +86,7 @@ class SolNeonTxsDB(BaseDBTable):
           ORDER BY a.block_slot, a.neon_total_gas_used, a.idx, a.inner_idx
         '''
 
-        row_list = self._db.fetch_all(request, (neon_sig,))
+        row_list = self._fetch_all(request, (neon_sig,))
 
         sol_ix_list: List[SolNeonIxReceiptShortInfo] = list()
 
@@ -130,4 +130,4 @@ class SolNeonTxsDB(BaseDBTable):
                     AND block_slot < %s
                     AND block_slot NOT IN ({', '.join(['%s' for _ in block_slot_list])})
             '''
-        self._db.update_row(request, [base_block_slot, block_slot_list[-1]] + block_slot_list)
+        self._update_row(request, [base_block_slot, block_slot_list[-1]] + block_slot_list)

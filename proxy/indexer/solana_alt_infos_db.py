@@ -29,7 +29,7 @@ class SolAltInfosDB(BaseDBTable):
         '''
 
     def set_alt_list(self, block_slot: int, iter_alt_info: Iterator[NeonIndexedAltInfo]) -> None:
-        self._db.update_row(self._delete_request, (block_slot,))
+        self._update_row(self._delete_request, (block_slot,))
 
         alt_info_list = [alt_info.as_dict() for alt_info in iter_alt_info]
         if not len(alt_info_list):
@@ -39,7 +39,7 @@ class SolAltInfosDB(BaseDBTable):
         self._insert_row([block_slot, json_data])
 
     def get_alt_list(self, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
-        value_list = self._db.fetch_one(self._select_request, (block_slot,))
+        value_list = self._fetch_one(self._select_request, (block_slot,))
 
         alt_block_slot: Optional[int] = None
         alt_list: List[Dict[str, Any]] = list()

@@ -64,6 +64,9 @@ class Config(DBConfig):
         self._gas_less_tx_max_nonce = self._env_int("GAS_LESS_MAX_TX_NONCE", 0, 5)
         self._gas_less_tx_max_gas = self._env_int("GAS_LESS_MAX_GAS", 0, 20_000_000)  # Estimated gas on Mora = 18 mln
         self._start_slot = os.environ.get('START_SLOT', '0')
+        self._reindex_start_slot = os.environ.get('REINDEX_START_SLOT', '0')
+        self._reindex_thread_cnt = self._env_int('REINDEX_THREAD_COUNT', 0, 0)
+        self._reindex_block_cnt_per_thread = self._env_int('REINDEX_BLOCK_CNT_PER_THREAD', 10000, 10000)
         self._gas_tank_parallel_request_cnt = self._env_int("GAS_TANK_PARALLEL_REQUEST_COUNT", 1, 10)
         self._gas_tank_poll_tx_cnt = self._env_int('GAS_TANK_POLL_TX_COUNT', 1, 1000)
         self._indexer_poll_block_cnt = self._env_int('INDEXER_POLL_BLOCK_COUNT', 1, 32)
@@ -265,6 +268,18 @@ class Config(DBConfig):
         return self._start_slot
 
     @property
+    def reindex_start_slot(self) -> str:
+        return self._reindex_start_slot
+
+    @property
+    def reindex_thread_cnt(self) -> int:
+        return self._reindex_thread_cnt
+
+    @property
+    def reindex_block_cnt_per_thread(self) -> int:
+        return self._reindex_block_cnt_per_thread
+
+    @property
     def gas_tank_parallel_request_cnt(self) -> int:
         return self._gas_tank_parallel_request_cnt
 
@@ -386,6 +401,9 @@ class Config(DBConfig):
             'GAS_LESS_MAX_TX_NONCE': self.gas_less_tx_max_nonce,
             'GAS_LESS_MAX_GAS': self.gas_less_tx_max_gas,
             'START_SLOT': self.start_slot,
+            'REINDEX_START_SLOT': self.reindex_start_slot,
+            'REINDEX_THREAD_COUNT': self.reindex_thread_cnt,
+            'REINDEX_BLOCK_CNT_PER_THREAD': self.reindex_block_cnt_per_thread,
             'GAS_TANK_PARALLEL_REQUEST_COUNT': self.gas_tank_parallel_request_cnt,
             'GAS_TANK_POLL_TX_COUNT': self.gas_tank_poll_tx_cnt,
             'INDEXER_POLL_BLOCK_COUNT': self.indexer_poll_block_cnt,
@@ -403,7 +421,7 @@ class Config(DBConfig):
             'OPERATOR_ACCOUNT_LIST': ';'.join(list(self.operator_account_set)),
             'GATHER_STATISTICS': self.gather_statistics,
 
-            'GENESIS_BLOCK_TIMESTAMP=': self.genesis_timestamp,
+            'GENESIS_BLOCK_TIMESTAMP': self.genesis_timestamp,
             'COMMIT_LEVEL': self.commit_level,
 
             # Don't print accesses to the logs

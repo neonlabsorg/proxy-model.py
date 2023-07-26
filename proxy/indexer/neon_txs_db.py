@@ -105,7 +105,7 @@ class NeonTxsDB(BaseDBTable):
                AND b.is_active = True
              WHERE a.neon_sig = %s
         '''
-        return self._tx_from_value(self._db.fetch_one(request, (neon_sig,)))
+        return self._tx_from_value(self._fetch_one(request, (neon_sig,)))
 
     def get_tx_by_sender_nonce(self, sender: str, tx_nonce: int) -> Optional[NeonTxReceiptInfo]:
         request = self._base_request_hdr + '''
@@ -120,7 +120,7 @@ class NeonTxsDB(BaseDBTable):
              WHERE a.block_slot = %s
           ORDER BY a.tx_idx ASC
         '''
-        row_list = self._db.fetch_all(request, (block_slot,))
+        row_list = self._fetch_all(request, (block_slot,))
         if not row_list:
             return list()
 
@@ -131,7 +131,7 @@ class NeonTxsDB(BaseDBTable):
              WHERE a.block_slot = %s
                AND a.tx_idx = %s
         '''
-        value_list = self._db.fetch_one(request, (block_slot, tx_idx))
+        value_list = self._fetch_one(request, (block_slot, tx_idx))
         return self._tx_from_value(value_list)
 
     def finalize_block_list(self, base_block_slot: int, block_slot_list: List[int]) -> None:
@@ -141,4 +141,4 @@ class NeonTxsDB(BaseDBTable):
                     AND block_slot < %s
                     AND block_slot NOT IN ({','.join(["%s" for _ in block_slot_list])})
             '''
-        self._db.update_row(request, [base_block_slot, block_slot_list[-1]] + block_slot_list)
+        self._update_row(request, [base_block_slot, block_slot_list[-1]] + block_slot_list)

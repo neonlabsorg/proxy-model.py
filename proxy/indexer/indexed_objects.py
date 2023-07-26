@@ -1018,7 +1018,7 @@ class SolNeonDecoderStat:
         object.__setattr__(self, 'neon_corrupted_block_cnt', self.neon_corrupted_block_cnt + 1)
 
 
-class SolNeonDecoderState:
+class SolNeonDecoderCtx:
     # Iterate:
     #   for solana_block in block_range(start_block_slot, stop_block_slot):
     #       for solana_tx in solana_block.solana_tx_list:

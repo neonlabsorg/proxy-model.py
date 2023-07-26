@@ -109,6 +109,7 @@ class NeonExecutorStatData:
 
 @dataclass(frozen=True)
 class NeonBlockStatData:
+    reindex_ident: str
     start_block: int
     parsed_block: int
     finalized_block: int

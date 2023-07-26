@@ -123,7 +123,7 @@ class DBConnection:
         with self._tx_conn.cursor() as cursor:
             psycopg2.extras.execute_values(cursor, request, row_list, template=None, page_size=1000)
 
-    def _fetch_cnt(self, cnt: int, request: str, *args) -> List[List[Any]]:
+    def fetch_cnt(self, cnt: int, request: str, *args) -> List[List[Any]]:
         while True:
             try:
                 self._connect()
@@ -142,10 +142,3 @@ class DBConnection:
             except BaseException as exc:
                 LOG.error('Unknown fail to fetching of records', exc_info=exc)
                 raise
-
-    def fetch_one(self, request: str, *args) -> List[Any]:
-        row_list = self._fetch_cnt(1, request, *args)
-        return list() if not len(row_list) else row_list[0]
-
-    def fetch_all(self, request: str, *args) -> List[List[Any]]:
-        return self._fetch_cnt(10000, request, *args)

@@ -67,12 +67,17 @@ class IndexerStatService(StatService):
         self._metr_solana_rpc_health.set({}, 1 if status else 0)
 
     def commit_block_stat(self, block_stat: NeonBlockStatData) -> None:
-        self._metr_block_start.set({}, block_stat.start_block)
-        self._metr_block_confirmed.set({}, block_stat.confirmed_block)
-        self._metr_block_finalized.set({}, block_stat.finalized_block)
-        self._metr_block_parsed.set({}, block_stat.parsed_block)
-        if block_stat.tracer_block is not None:
-            self._metr_block_tracer.set({}, block_stat.tracer_block)
+        if len(block_stat.reindex_ident):
+            self._metr_block_start.set({'reindex': block_stat.reindex_ident}, block_stat.start_block)
+            self._metr_block_finalized.set({'reindex': block_stat.reindex_ident}, block_stat.finalized_block)
+            self._metr_block_parsed.set({'reindex': block_stat.reindex_ident}, block_stat.parsed_block)
+        else:
+            self._metr_block_start.set({}, block_stat.start_block)
+            self._metr_block_confirmed.set({}, block_stat.confirmed_block)
+            self._metr_block_finalized.set({}, block_stat.finalized_block)
+            self._metr_block_parsed.set({}, block_stat.parsed_block)
+            if block_stat.tracer_block is not None:
+                self._metr_block_tracer.set({}, block_stat.tracer_block)
 
     def commit_neon_tx_result(self, tx_stat: NeonTxStatData):
         self._metr_tx_count.add({}, tx_stat.completed_neon_tx_cnt)

@@ -29,7 +29,7 @@ class StuckNeonHoldersDB(BaseDBTable):
         '''
 
     def set_holder_list(self, block_slot: int, iter_neon_holder: Iterator[NeonIndexedHolderInfo]) -> None:
-        self._db.update_row(self._delete_request, (block_slot,))
+        self._update_row(self._delete_request, (block_slot,))
 
         neon_holder_list = [holder.as_dict() for holder in iter_neon_holder]
         if not len(neon_holder_list):
@@ -39,7 +39,7 @@ class StuckNeonHoldersDB(BaseDBTable):
         self._insert_row([block_slot, json_data])
 
     def get_holder_list(self, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
-        value_list = self._db.fetch_one(self._select_request, (block_slot,))
+        value_list = self._fetch_one(self._select_request, (block_slot,))
 
         holder_block_slot: Optional[int] = None
         holder_list: List[Dict[str, Any]] = list()

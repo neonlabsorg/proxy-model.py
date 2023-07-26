@@ -9,7 +9,7 @@ from ..common_neon.utils import NeonTxInfo
 from ..common_neon.address import NeonAddress
 from ..common_neon.solana_tx import SolPubKey
 from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.db.sql_dict import SQLDict
+from ..common_neon.db.constats_db import ConstantsDB
 
 from ..gas_tank import GasTank
 from ..gas_tank.portal_analyzer import PortalAnalyzer
@@ -143,7 +143,7 @@ class TestGasTank(unittest.TestCase):
 
         mock_allow_gas_less_tx.assert_called_once_with(NeonAddress(wormhole_gas_less_account), neon_tx)
 
-    @patch.object(SQLDict, 'get')
+    @patch.object(ConstantsDB, 'get')
     @patch.object(SolInteractor, 'get_block_slot')
     def test_init_gas_tank_slot_continue(self, mock_get_slot, mock_dict_get):
         start_slot = 1234
@@ -156,7 +156,7 @@ class TestGasTank(unittest.TestCase):
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
-    @patch.object(SQLDict, 'get')
+    @patch.object(ConstantsDB, 'get')
     @patch.object(SolInteractor, 'get_block_slot')
     def test_init_gas_tank_slot_continue_recent_slot_not_found(self, mock_get_slot, mock_dict_get):
         start_slot = 1234
@@ -169,7 +169,7 @@ class TestGasTank(unittest.TestCase):
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
-    @patch.object(SQLDict, 'get')
+    @patch.object(ConstantsDB, 'get')
     @patch.object(SolInteractor, 'get_block_slot')
     def test_init_gas_tank_start_slot_parse_error(self, mock_get_slot, mock_dict_get):
         start_slot = 1234
@@ -182,7 +182,7 @@ class TestGasTank(unittest.TestCase):
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
-    @patch.object(SQLDict, 'get')
+    @patch.object(ConstantsDB, 'get')
     @patch.object(SolInteractor, 'get_block_slot')
     def test_init_gas_tank_slot_latest(self, mock_get_slot, mock_dict_get):
         start_slot = 1234
@@ -195,7 +195,7 @@ class TestGasTank(unittest.TestCase):
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
-    @patch.object(SQLDict, 'get')
+    @patch.object(ConstantsDB, 'get')
     @patch.object(SolInteractor, 'get_block_slot')
     def test_init_gas_tank_slot_number(self, mock_get_slot, mock_dict_get):
         start_slot = 1234
@@ -208,7 +208,7 @@ class TestGasTank(unittest.TestCase):
         mock_get_slot.assert_called_once_with('finalized')
         mock_dict_get.assert_called()
 
-    @patch.object(SQLDict, 'get')
+    @patch.object(ConstantsDB, 'get')
     @patch.object(SolInteractor, 'get_block_slot')
     def test_init_gas_tank_big_slot_number(self, mock_get_slot, mock_dict_get):
         start_slot = 1234

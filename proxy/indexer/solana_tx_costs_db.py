@@ -36,4 +36,4 @@ class SolTxCostsDB(BaseDBTable):
                     AND block_slot < %s
                     AND block_slot NOT IN ({', '.join(['%s' for _ in block_slot_list])})
         '''
-        self._db.update_row(request, [base_block_slot, block_slot_list[-1]] + block_slot_list)
+        self._update_row(request, [base_block_slot, block_slot_list[-1]] + block_slot_list)

@@ -31,7 +31,7 @@ class StuckNeonTxsDB(BaseDBTable):
         '''
 
     def set_tx_list(self, is_finalized: bool, block_slot: int, iter_neon_tx: Iterator[NeonIndexedTxInfo]) -> None:
-        self._db.update_row(self._delete_request, (is_finalized, block_slot,))
+        self._update_row(self._delete_request, (is_finalized, block_slot,))
 
         neon_tx_list = [tx.as_dict() for tx in iter_neon_tx]
         if not len(neon_tx_list):
@@ -41,7 +41,7 @@ class StuckNeonTxsDB(BaseDBTable):
         self._insert_row([is_finalized, block_slot, json_data])
 
     def get_tx_list(self, is_finalized: bool, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
-        value_list = self._db.fetch_one(self._select_request, (is_finalized, block_slot,))
+        value_list = self._fetch_one(self._select_request, (is_finalized, block_slot,))
 
         tx_list: List[Dict[str, Any]] = list()
         tx_block_slot: Optional[int] = None

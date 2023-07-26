@@ -82,6 +82,9 @@ class BaseDBTable:
         assert len(self._column_list) == len(value_list)
         self._db.update_row(self._insert_row_request, value_list)
 
+    def _update_row(self, update_row_request: str, value_list: Union[Tuple[Any, ...], List[Any]]) -> None:
+        self._db.update_row(update_row_request, value_list)
+
     def _remove_dups(self, row_list: List[List[Any]]) -> List[List[Any]]:
         if not len(self._key_set):
             return row_list
@@ -109,3 +112,10 @@ class BaseDBTable:
 
         row_list = self._remove_dups(row_list)
         self._db.update_row_list(self._insert_row_list_request, row_list)
+
+    def _fetch_one(self, request: str, *args) -> List[Any]:
+        row_list = self._db.fetch_cnt(1, request, *args)
+        return list() if not len(row_list) else row_list[0]
+
+    def _fetch_all(self, request: str, *args) -> List[List[Any]]:
+        return self._db.fetch_cnt(10000, request, *args)

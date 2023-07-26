@@ -138,7 +138,7 @@ class NeonTxLogsDB(BaseDBTable):
              LIMIT 1000
          '''
 
-        row_list = self._db.fetch_all(request, tuple(param_list))
+        row_list = self._fetch_all(request, tuple(param_list))
 
         log_list: List[Dict[str, Any]] = list()
         for value_list in reversed(row_list):
@@ -154,4 +154,4 @@ class NeonTxLogsDB(BaseDBTable):
                     AND block_slot < %s
                     AND block_slot NOT IN ({','.join(["%s" for _ in block_slot_list])})
             '''
-        self._db.update_row(request, [base_block_slot, block_slot_list[-1]] + block_slot_list)
+        self._update_row(request, [base_block_slot, block_slot_list[-1]] + block_slot_list)
