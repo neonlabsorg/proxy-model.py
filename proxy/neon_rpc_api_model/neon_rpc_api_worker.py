@@ -33,7 +33,7 @@ from ..mempool import (
 )
 
 from ..gas_tank.gas_less_accounts_db import GasLessAccountsDB
-from ..indexer.indexer_db import IndexerDBCtx, IndexerDB
+from ..indexer.indexer_db import IndexerDB
 
 from .estimate import GasEstimate
 from .transaction_validator import NeonTxValidator
@@ -63,10 +63,9 @@ class NeonRpcApiWorker:
         self._config = config
         self._solana = SolInteractor(config, config.solana_url)
 
-        db = DBConnection(config)
-        db_ctx = IndexerDBCtx.from_db(config, db, '')
-        self._db = IndexerDB(db_ctx)
-        self._gas_tank = GasLessAccountsDB(db)
+        db_conn = DBConnection(config)
+        self._db = IndexerDB.from_db(config, db_conn, '')
+        self._gas_tank = GasLessAccountsDB(db_conn)
 
         self._mempool_client = MemPoolClient(MP_SERVICE_ADDR)
 

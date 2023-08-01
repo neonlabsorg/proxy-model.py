@@ -28,10 +28,10 @@ LOG = logging.getLogger(__name__)
 
 class GasTank:
     def __init__(self, config: Config):
-        self._db = DBConnection(config)
-        self._constant_db = ConstantsDB(self._db)
+        self._db_conn = DBConnection(config)
+        self._constant_db = ConstantsDB(self._db_conn)
 
-        self._gas_less_account_db = GasLessAccountsDB(self._db)
+        self._gas_less_account_db = GasLessAccountsDB(self._db_conn)
         self._gas_less_account_dict: Dict[str, GasLessPermit] = dict()
 
         self._solana = SolInteractor(config, config.solana_url)
@@ -47,7 +47,7 @@ class GasTank:
 
         sol_tx_meta_dict = SolTxMetaDict()
         self._sol_tx_collector = FinalizedSolTxMetaCollector(
-            self._db, config, self._solana, sol_tx_meta_dict, self._start_slot
+            self._db_conn, config, self._solana, sol_tx_meta_dict, self._start_slot
         )
 
         self._neon_holder_dict: Dict[str, NeonIndexedHolderInfo] = dict()
@@ -370,7 +370,7 @@ class GasTank:
         if not len(self._gas_less_account_dict):
             return
 
-        self._db.run_tx(
+        self._db_conn.run_tx(
             lambda: self._gas_less_account_db.add_gas_less_permit_list(iter(self._gas_less_account_dict.values()))
         )
         self._gas_less_account_dict.clear()

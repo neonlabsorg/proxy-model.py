@@ -29,7 +29,7 @@ class MPExecutorStuckTxListTask(MPExecutorBaseTask):
         return MPGetStuckTxListResponse(stuck_tx_list=dst_tx_list)
 
     def _get_tx_list(self, block_slot: int) -> List[Dict[str, Any]]:
-        db = DBConnection(self._config)
-        stuck_txs_db = StuckNeonTxsDB(db)
+        db_conn = DBConnection(self._config)
+        stuck_txs_db = StuckNeonTxsDB(db_conn)
         _, src_tx_list = stuck_txs_db.get_tx_list(False, block_slot)
         return src_tx_list

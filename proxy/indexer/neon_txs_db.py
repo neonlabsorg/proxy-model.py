@@ -134,11 +134,11 @@ class NeonTxsDB(BaseDBTable):
         value_list = self._fetch_one(request, (block_slot, tx_idx))
         return self._tx_from_value(value_list)
 
-    def finalize_block_list(self, base_block_slot: int, block_slot_list: List[int]) -> None:
+    def finalize_block_list(self, from_slot: int, to_slot: int, slot_list: List[int]) -> None:
         request = f'''
             DELETE FROM {self._table_name}
                   WHERE block_slot > %s
-                    AND block_slot < %s
-                    AND block_slot NOT IN ({','.join(["%s" for _ in block_slot_list])})
+                    AND block_slot <= %s
+                    AND block_slot NOT IN ({','.join(["%s" for _ in slot_list])})
             '''
-        self._update_row(request, [base_block_slot, block_slot_list[-1]] + block_slot_list)
+        self._update_row(request, [from_slot, to_slot] + slot_list)
