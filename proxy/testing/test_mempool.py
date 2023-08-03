@@ -14,7 +14,6 @@ from ..common_neon.config import Config
 from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.solana_tx import SolPubKey
 from ..common_neon.utils.eth_proto import NeonTx
-from ..common_neon.utils.neon_tx_info import NeonTxInfo
 from ..common_neon.elf_params import ElfParams
 from ..common_neon.operator_resource_mng import OpResMng
 
