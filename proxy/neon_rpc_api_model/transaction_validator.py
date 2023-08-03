@@ -52,7 +52,7 @@ class NeonTxValidator:
     def validate(self) -> NeonTxExecCfg:
         self._prevalidate_tx()
         if self._config.accept_reverted_tx_into_mempool:
-            emulated_result = NeonEmulatedResult()
+            emulated_result: NeonEmulatedResult = dict()
         else:
             emulated_result: NeonEmulatedResult = call_tx_emulated(self._config, self._tx)
             self._prevalidate_emulator(emulated_result)
