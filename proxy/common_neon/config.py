@@ -43,8 +43,8 @@ class Config(DBConfig):
         self._mempool_cache_life_sec = self._env_int('MEMPOOL_CACHE_LIFE_SEC', 15, 30 * 60)
         self._accept_reverted_tx_into_mempool = self._env_bool('ACCEPT_REVERTED_TX_INTO_MEMPOOL', False)
         self._holder_size = self._env_int("HOLDER_SIZE", 1024, 262144)  # 256*1024
-        self._min_op_balance_to_warn = self._env_int("MIN_OPERATOR_BALANCE_TO_WARN", 9000000000, 9000000000)
-        self._min_op_balance_to_err = self._env_int("MIN_OPERATOR_BALANCE_TO_ERR", 1000000000, 1000000000)
+        self._min_op_balance_to_warn = self._env_int("MIN_OPERATOR_BALANCE_TO_WARN", 2, 9000000000)
+        self._min_op_balance_to_err = self._env_int("MIN_OPERATOR_BALANCE_TO_ERR", 1, 1000000000)
         self._perm_account_id = self._env_int("PERM_ACCOUNT_ID", 1, 1)
         self._perm_account_limit = self._env_int("PERM_ACCOUNT_LIMIT", 1, 2)
         self._recheck_used_resource_sec = self._env_int('RECHECK_USED_RESOURCE_SEC', 10, 60)
@@ -62,7 +62,6 @@ class Config(DBConfig):
         self._min_wo_chainid_gas_price = self._env_int("MINIMAL_WO_CHAINID_GAS_PRICE", 0, 10) * (10 ** 9)
         self._gas_less_tx_max_nonce = self._env_int("GAS_LESS_MAX_TX_NONCE", 0, 5)
         self._gas_less_tx_max_gas = self._env_int("GAS_LESS_MAX_GAS", 0, 20_000_000)  # Estimated gas on Mora = 18 mln
-        self._neon_price_usd = Decimal('0.25')
         self._start_slot = os.environ.get('START_SLOT', '0')
         self._gas_tank_parallel_request_cnt = self._env_int("GAS_TANK_PARALLEL_REQUEST_COUNT", 1, 10)
         self._gas_tank_poll_tx_cnt = self._env_int('GAS_TANK_POLL_TX_COUNT', 1, 1000)
@@ -252,10 +251,6 @@ class Config(DBConfig):
         return self._gas_less_tx_max_gas
 
     @property
-    def neon_price_usd(self) -> Decimal:
-        return self._neon_price_usd
-
-    @property
     def start_slot(self) -> str:
         return self._start_slot
 
@@ -379,7 +374,6 @@ class Config(DBConfig):
             'MINIMAL_WO_CHAINID_GAS_PRICE': self.min_wo_chainid_gas_price,
             'GAS_LESS_MAX_TX_NONCE': self.gas_less_tx_max_nonce,
             'GAS_LESS_MAX_GAS': self.gas_less_tx_max_gas,
-            'NEON_PRICE_USD': self.neon_price_usd,
             'START_SLOT': self.start_slot,
             'GAS_TANK_PARALLEL_REQUEST_COUNT': self.gas_tank_parallel_request_cnt,
             'GAS_TANK_POLL_TX_COUNT': self.gas_tank_poll_tx_cnt,
