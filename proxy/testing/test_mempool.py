@@ -596,7 +596,7 @@ class TestMPSchedule(unittest.TestCase):
 
         processing_req, res = _add_tx(req_data, req_id='processing', gas_price=tx.gas_price + 1)
         self.assertEqual(res.code, MPTxSendResultCode.NonceTooLow)
-        self.assertEqual(res.state_tx_cnt, tx.nonce)
+        self.assertEqual(res.state_tx_cnt, tx.nonce + 1)
 
         req, res = _add_tx(req_data, req_id='new-nonce', nonce=tx.nonce + 1)
         self.assertEqual(res.code, MPTxSendResultCode.Success)
