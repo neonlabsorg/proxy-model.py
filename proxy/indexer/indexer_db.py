@@ -24,18 +24,14 @@ from ..common_neon.utils import NeonTxReceiptInfo, SolBlockInfo
 class IndexerDB:
     base_start_slot_name = 'start_block_slot'
 
-    def __init__(self, config: Config, db_conn: DBConnection, prefix: str):
+    def __init__(self, config: Config, db_conn: DBConnection, reindex_ident: str):
         self._config = config
         self._db_conn = db_conn
+        self._reindex_ident = reindex_ident + '-' if len(reindex_ident) else ''
 
-        if len(prefix):
-            self._prefix = prefix + '-'
-        else:
-            self._prefix = ''
-
-        self._start_slot_name = self._prefix + self.base_start_slot_name
-        self._stop_slot_name = self._prefix + 'stop_block_slot'
-        self._min_used_slot_name = self._prefix + 'min_receipt_block_slot'
+        self._start_slot_name = self._reindex_ident + self.base_start_slot_name
+        self._stop_slot_name = self._reindex_ident + 'stop_block_slot'
+        self._min_used_slot_name = self._reindex_ident + 'min_receipt_block_slot'
 
         self._constants_db = ConstantsDB(db_conn)
         self._sol_blocks_db = SolBlocksDB(db_conn)
@@ -65,8 +61,8 @@ class IndexerDB:
         self._min_used_slot = 0
 
     @staticmethod
-    def from_db(config: Config, db: DBConnection, prefix: str) -> IndexerDB:
-        db = IndexerDB(config, db, prefix)
+    def from_db(config: Config, db: DBConnection, reindex_ident: str) -> IndexerDB:
+        db = IndexerDB(config, db, reindex_ident)
 
         db._min_used_slot = db._constants_db.get(db._min_used_slot_name, 0)
         db._start_slot = db._constants_db.get(db._start_slot_name, db._min_used_slot)
@@ -75,9 +71,9 @@ class IndexerDB:
         return db
 
     @staticmethod
-    def from_range(config: Config, db: DBConnection, prefix: str,
-                   start_slot: int, stop_slot: Optional[int]) -> IndexerDB:
-        db = IndexerDB(config, db, prefix)
+    def from_range(config: Config, db: DBConnection, start_slot: int,
+                   reindex_ident: str = '', stop_slot: Optional[int] = None) -> IndexerDB:
+        db = IndexerDB(config, db, reindex_ident)
 
         db._start_slot = start_slot
         db._min_used_slot = start_slot
@@ -92,8 +88,8 @@ class IndexerDB:
         return db
 
     @property
-    def prefix(self) -> str:
-        return self._prefix
+    def reindex_ident(self) -> str:
+        return self._reindex_ident
 
     @property
     def config(self) -> Config:
@@ -112,12 +108,13 @@ class IndexerDB:
         return self._stop_slot
 
     def is_reindexing_mode(self) -> bool:
-        return self._stop_slot is not None
+        return len(self._reindex_ident) > 0
 
     def is_healthy(self) -> bool:
         return self._db_conn.is_connected()
 
     def drop_not_finalized_history(self) -> None:
+        assert not self.is_reindexing_mode()
         self._db_conn.run_tx(
             lambda: self._drop_not_finalized_history()
         )

@@ -46,6 +46,7 @@ class TestGasTank(unittest.TestCase):
     @classmethod
     def create_gas_tank(cls, start_slot: str) -> GasTank:
         config = FakeConfig(start_slot)
+        cls.config = config
         return GasTank(config=config)
 
     @classmethod
@@ -150,7 +151,7 @@ class TestGasTank(unittest.TestCase):
         mock_dict_get.side_effect = [start_slot - 1]
         mock_get_slot.side_effect = [start_slot + 1]
 
-        new_gas_tank = self.create_gas_tank('CONTINUE')
+        new_gas_tank = self.create_gas_tank(self.config.continue_slot_name)
 
         self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot - 1)
         mock_get_slot.assert_called_once_with('finalized')
@@ -163,7 +164,7 @@ class TestGasTank(unittest.TestCase):
         mock_dict_get.side_effect = [None]
         mock_get_slot.side_effect = [start_slot + 1]
 
-        new_gas_tank = self.create_gas_tank('CONTINUE')
+        new_gas_tank = self.create_gas_tank(self.config.continue_slot_name)
 
         self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot + 1)
         mock_get_slot.assert_called_once_with('finalized')
@@ -189,7 +190,7 @@ class TestGasTank(unittest.TestCase):
         mock_dict_get.side_effect = [start_slot - 1]
         mock_get_slot.side_effect = [start_slot + 1]
 
-        new_gas_tank = self.create_gas_tank('LATEST')
+        new_gas_tank = self.create_gas_tank(config.latest_slot_name)
 
         self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot + 1)
         mock_get_slot.assert_called_once_with('finalized')

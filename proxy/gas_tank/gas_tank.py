@@ -12,6 +12,7 @@ from .solana_tx_meta_collector import SolTxMetaDict, FinalizedSolTxMetaCollector
 from ..common_neon.address import NeonAddress
 from ..common_neon.config import Config
 from ..common_neon.neon_instruction import EvmIxCode
+from ..common_neon.solana_tx import SolCommit
 from ..common_neon.db.db_connect import DBConnection
 from ..common_neon.db.constats_db import ConstantsDB
 from ..common_neon.metrics_logger import MetricsLogger
@@ -37,8 +38,11 @@ class GasTank:
         self._solana = SolInteractor(config, config.solana_url)
         self._config = config
 
+        first_slot = self._solana.get_first_available_block()
+        finalized_slot = self._solana.get_block_slot(SolCommit.Finalized)
         last_known_slot = self._constant_db.get('latest_gas_tank_slot', None)
-        self._start_slot = get_start_slot(config, self._solana, last_known_slot)
+
+        self._start_slot = get_start_slot(config, first_slot, finalized_slot, last_known_slot)
         self._last_block_slot = self._start_slot
         self._latest_gas_tank_slot = self._start_slot
         self._current_slot = 0

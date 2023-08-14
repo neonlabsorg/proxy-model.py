@@ -397,7 +397,11 @@ class SolInteractor:
 
     def get_first_available_block(self) -> int:
         response = self._send_rpc_request('getFirstAvailableBlock')
-        return response.get('result', 0)
+        slot = response.get('result', 0)
+        LOG.debug(f'Solana`s first slot {slot}')
+        if slot > 0:
+            slot += 512
+        return slot
 
     def get_block_info(self, block_slot: int, commitment=SolCommit.Confirmed, full=False) -> SolBlockInfo:
         opts = {

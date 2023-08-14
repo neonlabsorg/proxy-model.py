@@ -1,65 +1,58 @@
 import logging
 
-from ..common_neon.solana_tx import SolCommit
 from ..common_neon.config import Config
-from ..common_neon.solana_interactor import SolInteractor
 
 
 LOG = logging.getLogger(__name__)
 
 
-def get_start_slot(config: Config, solana: SolInteractor, last_known_slot: int) -> int:
-    latest_slot = solana.get_block_slot(SolCommit.Finalized)
-    start_slot = _get_start_slot_from_config(config, last_known_slot, latest_slot)
+def get_config_start_slot(cfg: Config, first_slot: int, finalized_slot: int, last_known_slot: int) -> int:
+    config_start_slot = _get_config_start_slot(cfg, last_known_slot, finalized_slot)
 
-    first_slot = get_first_slot(solana)
-    start_slot = max(start_slot, first_slot)
-    LOG.info(f'FIRST_AVAILABLE_SLOT={first_slot}: started the receipt slot from {start_slot}')
+    start_slot = max(config_start_slot, first_slot)
+    LOG.info(
+        f'FIRST_AVAILABLE_SLOT={first_slot}, FINALIZED_SLOT={finalized_slot},'
+        f'{cfg.start_slot_name}={config_start_slot}: '
+        f'started from the slot {start_slot}'
+    )
     return start_slot
 
 
-def get_first_slot(solana: SolInteractor) -> int:
-    first_slot = solana.get_first_available_block()
-    if first_slot > 0:
-        first_slot += 512
-    return first_slot
-
-
-def _get_start_slot_from_config(config: Config, last_known_slot: int, latest_slot: int) -> int:
+def _get_config_start_slot(cfg: Config, last_known_slot: int, finalized_slot: int) -> int:
     """
     This function allow to skip some part of history.
     - LATEST - start from the last block slot from Solana
     - CONTINUE - continue from the last parsed slot of from latest
-    - NUMBER - first start from the number, then continue from last parsed slot
+    - INTEGER - first start from the INTEGER, then continue from last parsed slot
     """
     last_known_slot = 0 if not isinstance(last_known_slot, int) else last_known_slot
     start_int_slot = 0
 
-    start_slot = config.start_slot.upper().strip()
-    LOG.info(f'Starting the receipt slot with LAST_KNOWN_SLOT={last_known_slot} and START_SLOT={start_slot}')
+    start_slot = cfg.start_slot
+    LOG.info(f'Starting with LAST_KNOWN_SLOT={last_known_slot} and {cfg.start_slot_name}={start_slot}')
 
-    if start_slot not in {'CONTINUE', 'LATEST'}:
+    if start_slot not in {cfg.continue_slot_name, cfg.latest_slot_name}:
         try:
-            start_int_slot = min(int(start_slot), latest_slot)
+            start_int_slot = min(int(start_slot), finalized_slot)
         except (Exception,):
-            LOG.error(f'Wrong value START_SLOT={start_slot}: use START_SLOT=0')
+            LOG.error(f'Wrong value {cfg.start_slot_name}={start_slot}: forced to use {cfg.start_slot_name}=0')
             start_int_slot = 0
 
-    if start_slot == 'CONTINUE':
+    if start_slot == cfg.continue_slot_name:
         if last_known_slot > 0:
-            LOG.info(f'START_SLOT={start_slot}: started the receipt slot from previous run {last_known_slot}')
+            LOG.info(f'{cfg.start_slot_name}={start_slot}: started from the last run {last_known_slot}')
             return last_known_slot
         else:
-            LOG.info(f'START_SLOT={start_slot}: forced the receipt slot from the latest Solana slot')
-            start_slot = 'LATEST'
+            LOG.info(f'{cfg.start_slot_name}={start_slot}: forced to use the Solana`s finalized slot')
+            start_slot = cfg.latest_slot_name
 
-    if start_slot == 'LATEST':
-        LOG.info(f'START_SLOT={start_slot}: started the receipt slot from the latest Solana slot {latest_slot}')
-        return latest_slot
+    if start_slot == cfg.latest_slot_name:
+        LOG.info(f'{cfg.start_slot_name}={start_slot}: started from the Solana`s finalized slot {finalized_slot}')
+        return finalized_slot
 
     if start_int_slot < last_known_slot:
-        LOG.info(f'START_SLOT={start_slot}: started the receipt slot from previous run {last_known_slot}')
+        LOG.info(f'{cfg.start_slot_name}={start_slot}: started from the last run {last_known_slot}')
         return last_known_slot
 
-    LOG.info(f'START_SLOT={start_slot}: started the receipt slot from {start_int_slot}')
+    LOG.info(f'{cfg.start_slot_name}={start_slot}: started from the config start slot {start_int_slot}')
     return start_int_slot

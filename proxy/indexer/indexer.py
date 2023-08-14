@@ -117,7 +117,7 @@ class Indexer:
                 self._stat_client.commit_neon_tx_result(tx_stat)
 
         block_stat = NeonBlockStatData(
-            reindex_ident=self._db.prefix,
+            reindex_ident=self._db.reindex_ident,
             start_block=self._db.start_slot,
             parsed_block=neon_block.block_slot,
             finalized_block=self._last_finalized_slot,
@@ -237,7 +237,7 @@ class Indexer:
 
     def run(self):
         if self._db.is_reindexing_mode():
-            with logging_context(reindex_ident=self._db.prefix):
+            with logging_context(reindex_ident=self._db.reindex_ident):
                 self._run()
         else:
             self._run()
@@ -271,9 +271,8 @@ class Indexer:
             self._collect_neon_txs(dctx, self._last_finalized_slot, SolCommit.Finalized)
 
         except SolHistoryNotFound as err:
-            first_slot = self._check_first_slot()
+            self._check_first_slot()
             LOG.debug(
-                f'first slot: {first_slot}, '
                 f'start slot: {dctx.start_slot}, '
                 f'stop slot: {dctx.stop_slot}, '
                 f'skip parsing of finalized history: {str(err)}'
@@ -304,17 +303,15 @@ class Indexer:
         except SolHistoryNotFound as err:
             LOG.debug(f'skip parsing of not-finalized history: {str(err)}')
 
-    def _check_first_slot(self) -> int:
+    def _check_first_slot(self) -> None:
         first_slot = self._solana.get_first_available_block()
-        start_slot = first_slot + 512
-        if self._db.start_slot < start_slot:
-            self._db.set_start_slot(start_slot)
+        if self._db.start_slot < first_slot:
+            self._db.set_start_slot(first_slot)
 
         # Skip history if it was cleaned by the Solana Node
         finalized_neon_block = self._neon_block_dict.finalized_neon_block
-        if (finalized_neon_block is not None) and (start_slot > finalized_neon_block.block_slot):
+        if (finalized_neon_block is not None) and (first_slot > finalized_neon_block.block_slot):
             self._neon_block_dict.clear()
-        return first_slot
 
     def _print_stat(self, dctx: SolNeonDecoderCtx) -> None:
         cache_stat = self._neon_block_dict.stat

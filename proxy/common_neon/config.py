@@ -2,7 +2,6 @@ import math
 import os
 
 from decimal import Decimal
-from typing import Optional
 from urllib.parse import urlparse
 from typing import Optional, Set
 
@@ -31,6 +30,13 @@ def parse_solana_websocket_url(solana_url: str) -> str:
 class Config(DBConfig):
     _one_block_sec = 0.4
     _min_finalize_sec = _one_block_sec * 32
+
+    start_slot_name = 'START_SLOT'
+    reindex_start_slot_name = 'REINDEX_START_SLOT'
+    reindex_thread_cnt_name = 'REINDEX_THREAD_COUNT'
+
+    continue_slot_name = 'CONTINUE'
+    latest_slot_name = 'LATEST'
 
     def __init__(self):
         super().__init__()
@@ -63,9 +69,9 @@ class Config(DBConfig):
         self._const_gas_price = self._env_int('CONST_GAS_PRICE', -1, -1) * (10 ** 9)
         self._gas_less_tx_max_nonce = self._env_int("GAS_LESS_MAX_TX_NONCE", 0, 5)
         self._gas_less_tx_max_gas = self._env_int("GAS_LESS_MAX_GAS", 0, 20_000_000)  # Estimated gas on Mora = 18 mln
-        self._start_slot = os.environ.get('START_SLOT', '0')
-        self._reindex_start_slot = os.environ.get('REINDEX_START_SLOT', '0')
-        self._reindex_thread_cnt = self._env_int('REINDEX_THREAD_COUNT', 0, 0)
+        self._start_slot = os.environ.get(self.start_slot_name, '0').upper().strip()
+        self._reindex_start_slot = os.environ.get(self.reindex_start_slot_name, '0').upper().strip()
+        self._reindex_thread_cnt = self._env_int(self.reindex_thread_cnt_name, 0, 0)
         self._reindex_block_cnt_per_thread = self._env_int('REINDEX_BLOCK_CNT_PER_THREAD', 10000, 10000)
         self._gas_tank_parallel_request_cnt = self._env_int("GAS_TANK_PARALLEL_REQUEST_COUNT", 1, 10)
         self._gas_tank_poll_tx_cnt = self._env_int('GAS_TANK_POLL_TX_COUNT', 1, 1000)
@@ -400,9 +406,9 @@ class Config(DBConfig):
             'CONST_GAS_PRICE': self.const_gas_price,
             'GAS_LESS_MAX_TX_NONCE': self.gas_less_tx_max_nonce,
             'GAS_LESS_MAX_GAS': self.gas_less_tx_max_gas,
-            'START_SLOT': self.start_slot,
-            'REINDEX_START_SLOT': self.reindex_start_slot,
-            'REINDEX_THREAD_COUNT': self.reindex_thread_cnt,
+            self.start_slot_name: self.start_slot,
+            self.reindex_start_slot_name: self.reindex_start_slot,
+            self.reindex_thread_cnt_name: self.reindex_thread_cnt,
             'REINDEX_BLOCK_CNT_PER_THREAD': self.reindex_block_cnt_per_thread,
             'GAS_TANK_PARALLEL_REQUEST_COUNT': self.gas_tank_parallel_request_cnt,
             'GAS_TANK_POLL_TX_COUNT': self.gas_tank_poll_tx_cnt,
