@@ -84,10 +84,10 @@ class ProxyStatService(StatService):
         self._metr_tx_failed = Counter('tx_failed_count', 'Count Of Failed Txs', registry=self._registry)
 
         self._metr_op_sol_balance = Gauge(
-            'operator_sol_balance', 'Operator Balance in Sol\'s', registry=self._registry
+            'operator_sol_balance', 'Operator Balance in SOLs', registry=self._registry
         )
         self._metr_op_neon_balance = Gauge(
-            'operator_neon_balance', 'Operator Balance in Neon\'s', registry=self._registry
+            'operator_neon_balance', 'Operator Balance in NEONs', registry=self._registry
         )
         self._metr_key_total = Gauge('operator_key_count', 'Operator Keys count', registry=self._registry)
         self._metr_res_total = Gauge('operator_resource_count', 'Operator Resource count', registry=self._registry)

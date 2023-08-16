@@ -223,15 +223,15 @@ class Indexer:
     def _has_new_blocks(self) -> bool:
         # TODO: fixme
         if self._db.is_reindexing_mode():
-            finalized_slot = self._solana.get_block_slot(SolCommit.Finalized)
+            finalized_slot = self._solana.get_finalized_slot()
             finalized_slot = min(self._db.stop_slot, finalized_slot)
             result = self._last_finalized_slot < finalized_slot
             self._last_finalized_slot = finalized_slot
         else:
-            self._last_confirmed_slot = self._solana.get_block_slot(SolCommit.Confirmed)
+            self._last_confirmed_slot = self._solana.get_confirmed_slot()
             result = self._last_head_slot != self._last_confirmed_slot
             if result:
-                self._last_finalized_slot = self._solana.get_block_slot(SolCommit.Finalized)
+                self._last_finalized_slot = self._solana.get_finalized_slot()
                 self._last_tracer_slot = self._tracer_api.max_slot()
         return result
 
@@ -288,7 +288,7 @@ class Indexer:
         # the head of finalized blocks will go forward
         # and there are no reason to parse confirmed blocks,
         # because on next iteration there will be the next portion of finalized blocks
-        finalized_block_slot = self._solana.get_block_slot(SolCommit.Finalized)
+        finalized_block_slot = self._solana.get_finalized_slot()
         if (finalized_block_slot - dctx.stop_slot) >= 3:
             LOG.debug(f'skip parsing of not-finalized history: {finalized_block_slot} > {dctx.stop_slot}')
             return
@@ -304,7 +304,7 @@ class Indexer:
             LOG.debug(f'skip parsing of not-finalized history: {str(err)}')
 
     def _check_first_slot(self) -> None:
-        first_slot = self._solana.get_first_available_block()
+        first_slot = self._solana.get_first_available_slot()
         if self._db.start_slot < first_slot:
             self._db.set_start_slot(first_slot)
 

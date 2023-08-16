@@ -61,7 +61,7 @@ class IndexerDB:
         self._min_used_slot = 0
 
     @staticmethod
-    def from_db(config: Config, db: DBConnection, reindex_ident: str) -> IndexerDB:
+    def from_db(config: Config, db: DBConnection, reindex_ident: str = '') -> IndexerDB:
         db = IndexerDB(config, db, reindex_ident)
 
         db._min_used_slot = db._constants_db.get(db._min_used_slot_name, 0)
@@ -90,14 +90,6 @@ class IndexerDB:
     @property
     def reindex_ident(self) -> str:
         return self._reindex_ident
-
-    @property
-    def config(self) -> Config:
-        return self._config
-
-    @property
-    def db_conn(self) -> DBConnection:
-        return self._db_conn
 
     @property
     def start_slot(self) -> int:

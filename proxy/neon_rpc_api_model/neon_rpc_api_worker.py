@@ -64,7 +64,7 @@ class NeonRpcApiWorker:
         self._solana = SolInteractor(config, config.solana_url)
 
         db_conn = DBConnection(config)
-        self._db = IndexerDB.from_db(config, db_conn, '')
+        self._db = IndexerDB.from_db(config, db_conn)
         self._gas_tank = GasLessAccountsDB(db_conn)
 
         self._mempool_client = MemPoolClient(MP_SERVICE_ADDR)
@@ -979,7 +979,7 @@ class NeonRpcApiWorker:
     def _is_neon_tx_exist(self, neon_tx: NeonTx) -> bool:
         neon_tx_receipt = self._db.get_tx_by_neon_sig(neon_tx.hex_tx_sig)
         if neon_tx_receipt is not None:
-            if neon_tx_receipt.neon_tx_res.block_slot <= self._db.get_finalized_block_slot():
+            if neon_tx_receipt.neon_tx_res.block_slot <= self._db.finalized_slot:
                 raise EthereumError(message='already known')
             return True
 

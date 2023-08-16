@@ -84,7 +84,7 @@ class MPExecutorFreeALTQueueTask(MPExecutorBaseTask):
             if mp_alt_info is not None:
                 mp_alt_info_dict[alt_address.table_account] = mp_alt_info
 
-        block_slot = self._solana.get_block_slot(SolCommit.Confirmed) - 3
+        block_slot = self._solana.get_confirmed_slot() - 3
         alt_dict_list = self._get_alt_list(block_slot)
 
         for alt_dict in alt_dict_list:

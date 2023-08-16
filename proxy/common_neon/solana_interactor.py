@@ -202,6 +202,12 @@ class SolInteractor:
         }
         return self._send_rpc_request('getSlot', opts).get('result', 0)
 
+    def get_finalized_slot(self) -> int:
+        return self.get_block_slot(SolCommit.Finalized)
+
+    def get_confirmed_slot(self) -> int:
+        return self.get_block_slot(SolCommit.Confirmed)
+
     @staticmethod
     def _decode_account_info(address: Union[str, SolPubKey], raw_account: Dict[str, Any]) -> AccountInfo:
         data = base64.b64decode(raw_account.get('data', None)[0])
@@ -395,12 +401,17 @@ class SolInteractor:
             tx_receipt_list=net_block.get('transactions', list())
         )
 
-    def get_first_available_block(self) -> int:
+    def get_first_available_slot(self) -> int:
         response = self._send_rpc_request('getFirstAvailableBlock')
         slot = response.get('result', 0)
-        LOG.debug(f'Solana`s first slot {slot}')
+        LOG.debug(f'Solana\'s first slot {slot}')
         if slot > 0:
             slot += 512
+
+        while self.get_block_info(slot).is_empty():
+            LOG.debug(f'Skip block {slot}...')
+            slot += 1
+
         return slot
 
     def get_block_info(self, block_slot: int, commitment=SolCommit.Confirmed, full=False) -> SolBlockInfo:
@@ -573,7 +584,7 @@ class SolInteractor:
             return True
 
         is_done = False
-        with websockets.sync.client.connect(self._config.solana_websocket_url) as websocket:
+        with websockets.sync.client.connect(self._config.solana_ws_url) as websocket:
             for tx_sig in tx_sig_list:
                 request = self._build_rpc_request('signatureSubscribe', tx_sig, {
                     'commitment': commitment

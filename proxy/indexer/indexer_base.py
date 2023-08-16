@@ -19,11 +19,10 @@ def get_config_start_slot(cfg: Config, first_slot: int, finalized_slot: int, las
 
 
 def _get_config_start_slot(cfg: Config, last_known_slot: int, finalized_slot: int) -> int:
-    """
-    This function allow to skip some part of history.
+    """This function allow to skip some part of history.
     - LATEST - start from the last block slot from Solana
-    - CONTINUE - continue from the last parsed slot of from latest
-    - INTEGER - first start from the INTEGER, then continue from last parsed slot
+    - CONTINUE - the first start from the LATEST, on next starts from the last parsed slot
+    - INTEGER - the first start from the INTEGER, on next starts CONTINUE
     """
     last_known_slot = 0 if not isinstance(last_known_slot, int) else last_known_slot
     start_int_slot = 0
@@ -43,11 +42,11 @@ def _get_config_start_slot(cfg: Config, last_known_slot: int, finalized_slot: in
             LOG.info(f'{cfg.start_slot_name}={start_slot}: started from the last run {last_known_slot}')
             return last_known_slot
         else:
-            LOG.info(f'{cfg.start_slot_name}={start_slot}: forced to use the Solana`s finalized slot')
+            LOG.info(f'{cfg.start_slot_name}={start_slot}: forced to use the Solana\'s finalized slot')
             start_slot = cfg.latest_slot_name
 
     if start_slot == cfg.latest_slot_name:
-        LOG.info(f'{cfg.start_slot_name}={start_slot}: started from the Solana`s finalized slot {finalized_slot}')
+        LOG.info(f'{cfg.start_slot_name}={start_slot}: started from the Solana\'s finalized slot {finalized_slot}')
         return finalized_slot
 
     if start_int_slot < last_known_slot:
