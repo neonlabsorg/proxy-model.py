@@ -28,16 +28,6 @@ def parse_solana_websocket_url(solana_url: str) -> str:
 
 
 class Config(DBConfig):
-    _one_block_sec = 0.4
-    _min_finalize_sec = _one_block_sec * 32
-
-    start_slot_name = 'START_SLOT'
-    reindex_start_slot_name = 'REINDEX_START_SLOT'
-    reindex_thread_cnt_name = 'REINDEX_THREAD_COUNT'
-
-    continue_slot_name = 'CONTINUE'
-    latest_slot_name = 'LATEST'
-
     def __init__(self):
         super().__init__()
         self._solana_url = os.environ.get("SOLANA_URL", "http://localhost:8899")
@@ -72,7 +62,8 @@ class Config(DBConfig):
         self._start_slot = os.environ.get(self.start_slot_name, '0').upper().strip()
         self._reindex_start_slot = os.environ.get(self.reindex_start_slot_name, '0').upper().strip()
         self._reindex_thread_cnt = self._env_int(self.reindex_thread_cnt_name, 0, 0)
-        self._reindex_block_cnt_per_thread = self._env_int('REINDEX_BLOCK_CNT_PER_THREAD', 10000, 10000)
+        self._reindex_block_cnt_per_thread = self._env_int(self.reindex_max_range_cnt_name, int(10 * 60 / self.one_block_sec), int(60 * 60 / self.one_block_sec))
+        self._reindex_max_range_cnt = self._env_int('REINDEX_MAX_RANGE_CNT', 1, 128)
         self._gas_tank_parallel_request_cnt = self._env_int("GAS_TANK_PARALLEL_REQUEST_COUNT", 1, 10)
         self._gas_tank_poll_tx_cnt = self._env_int('GAS_TANK_POLL_TX_COUNT', 1, 1000)
         self._indexer_poll_block_cnt = self._env_int('INDEXER_POLL_BLOCK_COUNT', 1, 32)
@@ -80,7 +71,7 @@ class Config(DBConfig):
         self._metrics_log_skip_cnt = self._env_int('METRICS_LOG_SKIP_COUNT', 1, 1000)
         self._max_tx_account_cnt = self._env_int("MAX_TX_ACCOUNT_COUNT", 20, 62)
         self._fuzz_fail_pct = self._env_int("FUZZ_FAIL_PCT", 0, 0)
-        self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", 4, math.ceil(self._min_finalize_sec))
+        self._confirm_timeout_sec = self._env_int("CONFIRM_TIMEOUT_SEC", 4, math.ceil(self.min_finalize_sec))
         self._max_evm_step_cnt_emulate = self._env_int("MAX_EVM_STEP_COUNT_TO_EMULATE", 1000, 500000)
         self._neon_cli_timeout = self._env_decimal("NEON_CLI_TIMEOUT", "2.5")
         self._neon_cli_debug_log = self._env_bool("NEON_CLI_DEBUG_LOG", False)
@@ -126,7 +117,9 @@ class Config(DBConfig):
 
     @staticmethod
     def _env_bool(name: str, default_value: bool) -> bool:
-        return os.environ.get(name, "YES" if default_value else "NO") == "YES"
+        value = os.environ.get(name, 'YES' if default_value else 'NO').upper().strip()
+        assert value in ('YES', 'ON', 'TRUE', 'NO', 'OFF', 'FALSE')
+        return value in ('YES', 'ON', 'TRUE')
 
     @staticmethod
     def _env_int(name: str, min_value: int, default_value: int) -> int:
@@ -138,11 +131,35 @@ class Config(DBConfig):
 
     @property
     def one_block_sec(self) -> float:
-        return self._one_block_sec
+        return 0.4
 
     @property
     def min_finalize_sec(self) -> float:
-        return self._min_finalize_sec
+        return self.one_block_sec * 32
+
+    @property
+    def start_slot_name(self) -> str:
+        return 'START_SLOT'
+
+    @property
+    def reindex_start_slot_name(self) -> str:
+        return 'REINDEX_START_SLOT'
+
+    @property
+    def reindex_thread_cnt_name(self) -> str:
+        return 'REINDEX_THREAD_COUNT'
+
+    @property
+    def reindex_max_range_cnt_name(self) -> str:
+        return 'REINDEX_MAX_RANGE_COUNT'
+
+    @property
+    def continue_slot_name(self) -> str:
+        return 'CONTINUE'
+
+    @property
+    def latest_slot_name(self) -> str:
+        return 'LATEST'
 
     @property
     def solana_url(self) -> str:
@@ -286,6 +303,10 @@ class Config(DBConfig):
         return self._reindex_block_cnt_per_thread
 
     @property
+    def reindex_max_range_cnt(self) -> int:
+        return self._reindex_max_range_cnt
+
+    @property
     def gas_tank_parallel_request_cnt(self) -> int:
         return self._gas_tank_parallel_request_cnt
 
@@ -409,6 +430,7 @@ class Config(DBConfig):
             self.start_slot_name: self.start_slot,
             self.reindex_start_slot_name: self.reindex_start_slot,
             self.reindex_thread_cnt_name: self.reindex_thread_cnt,
+            self.reindex_max_range_cnt_name: self.reindex_max_range_cnt,
             'REINDEX_BLOCK_CNT_PER_THREAD': self.reindex_block_cnt_per_thread,
             'GAS_TANK_PARALLEL_REQUEST_COUNT': self.gas_tank_parallel_request_cnt,
             'GAS_TANK_POLL_TX_COUNT': self.gas_tank_poll_tx_cnt,
@@ -438,7 +460,7 @@ class Config(DBConfig):
             # 'HVAC_URL': self.hvac_url,
             # 'HVAC_TOKEN': self.hvac_token,
             # 'HVAC_PATH': self.hvac_path,
-            # 'HVAC_MOUNT': self.hvac_mount,
+            # 'HVAC_MOUNT': self.hvac_mount,ga
 
             # 'CLICKHOUSE_DSN_LIST': self.ch_dsn_list,
         }
