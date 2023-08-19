@@ -38,7 +38,7 @@ class StuckNeonTxsDB(BaseDBTable):
             return
 
         json_data = json.dumps(neon_tx_list)
-        self._insert_row([is_finalized, block_slot, json_data])
+        self._insert_row((is_finalized, block_slot, json_data))
 
     def get_tx_list(self, is_finalized: bool, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
         value_list = self._fetch_one(self._select_request, (is_finalized, block_slot,))

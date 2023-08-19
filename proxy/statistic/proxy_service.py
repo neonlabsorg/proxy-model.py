@@ -12,6 +12,7 @@ from .data import NeonMethodData, NeonGasPriceData, NeonTxBeginData, NeonTxEndDa
 from .data import NeonOpResStatData, NeonOpResListData, NeonExecutorStatData
 
 from ..indexer.indexer_db import IndexerDB
+from ..common_neon.db.db_connect import DBConnection
 from ..common_neon.config import Config
 from ..common_neon.solana_interactor import SolInteractor
 
@@ -24,7 +25,7 @@ class ProxyStatDataPeeker:
         self._stat_service = stat_srv
         self._config = config
         self._solana = SolInteractor(config, config.solana_url)
-        self._db = IndexerDB(config)
+        self._db = IndexerDB.from_db(config, DBConnection(config))
 
         self._sol_account_list: List[str] = []
         self._neon_account_list: List[str] = []
@@ -77,7 +78,7 @@ class ProxyStatService(StatService):
         self._metr_tx_in_progress = Gauge('tx_in_progress', 'Count Of Processing Txs', registry=self._registry)
         self._metr_stuck_tx_in_progress = Gauge('stuck_tx_in_progress', 'Count Of Processing Stuck Txs', registry=self._registry)
         self._metr_tx_in_reschedule = Gauge('tx_in_reschedule', 'Count Of Txs in Rescheduled Queue', registry=self._registry)
-        self._metr_tx_in_stuck = Gauge('tx_in_stuck', 'Count Of Txs in Stuck Queue', registry=self._registry)
+        self._metr_tx_in_stuck = Gauge('stuck_tx_in_mempool', 'Count Of Txs in Stuck Queue', registry=self._registry)
 
         self._metr_tx_canceled = Counter('tx_canceled_count', 'Count of Canceled Txs')
         self._metr_tx_success = Counter('tx_success_count', 'Count Of Succeeded Txs', registry=self._registry)

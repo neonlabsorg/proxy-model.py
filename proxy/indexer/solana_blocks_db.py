@@ -1,7 +1,7 @@
 import math
 import logging
 
-from typing import Optional, List, Any, cast
+from typing import Optional, List, Any, Tuple, cast
 
 from ..common_neon.utils import SolBlockInfo
 from ..common_neon.db.base_db_table import BaseDBTable
@@ -179,34 +179,34 @@ class SolBlocksDB(BaseDBTable):
             ])
         self._insert_row_list(row_list)
 
-    def finalize_block_list(self, from_slot: int, to_slot: int, slot_list: List[int]):
+    def finalize_block_list(self, from_slot: int, to_slot: int, slot_tuple: Tuple[int, ...]) -> None:
         request = f'''
             UPDATE {self._table_name}
                SET is_finalized = True,
                    is_active = True
-             WHERE block_slot IN ({', '.join(['%s' for _ in slot_list])})
-            '''
-        self._update_row(request, slot_list)
+             WHERE block_slot IN %s
+        '''
+        self._update_row(request, (slot_tuple,))
 
         request = f'''
             DELETE FROM {self._table_name}
                   WHERE block_slot > %s
                     AND block_slot <= %s
-                    AND block_slot NOT IN ({', '.join(['%s' for _ in slot_list])})
-            '''
-        self._update_row(request, (from_slot, to_slot, slot_list))
+                    AND block_slot NOT IN %s
+        '''
+        self._update_row(request, (from_slot, to_slot, slot_tuple))
 
-    def activate_block_list(self, from_slot: int, slot_list: List[int]) -> None:
+    def activate_block_list(self, from_slot: int, slot_tuple: Tuple[int, ...]) -> None:
         request = f'''
             UPDATE {self._table_name}
                SET is_active = False
              WHERE block_slot > %s
-            '''
+        '''
         self._update_row(request, (from_slot,))
 
         request = f'''
             UPDATE {self._table_name}
                SET is_active = True
-             WHERE block_slot IN ({', '.join(['%s' for _ in slot_list])})
-            '''
-        self._update_row(request, slot_list)
+             WHERE block_slot IN %s
+        '''
+        self._update_row(request, (slot_tuple,))

@@ -17,7 +17,7 @@ class CliBase:
         self._enable_logging = enable_logging
 
     def _hide_solana_url(self, cmd: List[str]) -> str:
-        return ' '.join([item.replace(self._config.solana_http_url, 'XXXX') for item in cmd])
+        return ' '.join([item.replace(self._config.solana_url, 'XXXX') for item in cmd])
 
     def run_cli(self, cmd: List[str], **kwargs) -> str:
         if self._enable_logging:

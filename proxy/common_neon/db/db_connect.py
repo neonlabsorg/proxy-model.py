@@ -19,8 +19,8 @@ class DBConnection:
     _PGCursor = psycopg2.extensions.cursor
     _PGConnection = psycopg2.extensions.connection
 
-    def __init__(self, config: DBConfig):
-        self._config = config
+    def __init__(self, cfg: DBConfig):
+        self._cfg = cfg
         self._conn: Optional[DBConnection._PGConnection] = None
         self._tx_conn: Optional[DBConnection._PGConnection] = None
         self._connect()
@@ -33,19 +33,21 @@ class DBConnection:
             return
 
         kwargs = {}
-        if self._config.postgres_timeout > 0:
-            wait_ms = self._config.postgres_timeout * 1000
+        if self._cfg.postgres_timeout > 0:
+            wait_ms = self._cfg.postgres_timeout * 1000
             kwargs['options'] = (
                 f'-c statement_timeout={wait_ms} ' +
                 f'-c idle_in_transaction_session_timeout={wait_ms-500} '
             )
             LOG.debug(f'add statement timeout {wait_ms}')
 
+        self._cfg.validate_db_config()
+
         self._conn = psycopg2.connect(
-            dbname=self._config.postgres_db,
-            user=self._config.postgres_user,
-            password=self._config.postgres_password,
-            host=self._config.postgres_host,
+            dbname=self._cfg.postgres_db,
+            user=self._cfg.postgres_user,
+            password=self._cfg.postgres_password,
+            host=self._cfg.postgres_host,
             **kwargs
         )
         self._conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
@@ -70,7 +72,7 @@ class DBConnection:
 
     @property
     def config(self) -> DBConfig:
-        return self._config
+        return self._cfg
 
     def is_connected(self) -> bool:
         if self._conn is None:
@@ -113,10 +115,10 @@ class DBConnection:
         finally:
             self._tx_conn = None
 
-    def update_row(self, request: str, value_list: Union[Tuple[Any, ...], List[Any]]) -> None:
+    def update_row(self, request: str, value_tuple: Tuple[Any, ...]) -> None:
         assert self._tx_conn is not None
         with self._tx_conn.cursor() as cursor:
-            cursor.execute(request, value_list)
+            cursor.execute(request, value_tuple)
 
     def update_row_list(self, request: str, row_list: List[List[Any]]):
         assert self._tx_conn is not None

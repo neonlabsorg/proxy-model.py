@@ -1,4 +1,4 @@
-from typing import List, Any, Set
+from typing import List, Any, Set, Tuple
 
 from ..common_neon.db.base_db_table import BaseDBTable
 from ..common_neon.db.db_connect import DBConnection
@@ -123,11 +123,11 @@ class SolNeonTxsDB(BaseDBTable):
 
         return sol_ix_list
 
-    def finalize_block_list(self, from_slot: int, to_slot: int, slot_list: List[int]) -> None:
+    def finalize_block_list(self, from_slot: int, to_slot: int, slot_tuple: Tuple[int, ...]) -> None:
         request = f'''
             DELETE FROM {self._table_name}
                   WHERE block_slot > %s
                     AND block_slot <= %s
-                    AND block_slot NOT IN ({', '.join(['%s' for _ in slot_list])})
+                    AND block_slot NOT IN %s
             '''
-        self._update_row(request, [from_slot, to_slot] + slot_list)
+        self._update_row(request, (from_slot, to_slot, slot_tuple))

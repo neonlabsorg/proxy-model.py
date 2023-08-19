@@ -78,12 +78,12 @@ class BaseDBTable:
     def _encode_list(self, v: List[Any]) -> Optional[bytes]:
         return None if (not v) or (len(v) == 0) else self._encode(v)
 
-    def _insert_row(self, value_list: Union[Tuple[Any, ...], List[Any]]) -> None:
-        assert len(self._column_list) == len(value_list)
-        self._db.update_row(self._insert_row_request, value_list)
+    def _insert_row(self, value_tuple: Tuple[Any, ...]) -> None:
+        assert len(self._column_list) == len(value_tuple)
+        self._db.update_row(self._insert_row_request, value_tuple)
 
-    def _update_row(self, update_row_request: str, value_list: Union[Tuple[Any, ...], List[Any]]) -> None:
-        self._db.update_row(update_row_request, value_list)
+    def _update_row(self, update_row_request: str, value_tuple: Tuple[Any, ...]) -> None:
+        self._db.update_row(update_row_request, value_tuple)
 
     def _remove_dups(self, row_list: List[List[Any]]) -> List[List[Any]]:
         if not len(self._key_set):

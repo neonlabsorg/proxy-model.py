@@ -430,7 +430,8 @@ class SolInteractor:
 
         return self._decode_block_info(block_slot, net_block)
 
-    def get_block_info_list(self, block_slot_list: List[int], commitment=SolCommit.Confirmed, full=False) -> List[SolBlockInfo]:
+    def get_block_info_list(self, block_slot_list: List[int],
+                            commitment=SolCommit.Confirmed, full=False) -> List[SolBlockInfo]:
         block_list = list()
         if len(block_slot_list) == 0:
             return block_list
@@ -584,7 +585,7 @@ class SolInteractor:
             return True
 
         is_done = False
-        with websockets.sync.client.connect(self._config.solana_ws_url) as websocket:
+        with websockets.sync.client.connect(self._config.solana_websocket_url) as websocket:
             for tx_sig in tx_sig_list:
                 request = self._build_rpc_request('signatureSubscribe', tx_sig, {
                     'commitment': commitment

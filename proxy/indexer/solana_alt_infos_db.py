@@ -36,7 +36,7 @@ class SolAltInfosDB(BaseDBTable):
             return
 
         json_data = json.dumps(alt_info_list)
-        self._insert_row([block_slot, json_data])
+        self._insert_row((block_slot, json_data))
 
     def get_alt_list(self, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
         value_list = self._fetch_one(self._select_request, (block_slot,))

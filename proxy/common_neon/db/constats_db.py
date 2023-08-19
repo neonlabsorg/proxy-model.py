@@ -61,7 +61,7 @@ class ConstantsDB(MutableMapping, BaseDBTable):
 
     def __setitem__(self, key: str, value: Any) -> None:
         self._db.run_tx(
-            lambda: self._insert_row([key, self._encode(value)])
+            lambda: self._insert_row((key, self._encode(value)))
         )
 
     def __delitem__(self, key):
