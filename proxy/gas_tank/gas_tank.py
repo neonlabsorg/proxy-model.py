@@ -21,7 +21,7 @@ from ..common_neon.utils.json_logger import logging_context
 from ..common_neon.utils.neon_tx_info import NeonTxInfo
 
 from ..indexer.indexed_objects import NeonIndexedHolderInfo
-from ..indexer.indexer_base import get_config_start_slot
+from ..indexer.indexer_utils import get_config_start_slot
 
 LOG = logging.getLogger(__name__)
 

@@ -22,26 +22,26 @@ class ConstantsDB(MutableMapping, BaseDBTable):
         value_list = self._fetch_one(self._len_request)
         return 0 if not len(value_list) else value_list[0]
 
-    def _key_list(self) -> List[str]:
+    def _get_key_list(self) -> List[str]:
         row_list = self._fetch_all(self._key_list_request)
         return [r[0] for r in row_list]
 
-    def _value_list(self) -> List[Any]:
+    def _get_value_list(self) -> List[Any]:
         row_list = self._fetch_all(self._value_list_request)
         return [self._decode(r[0]) for r in row_list]
 
-    def _item_list(self) -> List[Tuple[str, Any]]:
+    def _get_item_list(self) -> List[Tuple[str, Any]]:
         row_list = self._fetch_all(self._item_list_request)
         return [(r[0], self._decode(r[1])) for r in row_list]
 
     def keys(self) -> List[str]:
-        return self._key_list()
+        return self._get_key_list()
 
     def values(self) -> List[Any]:
-        return self._value_list()
+        return self._get_value_list()
 
     def items(self) -> List[Tuple[str, Any]]:
-        return self._item_list()
+        return self._get_item_list()
 
     def get(self, key: str, default: Any) -> Any:
         value_list = self._fetch_one(self._get_request, (key,))
@@ -72,5 +72,5 @@ class ConstantsDB(MutableMapping, BaseDBTable):
         )
 
     def __iter__(self):
-        for key in self._key_list():
+        for key in self._get_key_list():
             yield key

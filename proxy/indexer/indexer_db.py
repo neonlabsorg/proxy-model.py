@@ -30,9 +30,11 @@ class IndexerDB:
         self._db_conn = db_conn
 
         self._reindex_ident = reindex_ident
-        self._start_slot_name = '-'.join([reindex_ident, self.base_start_slot_name])
-        self._stop_slot_name = '-'.join([reindex_ident, 'stop_block_slot'])
-        self._min_used_slot_name = '-'.join([reindex_ident, self.base_min_used_slot_name])
+        if self.is_reindexing_mode():
+            reindex_ident += '-'
+        self._start_slot_name = reindex_ident + self.base_start_slot_name
+        self._stop_slot_name = reindex_ident + 'stop_block_slot'
+        self._min_used_slot_name = reindex_ident + self.base_min_used_slot_name
 
         self._finalized_slot_name = 'finalized_block_slot'
         self._latest_slot_name = 'latest_block_slot'

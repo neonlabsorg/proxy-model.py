@@ -11,7 +11,7 @@ def get_config_start_slot(cfg: Config, first_slot: int, finalized_slot: int, las
 
     start_slot = max(config_start_slot, first_slot)
     LOG.info(
-        f'FIRST_AVAILABLE_SLOT={first_slot}, FINALIZED_SLOT={finalized_slot},'
+        f'FIRST_AVAILABLE_SLOT={first_slot}, FINALIZED_SLOT={finalized_slot}, '
         f'{cfg.start_slot_name}={config_start_slot}: '
         f'started from the slot {start_slot}'
     )
@@ -42,11 +42,11 @@ def _get_config_start_slot(cfg: Config, last_known_slot: int, finalized_slot: in
             LOG.info(f'{cfg.start_slot_name}={start_slot}: started from the last run {last_known_slot}')
             return last_known_slot
         else:
-            LOG.info(f'{cfg.start_slot_name}={start_slot}: forced to use the Solana\'s finalized slot')
+            LOG.info(f"{cfg.start_slot_name}={start_slot}: forced to use the Solana's finalized slot")
             start_slot = cfg.latest_slot_name
 
     if start_slot == cfg.latest_slot_name:
-        LOG.info(f'{cfg.start_slot_name}={start_slot}: started from the Solana\'s finalized slot {finalized_slot}')
+        LOG.info(f"{cfg.start_slot_name}={start_slot}: started from the Solana's finalized slot {finalized_slot}")
         return finalized_slot
 
     if start_int_slot < last_known_slot:

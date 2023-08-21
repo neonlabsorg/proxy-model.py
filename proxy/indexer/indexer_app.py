@@ -15,7 +15,7 @@ from ..statistic.indexer_service import IndexerStatService
 
 from .indexer import Indexer
 from .indexer_db import IndexerDB
-from .indexer_base import get_config_start_slot
+from .indexer_utils import get_config_start_slot
 
 
 LOG = logging.getLogger(__name__)
@@ -112,7 +112,7 @@ class NeonIndexerApp:
             # For example: CONTINUE:213456789-starting_block_slot
             reindex_ident = key[:-len(IndexerDB.base_start_slot_name + 1)]
             start_slot_pos = reindex_ident.find(':')
-            db = IndexerDB.from_db(self._cfg, self._db_conn, reindex_ident)
+            db = IndexerDB.from_db(self._cfg, DBConnection(self._cfg), reindex_ident)
 
             if start_slot_pos == -1:
                 LOG.error(f'Skip wrong REINDEX {reindex_ident}')
@@ -153,7 +153,7 @@ class NeonIndexerApp:
             # For example: CONTINUE:213456789
             ident = ':'.join([self._reindex_ident, str(start_slot)])
             stop_slot = min(start_slot + range_len, self._start_slot)
-            db = IndexerDB.from_range(self._cfg, self._db_conn, start_slot, ident, stop_slot)
+            db = IndexerDB.from_range(self._cfg, DBConnection(self._cfg), start_slot, ident, stop_slot)
             new_db_list.append(db)
             start_slot = stop_slot
 
@@ -196,7 +196,7 @@ class NeonIndexerApp:
 
             LOG.info(
                 f'{self._cfg.reindex_start_slot_name}={self._cfg.continue_slot_name}: '
-                f'started reindexing from the slot: {self._start_slot}'
+                f'started reindexing from the slot: {self._last_known_slot}'
             )
             return self._last_known_slot, reindex_ident
 
@@ -204,6 +204,11 @@ class NeonIndexerApp:
             reindex_int_slot = int(reindex_ident)
             if reindex_int_slot >= self._finalized_slot:
                 raise ValueError('Too big value')
+
+            LOG.info(
+                f'{self._cfg.reindex_start_slot_name}={reindex_ident}: '
+                f'started reindexing from the slot: {reindex_int_slot}'
+            )
 
             return reindex_int_slot, reindex_ident
 

@@ -25,9 +25,6 @@ class DBConnection:
         self._conn: Optional[DBConnection._PGConnection] = None
         self._tx_conn: Optional[DBConnection._PGConnection] = None
 
-    def __del__(self):
-        self._clear()
-
     def _connect(self) -> None:
         self._cfg.validate_db_config()
 
@@ -135,8 +132,7 @@ class DBConnection:
 
                 with self._cursor() as cursor:
                     cursor.execute(request, *args)
-                    result = cursor.fetchmany(cnt)
-                    return result
+                    return cursor.fetchmany(cnt)
 
             except BaseException as exc:
                 if self._tx_conn is not None:
