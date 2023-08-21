@@ -41,7 +41,6 @@ class Indexer:
         self._counted_logger = MetricsLogger(config)
         self._stat_client = IndexerStatClient(config)
         self._stat_client.start()
-        self._last_stat_time = 0.0
 
         self._last_processed_slot = 0
         self._last_head_slot = 0
@@ -126,14 +125,6 @@ class Indexer:
             tracer_block=self._last_tracer_slot
         )
         self._stat_client.commit_block_stat(block_stat)
-
-        now = time.time()
-        if abs(now - self._last_stat_time) < 1:
-            return
-
-        self._last_stat_time = now
-        self._stat_client.commit_db_health(self._db.is_healthy())
-        self._stat_client.commit_solana_rpc_health(self._solana.is_healthy())
 
     def _new_neon_block(self, dctx: SolNeonDecoderCtx, sol_block: SolBlockInfo) -> NeonIndexedBlockInfo:
         if not dctx.is_finalized():

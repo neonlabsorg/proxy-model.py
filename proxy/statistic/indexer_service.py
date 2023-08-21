@@ -1,10 +1,57 @@
+from __future__ import annotations
+
+import asyncio
+import logging
+
 from aioprometheus import Counter, Gauge, Histogram
 
-from ..statistic.data import NeonTxStatData, NeonBlockStatData
-from ..statistic.middleware import StatService
+from .data import NeonTxStatData, NeonBlockStatData
+from .middleware import StatService
+
+from ..common_neon.config import Config
+from ..common_neon.solana_interactor import SolInteractor
+from ..common_neon.db.db_connect import DBConnection
+
+
+LOG = logging.getLogger(__name__)
+
+
+class IndexerStatDataPeeker:
+    def __init__(self, config: Config, stat_srv: IndexerStatService):
+        self._stat_service = stat_srv
+        self._solana = SolInteractor(config, config.solana_url)
+        self._db_conn = DBConnection(config)
+
+    async def run(self):
+        while True:
+            await asyncio.sleep(1)
+            try:
+                self._stat_solana_node_health()
+                self._stat_db_health()
+            except BaseException as err:
+                LOG.warning('Exception on statistic processing', exc_info=err)
+
+    def _stat_solana_node_health(self) -> None:
+        is_healthy = self._solana.is_healthy()
+        if is_healthy is None:
+            self._stat_service.commit_solana_node_health(False)
+            self._stat_service.commit_solana_rpc_health(False)
+        elif is_healthy:
+            self._stat_service.commit_solana_node_health(True)
+            self._stat_service.commit_solana_rpc_health(True)
+        else:
+            self._stat_service.commit_solana_node_health(False)
+            self._stat_service.commit_solana_rpc_health(True)
+
+    def _stat_db_health(self) -> None:
+        self._stat_service.commit_db_health(self._db_conn.is_connected())
 
 
 class IndexerStatService(StatService):
+    def __init__(self, config: Config):
+        super().__init__(config)
+        self._data_peeker = IndexerStatDataPeeker(config, self)
+
     def _init_metric_list(self):
         self._metr_tx_count = Counter(
             'tx_count', 'Count of completed Neon transactions (independent on status)', registry=self._registry
@@ -57,14 +104,33 @@ class IndexerStatService(StatService):
         self._metr_block_parsed = Gauge('block_parsed', 'Last parsed block numer', registry=self._registry)
         self._metr_block_tracer = Gauge('block_tracer', 'Last tracer block numer', registry=self._registry)
 
-        self._metr_db_health = Gauge('db_health', 'DB status', registry=self._registry)
-        self._metr_solana_rpc_health = Gauge('solana_rpc_health', 'Solana Node status', registry=self._registry)
+        self._metr_db_health = Gauge(
+            'db_health',
+            'DB connection status',
+            registry=self._registry
+        )
+        self._metr_solana_rpc_health = Gauge(
+            'solana_rpc_health',
+            'Status of RPC connection to Solana',
+            registry=self._registry
+        )
+        self._metr_solana_node_health = Gauge(
+            'solana_node_health',
+            'Status from Solana Node',
+            registry=self._registry
+        )
+
+    def _process_init(self) -> None:
+        self._event_loop.create_task(self._data_peeker.run())
 
     def commit_db_health(self, status: bool) -> None:
         self._metr_db_health.set({}, 1 if status else 0)
 
     def commit_solana_rpc_health(self, status: bool) -> None:
         self._metr_solana_rpc_health.set({}, 1 if status else 0)
+
+    def commit_solana_node_health(self, status: bool) -> None:
+        self._metr_solana_node_health.set({}, 1 if status else 0)
 
     def commit_block_stat(self, block_stat: NeonBlockStatData) -> None:
         if len(block_stat.reindex_ident):

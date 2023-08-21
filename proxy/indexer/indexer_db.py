@@ -112,9 +112,6 @@ class IndexerDB:
     def is_reindexing_mode(self) -> bool:
         return len(self._reindex_ident) > 0
 
-    def is_healthy(self) -> bool:
-        return self._db_conn.is_connected()
-
     def drop_not_finalized_history(self) -> None:
         self._db_conn.run_tx(
             lambda: self._drop_not_finalized_history()

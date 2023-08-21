@@ -11,10 +11,9 @@ from .middleware import StatService
 from .data import NeonMethodData, NeonGasPriceData, NeonTxBeginData, NeonTxEndData
 from .data import NeonOpResStatData, NeonOpResListData, NeonExecutorStatData
 
-from ..indexer.indexer_db import IndexerDB
-from ..common_neon.db.db_connect import DBConnection
 from ..common_neon.config import Config
 from ..common_neon.solana_interactor import SolInteractor
+from ..common_neon.db.db_connect import DBConnection
 
 
 LOG = logging.getLogger(__name__)
@@ -23,9 +22,8 @@ LOG = logging.getLogger(__name__)
 class ProxyStatDataPeeker:
     def __init__(self, config: Config, stat_srv: ProxyStatService):
         self._stat_service = stat_srv
-        self._config = config
         self._solana = SolInteractor(config, config.solana_url)
-        self._db = IndexerDB.from_db(config, DBConnection(config))
+        self._db_conn = DBConnection(config)
 
         self._sol_account_list: List[str] = []
         self._neon_account_list: List[str] = []
@@ -39,7 +37,7 @@ class ProxyStatDataPeeker:
             await asyncio.sleep(1)
             try:
                 self._stat_operator_balance()
-                self._stat_solana_rpc_health()
+                self._stat_solana_node_health()
                 self._stat_db_health()
             except BaseException as err:
                 LOG.warning('Exception on statistic processing', exc_info=err)
@@ -55,11 +53,20 @@ class ProxyStatDataPeeker:
                 neon_balance = Decimal(neon_layout.balance) / 1_000_000_000 / 1_000_000_000
                 self._stat_service.commit_op_neon_balance(neon_account, neon_balance)
 
-    def _stat_solana_rpc_health(self) -> None:
-        self._stat_service.commit_solana_rpc_health(self._solana.is_healthy())
+    def _stat_solana_node_health(self) -> None:
+        is_healthy = self._solana.is_healthy()
+        if is_healthy is None:
+            self._stat_service.commit_solana_node_health(False)
+            self._stat_service.commit_solana_rpc_health(False)
+        elif is_healthy:
+            self._stat_service.commit_solana_node_health(True)
+            self._stat_service.commit_solana_rpc_health(True)
+        else:
+            self._stat_service.commit_solana_node_health(False)
+            self._stat_service.commit_solana_rpc_health(True)
 
     def _stat_db_health(self) -> None:
-        self._stat_service.commit_db_health(self._db.is_healthy())
+        self._stat_service.commit_db_health(self._db_conn.is_connected())
 
 
 class ProxyStatService(StatService):
@@ -113,8 +120,21 @@ class ProxyStatService(StatService):
         self._metr_operator_fee = Gauge('operator_fee', 'Operator Fee', registry=self._registry)
         self._metr_gas_price_slippage = Gauge('gas_price_slippage', 'Gas Price Slippage', registry=self._registry)
 
-        self._metr_db_health = Gauge('db_health', 'DB status', registry=self._registry)
-        self._metr_solana_rpc_health = Gauge('solana_rpc_health', 'Solana Node status', registry=self._registry)
+        self._metr_db_health = Gauge(
+            'db_health',
+            'DB connection status',
+            registry=self._registry
+        )
+        self._metr_solana_rpc_health = Gauge(
+            'solana_rpc_health',
+            'Status of RPC connection to Solana',
+            registry=self._registry
+        )
+        self._metr_solana_node_health = Gauge(
+            'solana_node_health',
+            'Status from Solana Node',
+            registry=self._registry
+        )
 
     def _process_init(self) -> None:
         self._event_loop.create_task(self._data_peeker.run())
@@ -151,6 +171,9 @@ class ProxyStatService(StatService):
 
     def commit_solana_rpc_health(self, status: bool) -> None:
         self._metr_solana_rpc_health.set({}, 1 if status else 0)
+
+    def commit_solana_node_health(self, status: bool) -> None:
+        self._metr_solana_node_health.set({}, 1 if status else 0)
 
     def commit_gas_price(self, gas_price: NeonGasPriceData) -> None:
         self._metr_gas_price.set({}, gas_price.min_gas_price)

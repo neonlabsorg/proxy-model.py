@@ -73,7 +73,7 @@ class NeonTxEndData:
     processing_stuck_cnt: int = 0
     in_reschedule_queue_cnt: int = 0
     in_stuck_queue_cnt: int = 0
-    in_waiting_queue_cnt: int = 0
+    in_mempool_cnt: int = 0
 
     def add_value(self, code: NeonTxEndCode) -> None:
         if code in {NeonTxEndCode.Done, NeonTxEndCode.StuckDone}:

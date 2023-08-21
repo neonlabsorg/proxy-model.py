@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import time
+import itertools
 
-from typing import List, Tuple, Union, Any, Optional, Callable
+from typing import List, Tuple, Any, Optional, Callable
 
 import psycopg2
 import psycopg2.extensions
@@ -23,16 +24,20 @@ class DBConnection:
         self._cfg = cfg
         self._conn: Optional[DBConnection._PGConnection] = None
         self._tx_conn: Optional[DBConnection._PGConnection] = None
-        self._connect()
 
     def __del__(self):
-        self._close()
+        self._clear()
 
     def _connect(self) -> None:
-        if self._conn is not None:
-            return
+        self._cfg.validate_db_config()
 
-        kwargs = {}
+        kwargs = dict(
+            dbname=self._cfg.postgres_db,
+            user=self._cfg.postgres_user,
+            password=self._cfg.postgres_password,
+            host=self._cfg.postgres_host,
+        )
+
         if self._cfg.postgres_timeout > 0:
             wait_ms = self._cfg.postgres_timeout * 1000
             kwargs['options'] = (
@@ -41,25 +46,13 @@ class DBConnection:
             )
             LOG.debug(f'add statement timeout {wait_ms}')
 
-        self._cfg.validate_db_config()
-
-        self._conn = psycopg2.connect(
-            dbname=self._cfg.postgres_db,
-            user=self._cfg.postgres_user,
-            password=self._cfg.postgres_password,
-            host=self._cfg.postgres_host,
-            **kwargs
-        )
+        self._conn = psycopg2.connect(**kwargs)
         self._conn.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_READ_COMMITTED)
 
-    def _close(self) -> None:
-        if self._conn is None:
-            return
-
-        self._conn.close()
-        self._clear()
-
     def _clear(self) -> None:
+        if self._conn is not None:
+            self._conn.close()
+
         self._conn = None
         self._tx_conn = None
 
@@ -75,15 +68,16 @@ class DBConnection:
         return self._cfg
 
     def is_connected(self) -> bool:
-        if self._conn is None:
-            return False
 
         try:
-            self._connect()
+            if self._conn is None:
+                self._connect()
+
             with self._cursor() as cursor:
                 cursor.execute('SELECT 1')
+
             return True
-        except (psycopg2.OperationalError, psycopg2.InterfaceError):
+        except (BaseException, ):
             self._clear()
             return False
 
@@ -93,9 +87,11 @@ class DBConnection:
             return
 
         try:
-            while True:
+            for retry in itertools.count():
                 try:
-                    self._connect()
+                    if self._conn is None:
+                        self._connect()
+
                     with self._conn as tx_conn:
                         self._tx_conn = tx_conn
 
@@ -103,17 +99,23 @@ class DBConnection:
                         self._tx_conn = None
                         return
 
-                except (psycopg2.OperationalError, psycopg2.InterfaceError) as exc:
-                    LOG.debug('Fail on run TPC transaction', exc_info=exc)
-                    self._clear()
-                    time.sleep(1)
-
                 except BaseException as exc:
-                    LOG.error('Unknown fail on run TPC transaction', exc_info=exc)
-                    raise
-
+                    self._on_fail_execute(retry, exc)
         finally:
             self._tx_conn = None
+
+    def _on_fail_execute(self, retry: int, exc: BaseException) -> None:
+        if isinstance(exc, psycopg2.OperationalError) or isinstance(exc, psycopg2.InterfaceError):
+            if retry > 1:
+                LOG.debug(f'Fail {retry} on DB connection', exc_info=exc)
+
+            self._clear()
+            time.sleep(1)
+
+        else:
+            self._clear()
+            LOG.error('Unknown fail on DB connection', exc_info=exc)
+            raise
 
     def update_row(self, request: str, value_tuple: Tuple[Any, ...]) -> None:
         assert self._tx_conn is not None
@@ -126,21 +128,20 @@ class DBConnection:
             psycopg2.extras.execute_values(cursor, request, row_list, template=None, page_size=1000)
 
     def fetch_cnt(self, cnt: int, request: str, *args) -> List[List[Any]]:
-        while True:
+        for retry in itertools.count():
             try:
-                self._connect()
+                if self._conn is None:
+                    self._connect()
+
                 with self._cursor() as cursor:
                     cursor.execute(request, *args)
-                    return cursor.fetchmany(cnt)
-
-            except (psycopg2.OperationalError, psycopg2.InterfaceError) as exc:
-                if self._tx_conn is not None:
-                    raise
-
-                LOG.debug('Fail on fetching of records', exc_info=exc)
-                self._clear()
-                time.sleep(1)
+                    result = cursor.fetchmany(cnt)
+                    return result
 
             except BaseException as exc:
-                LOG.error('Unknown fail to fetching of records', exc_info=exc)
-                raise
+                if self._tx_conn is not None:
+                    # Got an exception during DB transaction execution
+                    #   next steps happens inside run_tx()
+                    raise
+
+                self._on_fail_execute(retry, exc)
