@@ -190,7 +190,7 @@ class TestGasTank(unittest.TestCase):
         mock_dict_get.side_effect = [start_slot - 1]
         mock_get_slot.side_effect = [start_slot + 1]
 
-        new_gas_tank = self.create_gas_tank(config.latest_slot_name)
+        new_gas_tank = self.create_gas_tank(self.config.latest_slot_name)
 
         self.assertEqual(new_gas_tank._latest_gas_tank_slot, start_slot + 1)
         mock_get_slot.assert_called_once_with('finalized')
