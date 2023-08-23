@@ -268,7 +268,6 @@ class Indexer:
                 LOG.warning('Exception on transactions decoding', exc_info=exc)
             finally:
                 self._decoder_stat.commit_timer()
-        LOG.debug('exit')
 
     def _has_new_blocks(self) -> bool:
         if self._db.is_reindexing_mode():
@@ -276,9 +275,8 @@ class Indexer:
             finalized_slot = self._db.finalized_slot
             # reindexing should stop on the terminated slot
             finalized_slot = min(self._term_slot, finalized_slot)
-            result = self._last_finalized_slot < finalized_slot
-            if result:
-                self._last_finalized_slot = finalized_slot
+            result = self._last_processed_slot < finalized_slot
+            self._last_finalized_slot = finalized_slot
         else:
             self._last_confirmed_slot = self._solana.get_confirmed_slot()
             result = self._last_processed_slot != self._last_confirmed_slot

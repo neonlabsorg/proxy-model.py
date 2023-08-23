@@ -7,18 +7,18 @@ LOG = logging.getLogger(__name__)
 
 
 def get_config_start_slot(cfg: Config, first_slot: int, finalized_slot: int, last_known_slot: int) -> int:
-    config_start_slot = _get_config_start_slot(cfg, last_known_slot, finalized_slot)
+    cfg_start_slot = _get_cfg_start_slot(cfg, last_known_slot, finalized_slot)
 
-    start_slot = max(config_start_slot, first_slot)
+    start_slot = max(cfg_start_slot, first_slot)
     LOG.info(
         f'FIRST_AVAILABLE_SLOT={first_slot}, FINALIZED_SLOT={finalized_slot}, '
-        f'{cfg.start_slot_name}={config_start_slot}: '
+        f'{cfg.start_slot_name}={cfg_start_slot}: '
         f'started from the slot {start_slot}'
     )
     return start_slot
 
 
-def _get_config_start_slot(cfg: Config, last_known_slot: int, finalized_slot: int) -> int:
+def _get_cfg_start_slot(cfg: Config, last_known_slot: int, finalized_slot: int) -> int:
     """This function allow to skip some part of history.
     - LATEST - start from the last block slot from Solana
     - CONTINUE - the first start from the LATEST, on next starts from the last parsed slot

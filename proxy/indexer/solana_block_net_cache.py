@@ -1,4 +1,4 @@
-from typing import List, Generator
+from typing import List, Generator, Optional
 import logging
 
 from ..common_neon.utils.solana_block import SolBlockInfo
@@ -35,6 +35,7 @@ class SolBlockNetCache:
         self._start_slot = sol_block.block_slot
 
     def iter_block(self, state: SolNeonDecoderCtx) -> Generator[SolBlockInfo, None, None]:
+        root_block: Optional[SolBlockInfo] = None
         root_slot = state.start_slot
         start_slot = state.start_slot
 
@@ -47,12 +48,18 @@ class SolBlockNetCache:
             if not len(block_queue):
                 continue
 
-            root_slot, block_queue = block_queue[0].block_slot, block_queue[1:]
+            # skip the root-slot, include it in the next queue (like start-slot)
+            root_block, block_queue = block_queue[0], block_queue[1:]
             for sol_block in reversed(block_queue):
                 yield sol_block
+            root_slot = root_block.block_slot
 
         if root_slot != state.stop_slot:
             self._raise_sol_history_error(state, f'Fail to get head {root_slot}')
+
+        # in the loop there were the skipping of the root-slot, now return last one
+        if root_block is not None:
+            yield root_block
 
     def _build_block_queue(self, state: SolNeonDecoderCtx, root_slot: int, slot: int) -> List[SolBlockInfo]:
         block_queue: List[SolBlockInfo] = list()

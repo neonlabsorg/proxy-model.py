@@ -210,6 +210,7 @@ services:
       CONFIG: ci
       EVM_LOADER: 53DfF883gyixYNXnM7s5xhdeyV8mVk9T4i2hGV9vG9io
       START_SLOT: continue
+      REINDEX_START_SLOT: continue
     hostname: indexer
     depends_on:
       solana:

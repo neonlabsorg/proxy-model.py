@@ -25,6 +25,7 @@ class IndexerDB:
     _max_u64 = (2 ** 64 - 1)
     base_start_slot_name = 'starting_block_slot'
     base_min_used_slot_name = 'min_receipt_block_slot'
+    finalized_slot_name = 'finalized_block_slot'
 
     def __init__(self, config: Config, db_conn: DBConnection, reindex_ident: str):
         self._config = config
@@ -37,8 +38,6 @@ class IndexerDB:
         self._start_slot_name = reindex_ident + self.base_start_slot_name
         self._stop_slot_name = reindex_ident + 'stop_block_slot'
         self._min_used_slot_name = reindex_ident + self.base_min_used_slot_name
-
-        self._finalized_slot_name = 'finalized_block_slot'
         self._latest_slot_name = 'latest_block_slot'
 
         self._constants_db = ConstantsDB(db_conn)
@@ -210,7 +209,7 @@ class IndexerDB:
             return
 
         self._finalized_slot = slot
-        self._constants_db[self._finalized_slot_name] = slot
+        self._constants_db[self.finalized_slot_name] = slot
 
     def _set_latest_slot(self, slot: int) -> None:
         if self._latest_slot >= slot:
@@ -271,7 +270,7 @@ class IndexerDB:
 
     @property
     def finalized_slot(self) -> int:
-        return self._constants_db.get(self._finalized_slot_name, 0)
+        return self._constants_db.get(self.finalized_slot_name, 0)
 
     @property
     def min_used_slot(self) -> int:

@@ -277,6 +277,10 @@ class Config(DBConfig):
         return 'LATEST'
 
     @property
+    def disable_slot_name(self) -> str:
+        return 'DISABLE'
+
+    @property
     def start_slot(self) -> str:
         return self._start_slot
 

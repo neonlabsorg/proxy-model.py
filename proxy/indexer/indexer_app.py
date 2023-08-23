@@ -22,6 +22,8 @@ LOG = logging.getLogger(__name__)
 
 
 class NeonIndexerApp:
+    _disabled_start_slot = -1
+
     def __init__(self):
         self._config = Config()
 
@@ -35,6 +37,7 @@ class NeonIndexerApp:
 
         self._reindex_ident = ''
         self._reindex_start_slot: Optional[int] = None
+        self._reindex_stop_slot = 0
 
     def start(self):
         Logger.setup()
@@ -62,13 +65,39 @@ class NeonIndexerApp:
         self._last_known_slot = last_known_slot = constants_db.get(IndexerDB.base_min_used_slot_name, 0)
         self._first_slot = first_slot = solana.get_first_available_slot()
         self._finalized_slot = finalized_slot = solana.get_finalized_slot()
+
+        if self._config.start_slot == self._config.disable_slot_name:
+            self._start_slot = self._disabled_start_slot
+            self._reindex_stop_slot = self._get_reindex_stop_on_finalized_slot(constants_db)
+            LOG.debug(f'{self._config.start_slot_name}={self._config.start_slot}, skip indexing...')
+            return
+
         self._start_slot = get_config_start_slot(self._config, first_slot, finalized_slot, last_known_slot)
+        # reindexing should stop on the start slot of indexing
+        self._reindex_stop_slot = self._start_slot
+
+    def _get_reindex_stop_on_finalized_slot(self, constants_db: ConstantsDB) -> int:
+        """If it is the first start with disabling indexing,
+        then collect information about blocks in the Solana
+        """
+        finalized_slot = constants_db.get(IndexerDB.finalized_slot_name, 0)
+        if finalized_slot != 0:
+            return finalized_slot
+
+        constants_db[IndexerDB.finalized_slot_name] = self._finalized_slot
+        return self._finalized_slot
 
     def _start_indexing(self) -> None:
-        time.sleep(10)
+        if self._start_slot == self._disabled_start_slot:
+            return self._empty_run()
+
         db = IndexerDB.from_range(self._config, self._db_conn, self._start_slot)
         indexer = Indexer(self._config, db)
         indexer.run()
+
+    def _empty_run(self) -> None:
+        while True:
+            time.sleep(0.5)
 
     def _start_reindexing(self, constants_db: ConstantsDB) -> None:
         self._reindex_start_slot, self._reindex_ident = self._get_reindex_start_slot()
@@ -143,7 +172,8 @@ class NeonIndexerApp:
         """Reindex slots between the reindexing start slot and indexing start slot.
         Check that the number of ranges is not exceeded.
         """
-        total_len = self._start_slot - self._reindex_start_slot + 1
+
+        total_len = self._reindex_stop_slot - self._reindex_start_slot + 1
         avail_cnt = max(1, self._config.reindex_max_range_cnt - len(db_list))
         need_cnt = int(total_len / self._config.reindex_range_len) + 1
         avail_cnt = min(avail_cnt, need_cnt)
@@ -151,10 +181,10 @@ class NeonIndexerApp:
 
         new_db_list: List[IndexerDB] = list()
         start_slot = self._reindex_start_slot
-        while start_slot < self._start_slot:
+        while start_slot < self._reindex_stop_slot:
             # For example: CONTINUE:213456789
             ident = ':'.join([self._reindex_ident, str(start_slot)])
-            stop_slot = min(start_slot + range_len, self._start_slot)
+            stop_slot = min(start_slot + range_len, self._reindex_stop_slot)
             db = IndexerDB.from_range(self._config, DBConnection(self._config), start_slot, ident, stop_slot)
             new_db_list.append(db)
             start_slot = stop_slot
@@ -188,10 +218,11 @@ class NeonIndexerApp:
             return None, ''
 
         if reindex_ident == self._config.continue_slot_name:
-            if self._config.start_slot != self._config.latest_slot_name:
+            if self._config.start_slot not in {self._config.latest_slot_name, self._config.disable_slot_name}:
                 LOG.error(
                     f'Wrong value {self._config.reindex_start_slot_name}={self._config.continue_slot_name}, '
-                    f'it is valid only for {self._config.start_slot_name}={self._config.latest_slot_name}: '
+                    f'it is valid only for {self._config.start_slot_name}='
+                    f'({self._config.latest_slot_name}, {self._config.disable_slot_name}): '
                     f'forced to disable {self._config.reindex_start_slot_name}'
                 )
                 return None, ''
@@ -284,5 +315,5 @@ class ReIndexer:
 
                 LOG.info(
                     f'Done reindex the range {db.start_slot}:{db.stop_slot} '
-                    f'on the ReIndexer({self._idx}'
+                    f'on the ReIndexer({self._idx})'
                 )
