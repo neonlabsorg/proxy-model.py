@@ -274,7 +274,7 @@ class Indexer:
         if self._db.is_reindexing_mode():
             # reindexing can't precede of indexing
             finalized_slot = self._db.finalized_slot
-            # reindexing should stop on the stop slot
+            # reindexing should stop on the terminated slot
             finalized_slot = min(self._term_slot, finalized_slot)
             result = self._last_finalized_slot < finalized_slot
             if result:

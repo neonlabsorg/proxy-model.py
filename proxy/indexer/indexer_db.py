@@ -32,7 +32,7 @@ class IndexerDB:
 
         self._reindex_ident = reindex_ident
         if self.is_reindexing_mode():
-            reindex_ident += '-'
+            reindex_ident += ':'
 
         self._start_slot_name = reindex_ident + self.base_start_slot_name
         self._stop_slot_name = reindex_ident + 'stop_block_slot'
