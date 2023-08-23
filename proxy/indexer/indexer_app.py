@@ -89,10 +89,12 @@ class NeonIndexerApp:
         self._launch_reindex_threads(db_list)
 
     def _is_reindex_completed(self, constants_db: ConstantsDB, db_list: List[IndexerDB]) -> bool:
-        if self._reindex_ident == self._cfg.continue_slot_name:
-            return False
-
         reindex_ident_name = 'reindex_ident'
+
+        if self._reindex_ident == self._cfg.continue_slot_name:
+            # every restart reindex slots from the last parsed slot to the current finalized slot
+            constants_db[reindex_ident_name] = self._reindex_ident
+            return False
 
         last_reindex_ident = constants_db.get(reindex_ident_name, '<NULL>')
         if (last_reindex_ident == self._reindex_ident) and (not len(db_list)):
@@ -268,12 +270,19 @@ class ReIndexer:
 
     def _run(self) -> None:
         """Under the hood it runs the Indexer but in a limited range of slots."""
-        LOG.debug(f'Start ReIndexer({self._idx})')
+        LOG.info(f'Start ReIndexer({self._idx})')
         for db in self._db_list:
             with logging_context(reindex_ident=db.reindex_ident):
-                LOG.debug(
+                LOG.info(
                     f'Start to reindex the range {db.start_slot}(->{db.min_used_slot}):{db.stop_slot} '
                     f'on the ReIndexer({self._idx})',
                 )
-            indexer = Indexer(self._cfg, db)
-            indexer.run()
+
+                indexer = Indexer(self._cfg, db)
+                indexer.run()
+                db.done()
+
+                LOG.info(
+                    f'Done reindex the range {db.start_slot}:{db.stop_slot} '
+                    f'on the ReIndexer({self._idx}'
+                )

@@ -113,7 +113,7 @@ class NeonTxsDB(BaseDBTable):
              WHERE a.from_addr = %s
                AND a.nonce = %s
         '''
-        return self._tx_from_value(self._db.fetch_one(request, (sender, hex(tx_nonce))))
+        return self._tx_from_value(self._fetch_one(request, (sender, hex(tx_nonce))))
 
     def get_tx_list_by_block_slot(self, block_slot: int) -> List[NeonTxReceiptInfo]:
         request = self._base_request_hdr + '''
@@ -134,11 +134,11 @@ class NeonTxsDB(BaseDBTable):
         value_list = self._fetch_one(request, (block_slot, tx_idx))
         return self._tx_from_value(value_list)
 
-    def finalize_block_list(self, from_slot: int, to_slot: int, slot_tuple: Tuple[int, ...]) -> None:
+    def finalize_block_list(self, from_slot: int, to_slot: int, slot_list: Tuple[int, ...]) -> None:
         request = f'''
             DELETE FROM {self._table_name}
                   WHERE block_slot > %s
                     AND block_slot <= %s
                     AND block_slot NOT IN %s
             '''
-        self._update_row(request, (from_slot, to_slot, slot_tuple))
+        self._update_row(request, (from_slot, to_slot, slot_list))

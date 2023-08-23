@@ -481,7 +481,6 @@ class NeonIndexedBlockInfo:
                         neon_holder_list: List[Dict[str, Any]],
                         neon_tx_list: List[Dict[str, Any]],
                         alt_info_list: List[Dict[str, Any]]) -> NeonIndexedBlockInfo:
-        assert sol_block.block_slot <= stuck_block_slot
 
         new_block = NeonIndexedBlockInfo(sol_block)
         new_block._stuck_block_slot = stuck_block_slot
@@ -640,12 +639,12 @@ class NeonIndexedBlockInfo:
             self._sol_alt_ix_list.append(alt_ix)
             alt_info.set_last_ix_slot(alt_ix.block_slot)
 
-    def iter_stuck_neon_holder(self, config: Config) -> Iterator[NeonIndexedHolderInfo]:
-        self._check_stuck_objs(config)
+    def iter_stuck_neon_holder(self) -> Iterator[NeonIndexedHolderInfo]:
+        assert self._is_stuck_completed
         return iter(self._stuck_neon_holder_list)
 
-    def iter_stuck_neon_tx(self, config: Config) -> Iterator[NeonIndexedTxInfo]:
-        self._check_stuck_objs(config)
+    def iter_stuck_neon_tx(self) -> Iterator[NeonIndexedTxInfo]:
+        assert self._is_stuck_completed
         return iter(self._stuck_neon_tx_list)
 
     def fail_neon_holder_list(self, failed_holder_list: List[NeonIndexedHolderInfo]) -> None:
@@ -808,13 +807,23 @@ class NeonIndexedBlockInfo:
             log_idx = tx.neon_tx_res.set_block_info(self._sol_block, tx.neon_tx.sig, tx_idx, log_idx, sum_gas_used)
             tx_idx += 1
 
-    def _check_stuck_objs(self, config: Config) -> None:
+    def check_stuck_objs(self, config: Config) -> None:
         if self._is_stuck_completed:
             return
+
         self._is_stuck_completed = True
         self._check_stuck_holders(config)
         self._check_stuck_txs(config)
         self._check_stuck_alts(config)
+
+    def has_stuck_objs(self) -> bool:
+        assert self._is_stuck_completed
+
+        return (
+            len(self._stuck_neon_tx_list) or
+            len(self._stuck_neon_holder_list) or
+            len(self._sol_alt_info_dict)
+        )
 
     def _check_stuck_holders(self, config: Config) -> None:
         # there were the restart with stuck holders

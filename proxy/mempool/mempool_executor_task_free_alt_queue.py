@@ -105,7 +105,7 @@ class MPExecutorFreeALTQueueTask(MPExecutorBaseTask):
         db_conn = DBConnection(self._config)
         alt_infos_db = SolAltInfosDB(db_conn)
 
-        _, alt_dict_list = alt_infos_db.get_alt_list(block_slot)
+        _, alt_dict_list = alt_infos_db.get_alt_list(block_slot, (2 ** 64 - 1))
         return alt_dict_list
 
     def _free_alt_list(self, alt_info_list: List[MPALTInfo], name: str,

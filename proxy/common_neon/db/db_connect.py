@@ -114,10 +114,10 @@ class DBConnection:
             LOG.error('Unknown fail on DB connection', exc_info=exc)
             raise
 
-    def update_row(self, request: str, value_tuple: Tuple[Any, ...]) -> None:
+    def update_row(self, request: str, value_list: Tuple[Any, ...]) -> None:
         assert self._tx_conn is not None
         with self._tx_conn.cursor() as cursor:
-            cursor.execute(request, value_tuple)
+            cursor.execute(request, value_list)
 
     def update_row_list(self, request: str, row_list: List[List[Any]]):
         assert self._tx_conn is not None

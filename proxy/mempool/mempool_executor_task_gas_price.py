@@ -48,8 +48,6 @@ class MPExecutorGasPriceTask(MPExecutorBaseTask):
             min_gas_price=self._gas_price_calculator.min_gas_price,
             sol_price_usd=self._gas_price_calculator.sol_price_usd,
             neon_price_usd=self._gas_price_calculator.neon_price_usd,
-            operator_fee=self._gas_price_calculator.operator_fee,
-            gas_price_slippage=self._gas_price_calculator.gas_price_slippage
         )
         self._stat_client.commit_gas_price(stat)
 

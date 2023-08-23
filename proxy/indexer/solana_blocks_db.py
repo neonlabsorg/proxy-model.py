@@ -179,14 +179,14 @@ class SolBlocksDB(BaseDBTable):
             ])
         self._insert_row_list(row_list)
 
-    def finalize_block_list(self, from_slot: int, to_slot: int, slot_tuple: Tuple[int, ...]) -> None:
+    def finalize_block_list(self, from_slot: int, to_slot: int, slot_list: Tuple[int, ...]) -> None:
         request = f'''
             UPDATE {self._table_name}
                SET is_finalized = True,
                    is_active = True
              WHERE block_slot IN %s
         '''
-        self._update_row(request, (slot_tuple,))
+        self._update_row(request, (slot_list,))
 
         request = f'''
             DELETE FROM {self._table_name}
@@ -194,9 +194,9 @@ class SolBlocksDB(BaseDBTable):
                     AND block_slot <= %s
                     AND block_slot NOT IN %s
         '''
-        self._update_row(request, (from_slot, to_slot, slot_tuple))
+        self._update_row(request, (from_slot, to_slot, slot_list))
 
-    def activate_block_list(self, from_slot: int, slot_tuple: Tuple[int, ...]) -> None:
+    def activate_block_list(self, from_slot: int, slot_list: Tuple[int, ...]) -> None:
         request = f'''
             UPDATE {self._table_name}
                SET is_active = False
@@ -209,4 +209,4 @@ class SolBlocksDB(BaseDBTable):
                SET is_active = True
              WHERE block_slot IN %s
         '''
-        self._update_row(request, (slot_tuple,))
+        self._update_row(request, (slot_list,))

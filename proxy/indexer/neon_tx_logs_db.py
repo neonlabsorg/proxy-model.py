@@ -147,11 +147,11 @@ class NeonTxLogsDB(BaseDBTable):
 
         return log_list
 
-    def finalize_block_list(self, from_slot: int, to_slot: int, slot_tuple: Tuple[int, ...]) -> None:
+    def finalize_block_list(self, from_slot: int, to_slot: int, slot_list: Tuple[int, ...]) -> None:
         request = f'''
             DELETE FROM {self._table_name}
                   WHERE block_slot > %s
                     AND block_slot <= %s
                     AND block_slot NOT IN %s
             '''
-        self._update_row(request, (from_slot, to_slot, slot_tuple))
+        self._update_row(request, (from_slot, to_slot, slot_list))

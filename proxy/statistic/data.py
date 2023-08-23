@@ -33,8 +33,6 @@ class NeonGasPriceData:
     min_gas_price: int
     sol_price_usd: Decimal
     neon_price_usd: Decimal
-    operator_fee: Decimal
-    gas_price_slippage: Decimal
 
 
 class NeonTxBeginCode(Enum):
@@ -112,6 +110,8 @@ class NeonBlockStatData:
     reindex_ident: str
     start_block: int
     parsed_block: int
+    stop_block: int
+    term_block: int
     finalized_block: int
     confirmed_block: int
     tracer_block: Optional[int]

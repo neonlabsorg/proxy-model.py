@@ -22,6 +22,7 @@ from ..common_neon.utils import NeonTxReceiptInfo, SolBlockInfo
 
 
 class IndexerDB:
+    _max_u64 = (2 ** 64 - 1)
     base_start_slot_name = 'starting_block_slot'
     base_min_used_slot_name = 'min_receipt_block_slot'
 
@@ -32,6 +33,7 @@ class IndexerDB:
         self._reindex_ident = reindex_ident
         if self.is_reindexing_mode():
             reindex_ident += '-'
+
         self._start_slot_name = reindex_ident + self.base_start_slot_name
         self._stop_slot_name = reindex_ident + 'stop_block_slot'
         self._min_used_slot_name = reindex_ident + self.base_min_used_slot_name
@@ -51,16 +53,16 @@ class IndexerDB:
         self._stuck_neon_txs_db = StuckNeonTxsDB(db_conn)
         self._sol_alt_infos_db = SolAltInfosDB(db_conn)
 
-        self._finalized_db_list = [
+        self._finalized_db_list = (
             self._sol_blocks_db,
             self._sol_tx_costs_db,
             self._neon_txs_db,
             self._sol_neon_txs_db,
             self._neon_tx_logs_db,
-        ]
+        )
 
         self._start_slot = 0
-        self._stop_slot: Optional[int] = None
+        self._stop_slot = self._max_u64
         self._min_used_slot = 0
         self._latest_slot = 0
         self._finalized_slot = 0
@@ -75,7 +77,7 @@ class IndexerDB:
 
         db._min_used_slot = db._constants_db.get(db._min_used_slot_name, 0)
         db._start_slot = db._constants_db.get(db._start_slot_name, db._min_used_slot)
-        db._stop_slot = db._constants_db.get(db._stop_slot_name, None)
+        db._stop_slot = db._constants_db.get(db._stop_slot_name, db._max_u64)
 
         return db
 
@@ -86,7 +88,7 @@ class IndexerDB:
 
         db._start_slot = start_slot
         db._min_used_slot = start_slot
-        db._stop_slot = stop_slot
+        db._stop_slot = stop_slot or db._max_u64
 
         db._min_used_slot = db._constants_db[db._min_used_slot_name] = start_slot
 
@@ -94,7 +96,7 @@ class IndexerDB:
             db._constants_db[db._start_slot_name] = start_slot
             db._constants_db[db._stop_slot_name] = stop_slot
 
-        if db._constants_db.get(db.base_start_slot_name, (2**64) - 1) > start_slot:
+        if db._constants_db.get(db.base_start_slot_name, db._max_u64) > start_slot:
             db._constants_db[db.base_start_slot_name] = start_slot
 
         return db
@@ -108,7 +110,7 @@ class IndexerDB:
         return self._start_slot
 
     @property
-    def stop_slot(self) -> Optional[int]:
+    def stop_slot(self) -> int:
         return self._stop_slot
 
     def is_reindexing_mode(self) -> bool:
@@ -150,55 +152,58 @@ class IndexerDB:
         self._gas_less_usages_db.set_tx_list(new_neon_block_queue)
 
     def _set_block_branch(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
+        last_neon_block = neon_block_queue[-1]
+
         if self.is_reindexing_mode():
+            self._submit_stuck_obj_list(last_neon_block)
             return
 
-        last_block = neon_block_queue[-1]
-        self._set_latest_slot(last_block.block_slot)
-        if last_block.is_finalized:
+        if last_neon_block.is_finalized:
             self._finalize_block_list(neon_block_queue)
         else:
             self._activate_block_list(neon_block_queue)
+        self._set_latest_slot(last_neon_block.block_slot)
 
     def _finalize_block_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
-        block_slot_list = [
+        block_slot_list = tuple(
             block.block_slot
             for block in neon_block_queue
             if block.is_done and (block.block_slot > self._finalized_slot)
-        ]
+        )
         if len(block_slot_list) == 0:
             return
 
-        last_block = neon_block_queue[-1]
+        last_neon_block = neon_block_queue[-1]
 
         for db_table in self._finalized_db_list:
-            db_table.finalize_block_list(self._finalized_slot, last_block.block_slot, tuple(block_slot_list))
+            db_table.finalize_block_list(self._finalized_slot, last_neon_block.block_slot, block_slot_list)
 
-        self._stuck_neon_holders_db.set_holder_list(
-            last_block.stuck_block_slot,
-            last_block.iter_stuck_neon_holder(self._config)
-        )
-        self._stuck_neon_txs_db.set_tx_list(
-            True, last_block.stuck_block_slot,
-            last_block.iter_stuck_neon_tx(self._config)
-        )
-        self._sol_alt_infos_db.set_alt_list(last_block.stuck_block_slot, last_block.iter_alt_info())
-
-        self._set_finalized_slot(last_block.block_slot)
+        self._submit_stuck_obj_list(last_neon_block)
+        self._set_finalized_slot(last_neon_block.block_slot)
 
     def _activate_block_list(self, neon_block_queue: List[NeonIndexedBlockInfo]) -> None:
-        last_block = neon_block_queue[-1]
-        if not last_block.is_done:
-            self._stuck_neon_txs_db.set_tx_list(
-                False, last_block.block_slot,
-                last_block.iter_stuck_neon_tx(self._config)
-            )
+        last_neon_block = neon_block_queue[-1]
+        if not last_neon_block.is_done:
+            last_neon_block.check_stuck_objs(self._config)
+            self._stuck_neon_txs_db.set_tx_list(self._start_slot, self._stop_slot, last_neon_block)
 
-        block_slot_list = [block.block_slot for block in neon_block_queue if not block.is_finalized]
+        block_slot_list = tuple(
+            block.block_slot
+            for block in neon_block_queue
+            if not block.is_finalized
+        )
         if not len(block_slot_list):
             return
 
-        self._sol_blocks_db.activate_block_list(self._finalized_slot, tuple(block_slot_list))
+        self._sol_blocks_db.activate_block_list(self._finalized_slot, block_slot_list)
+
+    def _submit_stuck_obj_list(self, neon_block: NeonIndexedBlockInfo) -> None:
+        if self._stop_slot > neon_block.block_slot:
+            neon_block.check_stuck_objs(self._config)
+
+        self._stuck_neon_holders_db.set_holder_list(self._start_slot, self._stop_slot, neon_block)
+        self._stuck_neon_txs_db.set_tx_list(self._start_slot, self._stop_slot, neon_block)
+        self._sol_alt_infos_db.set_alt_list(self._start_slot, self._stop_slot, neon_block)
 
     def _set_finalized_slot(self, slot: int) -> None:
         if self._finalized_slot >= slot:
@@ -318,11 +323,11 @@ class IndexerDB:
     def get_sol_alt_tx_list_by_neon_sig(self, neon_sig: str) -> List[SolAltIxInfo]:
         return self._sol_alt_txs_db.get_alt_ix_list_by_neon_sig(neon_sig)
 
-    def get_stuck_neon_holder_list(self, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
-        return self._stuck_neon_holders_db.get_holder_list(block_slot)
+    def get_stuck_neon_holder_list(self) -> Tuple[Optional[int], List[Dict[str, Any]]]:
+        return self._stuck_neon_holders_db.get_holder_list(self._start_slot, self._stop_slot)
 
-    def get_stuck_neon_tx_list(self, is_finalized: bool, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
-        return self._stuck_neon_txs_db.get_tx_list(is_finalized, block_slot)
+    def get_stuck_neon_tx_list(self) -> Tuple[Optional[int], List[Dict[str, Any]]]:
+        return self._stuck_neon_txs_db.get_tx_list(True, self._start_slot, self._stop_slot)
 
-    def get_sol_alt_info_list(self, block_slot: int) -> Tuple[Optional[int], List[Dict[str, Any]]]:
-        return self._sol_alt_infos_db.get_alt_list(block_slot)
+    def get_sol_alt_info_list(self) -> Tuple[Optional[int], List[Dict[str, Any]]]:
+        return self._sol_alt_infos_db.get_alt_list(self._start_slot, self._stop_slot)
