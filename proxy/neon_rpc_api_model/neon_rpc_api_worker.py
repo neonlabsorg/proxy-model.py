@@ -179,7 +179,6 @@ class NeonRpcApiWorker:
             min_executable_gas_price=hex(gas_price_info.min_executable_gas_price),
             min_wo_chainid_acceptable_gas_price=hex(gas_price_info.min_wo_chainid_acceptable_gas_price),
             allow_underpriced_tx_wo_chainid=gas_price_info.allow_underpriced_tx_wo_chainid,
-            accept_reverted_tx_into_mempool=gas_price_info.accept_reverted_tx_into_mempool,
             sol_price_usd=hex(gas_price_info.sol_price_usd),
             neon_price_usd=hex(gas_price_info.neon_price_usd),
             operator_fee=hex(gas_price_info.operator_fee),

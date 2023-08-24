@@ -51,11 +51,7 @@ class NeonTxValidator:
 
     def validate(self) -> NeonTxExecCfg:
         self._prevalidate_tx()
-        if self._config.accept_reverted_tx_into_mempool:
-            emulated_result: NeonEmulatedResult = dict()
-        else:
-            emulated_result: NeonEmulatedResult = call_tx_emulated(self._config, self._tx)
-            self._prevalidate_emulator(emulated_result)
+        emulated_result: NeonEmulatedResult = dict()
 
         neon_tx_exec_cfg = NeonTxExecCfg().set_emulated_result(emulated_result).set_state_tx_cnt(self._state_tx_cnt)
         return neon_tx_exec_cfg
@@ -79,6 +75,8 @@ class NeonTxValidator:
     def _prevalidate_tx_gas(self):
         if self._tx_gas_limit > self._max_u64:
             raise EthereumError(message='gas uint64 overflow')
+        if self._tx_gas_limit < 21_000:
+            raise EthereumError(message='gas limit reached')
         if (self._tx_gas_limit * self._tx.gasPrice) > (self._max_u256 - 1):
             raise EthereumError(message='max fee per gas higher than 2^256-1')
 
