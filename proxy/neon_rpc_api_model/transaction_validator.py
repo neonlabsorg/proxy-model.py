@@ -58,12 +58,12 @@ class NeonTxValidator:
 
     def _prevalidate_tx(self):
         self._prevalidate_sender_eoa()
-        self._prevalidate_tx_gas()
         self._prevalidate_tx_chain_id()
         self._prevalidate_tx_size()
         self._prevalidate_sender_balance()
         self._prevalidate_underpriced_tx_wo_chainid()
         self._validate_nonce()
+        self._prevalidate_tx_gas()
 
     def _prevalidate_emulator(self, emulator_json: Dict[str, Any]):
         check_emulated_exit_status(emulator_json)
