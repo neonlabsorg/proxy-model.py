@@ -815,13 +815,10 @@ class NeonRpcApiWorker:
     def _get_transaction_receipt(self, neon_tx_sig: str) -> Optional[NeonTxReceiptInfo]:
         neon_sig = self._normalize_tx_id(neon_tx_sig)
 
-        tx = self._db.get_tx_by_neon_sig(neon_sig)
-        if not tx:
-            neon_tx_or_error = self._mempool_client.get_pending_tx_by_hash(get_req_id_from_log(), neon_tx_sig)
-            if isinstance(neon_tx_or_error, EthereumError):
-                raise neon_tx_or_error
-            return None
-        return tx
+        neon_tx_or_error = self._mempool_client.get_pending_tx_by_hash(get_req_id_from_log(), neon_tx_sig)
+        if isinstance(neon_tx_or_error, EthereumError):
+            raise neon_tx_or_error
+        return self._db.get_tx_by_neon_sig(neon_sig)
 
     def eth_getTransactionReceipt(self, neon_tx_sig: str) -> Optional[dict]:
         tx = self._get_transaction_receipt(neon_tx_sig)
