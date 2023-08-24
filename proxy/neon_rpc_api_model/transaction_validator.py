@@ -60,10 +60,11 @@ class NeonTxValidator:
         self._prevalidate_sender_eoa()
         self._prevalidate_tx_chain_id()
         self._prevalidate_tx_size()
+        self._prevalidate_tx_gas()
         self._prevalidate_sender_balance()
         self._prevalidate_underpriced_tx_wo_chainid()
         self._validate_nonce()
-        self._prevalidate_tx_gas()
+        self._prevalidate_min_tx_gas()
 
     def _prevalidate_emulator(self, emulator_json: Dict[str, Any]):
         check_emulated_exit_status(emulator_json)
@@ -75,8 +76,6 @@ class NeonTxValidator:
     def _prevalidate_tx_gas(self):
         if self._tx_gas_limit > self._max_u64:
             raise EthereumError(message='gas uint64 overflow')
-        if self._tx_gas_limit < 21_000:
-            raise EthereumError(message='gas limit reached')
         if (self._tx_gas_limit * self._tx.gasPrice) > (self._max_u256 - 1):
             raise EthereumError(message='max fee per gas higher than 2^256-1')
 
@@ -93,6 +92,10 @@ class NeonTxValidator:
                 return
 
         raise EthereumError(f'transaction underpriced: have {self._tx.gasPrice} want {self._config.min_gas_price}')
+
+    def _prevalidate_min_tx_gas(self):
+        if self._tx_gas_limit < 21_000:
+            raise EthereumError(message='gas limit reached')
 
     def _prevalidate_tx_chain_id(self):
         if self._tx.chain_id() not in (None, ElfParams().chain_id):
