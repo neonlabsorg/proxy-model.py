@@ -1,82 +1,60 @@
 import logging
-from typing import Dict, List
 
-from .operator_resource_mng import OpResInfo
+from typing import Dict, List, Union
 
 from ..common_neon.config import Config
-from ..common_neon.constants import ACTIVE_HOLDER_TAG, FINALIZED_HOLDER_TAG, HOLDER_TAG
-from ..common_neon.data import NeonTxExecCfg, NeonAccountDict, NeonEmulatedResult
-from ..common_neon.errors import BadResourceError
-from ..common_neon.eth_proto import NeonTx
+from ..common_neon.data import NeonAccountDict, NeonEmulatedResult
 from ..common_neon.neon_instruction import NeonIxBuilder
-from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.solana_tx import SolPubKey, SolAccountMeta, SolAccount
+from ..common_neon.operator_resource_info import OpResInfo
 from ..common_neon.solana_alt import ALTAddress
+from ..common_neon.solana_interactor import SolInteractor
+from ..common_neon.solana_tx import SolTx, SolPubKey, SolAccountMeta, SolAccount
+from ..common_neon.utils.neon_tx_info import NeonTxInfo
+from ..common_neon.utils.eth_proto import NeonTx
+
+from .mempool_api import MPTxExecRequest
 
 
 LOG = logging.getLogger(__name__)
 
 
 class NeonTxSendCtx:
-    def __init__(self, config: Config, solana: SolInteractor, resource: OpResInfo,
-                 neon_tx: NeonTx, neon_tx_exec_cfg: NeonTxExecCfg):
+    def __init__(self, config: Config, solana: SolInteractor, resource: OpResInfo, mp_tx_req: MPTxExecRequest):
         self._config = config
-        self._neon_tx_exec_cfg = neon_tx_exec_cfg
-        self._neon_tx = neon_tx
-        self._sender = '0x' + neon_tx.sender()
-        self._bin_neon_sig: bytes = neon_tx.hash_signed()
-        self._neon_sig = '0x' + self._bin_neon_sig.hex().lower()
+        self._mp_tx_req = mp_tx_req
+        self._neon_tx_exec_cfg = mp_tx_req.neon_tx_exec_cfg
         self._solana = solana
         self._resource = resource
-        self._ix_builder = NeonIxBuilder(resource.public_key)
-        self._neon_meta_dict: Dict[str, SolAccountMeta] = {}
 
+        self._ix_builder = NeonIxBuilder(config, resource.public_key)
         self._ix_builder.init_operator_neon(self._resource.neon_address)
-        self._ix_builder.init_neon_tx(self._neon_tx)
-        self._ix_builder.init_iterative(self._resource.holder)
-
-        self._build_account_list(self._neon_tx_exec_cfg.account_dict)
-
-        self._is_holder_completed = False
-
-        self._decode_holder_account()
-
-    def _decode_holder_account(self) -> None:
-        holder_info = self._solana.get_holder_account_info(self._resource.holder)
-        if holder_info is None:
-            raise BadResourceError(f'Bad holder account {str(self._resource.holder)}')
-
-        if holder_info.tag == ACTIVE_HOLDER_TAG:
-            if holder_info.neon_tx_sig != self._neon_sig:
-                raise BadResourceError(
-                    f'Holder account {str(self._resource.holder)} '
-                    f'has another neon tx: {holder_info.neon_tx_sig}'
-                )
-            self._is_holder_completed = True
-        elif holder_info.tag == FINALIZED_HOLDER_TAG:
-            pass
-        elif holder_info.tag == HOLDER_TAG:
-            holder_msg_len = len(self._ix_builder.holder_msg)
-            self._is_holder_completed = (self._ix_builder.holder_msg == holder_info.neon_tx_data[:holder_msg_len])
+        self._ix_builder.init_iterative(self.holder_account)
+        if not mp_tx_req.is_stuck_tx():
+            self._ix_builder.init_neon_tx(mp_tx_req.neon_tx)
         else:
-            raise BadResourceError(f'Holder account has bad tag: {holder_info.tag}')
+            self._ix_builder.init_neon_tx_sig(mp_tx_req.sig)
 
-    def _add_meta(self, pubkey: SolPubKey, is_writable: bool) -> None:
-        key = str(pubkey)
-        meta = self._neon_meta_dict.get(key, None)
+        self._neon_meta_dict: Dict[SolPubKey, SolAccountMeta] = dict()
+        if not mp_tx_req.is_stuck_tx():
+            self._build_account_list(self._neon_tx_exec_cfg.account_dict)
+
+    def _add_meta(self, pubkey: Union[str, SolPubKey], is_writable: bool) -> None:
+        if isinstance(pubkey, str):
+            pubkey = SolPubKey.from_string(pubkey)
+        meta = self._neon_meta_dict.get(pubkey, None)
         if meta is not None:
             is_writable |= meta.is_writable
-        self._neon_meta_dict[key] = SolAccountMeta(pubkey=pubkey, is_signer=False, is_writable=is_writable)
+        self._neon_meta_dict[pubkey] = SolAccountMeta(pubkey=pubkey, is_signer=False, is_writable=is_writable)
 
     def _build_account_list(self, emulated_account_dict: NeonAccountDict) -> None:
         self._neon_meta_dict.clear()
 
         # Parse information from the emulator output
         for account_desc in emulated_account_dict['accounts']:
-            self._add_meta(SolPubKey.from_string(account_desc['account']), True)
+            self._add_meta(account_desc['account'], True)
 
         for account_desc in emulated_account_dict['solana_accounts']:
-            self._add_meta(SolPubKey.from_string(account_desc['pubkey']), account_desc['is_writable'])
+            self._add_meta(account_desc['pubkey'], account_desc['is_writable'])
 
         neon_meta_list = list(self._neon_meta_dict.values())
         LOG.debug(
@@ -84,12 +62,13 @@ class NeonTxSendCtx:
             ', '.join([f'{str(m.pubkey), m.is_signer, m.is_writable}' for m in neon_meta_list])
         )
 
-        contract = self._neon_tx.contract()
+        contract = self._mp_tx_req.neon_tx_info.contract
         if contract is not None:
-            LOG.debug(f'contract 0x{contract}: {len(neon_meta_list) + 6} accounts')
+            LOG.debug(f'contract {contract}: {len(neon_meta_list) + 6} accounts')
 
         self._ix_builder.init_neon_account_list(neon_meta_list)
 
+    @property
     def len_account_list(self) -> int:
         return len(self._neon_meta_dict)
 
@@ -104,25 +83,27 @@ class NeonTxSendCtx:
     def config(self) -> Config:
         return self._config
 
-    @property
-    def neon_sig(self) -> str:
-        return self._neon_sig
-
-    @property
-    def bin_neon_sig(self) -> bytes:
-        return self._bin_neon_sig
-
-    @property
-    def sender(self) -> str:
-        return self._sender
+    def is_stuck_tx(self) -> bool:
+        return self._mp_tx_req.is_stuck_tx()
 
     @property
     def neon_tx(self) -> NeonTx:
-        return self._neon_tx
+        assert self._mp_tx_req.neon_tx is not None
+        return self._mp_tx_req.neon_tx
+
+    @property
+    def neon_tx_info(self) -> NeonTxInfo:
+        return self._mp_tx_req.neon_tx_info
 
     @property
     def signer(self) -> SolAccount:
         return self._resource.signer
+
+    @property
+    def holder_account(self) -> SolPubKey:
+        if self._neon_tx_exec_cfg.holder_account is not None:
+            return self._neon_tx_exec_cfg.holder_account
+        return self._resource.holder_account
 
     @property
     def ix_builder(self) -> NeonIxBuilder:
@@ -133,8 +114,9 @@ class NeonTxSendCtx:
         return self._solana
 
     @property
-    def neon_tx_exec_cfg(self) -> NeonTxExecCfg:
-        return self._neon_tx_exec_cfg
+    def resize_iter_cnt(self) -> int:
+        assert self._neon_tx_exec_cfg.resize_iter_cnt >= 0
+        return self._neon_tx_exec_cfg.resize_iter_cnt
 
     @property
     def emulated_evm_step_cnt(self) -> int:
@@ -147,17 +129,38 @@ class NeonTxSendCtx:
         return self._neon_tx_exec_cfg.state_tx_cnt
 
     @property
-    def is_holder_completed(self) -> bool:
-        return self._is_holder_completed
-
-    @property
     def alt_address_list(self) -> List[ALTAddress]:
         return self._neon_tx_exec_cfg.alt_address_list
-
-    def set_holder_completed(self, value=True) -> None:
-        self._is_holder_completed = value
 
     def add_alt_address(self, alt_address: ALTAddress) -> None:
         self._neon_tx_exec_cfg.add_alt_address(alt_address)
 
+    @property
+    def strategy_idx(self) -> int:
+        return self._neon_tx_exec_cfg.strategy_idx
 
+    def set_strategy_idx(self, idx: int) -> None:
+        self._neon_tx_exec_cfg.set_strategy_idx(idx)
+
+    @property
+    def sol_tx_cnt(self) -> int:
+        return self._neon_tx_exec_cfg.sol_tx_cnt
+
+    def has_completed_receipt(self) -> bool:
+        return self._neon_tx_exec_cfg.has_completed_receipt()
+
+    def set_completed_receipt(self, value: bool) -> None:
+        self._neon_tx_exec_cfg.set_completed_receipt(value)
+
+    def mark_resource_use(self) -> None:
+        if self._neon_tx_exec_cfg.holder_account is None:
+            self._neon_tx_exec_cfg.set_holder_account(True, self._resource.holder_account)
+
+    def has_sol_tx(self, name: str) -> bool:
+        return self._neon_tx_exec_cfg.has_sol_tx(name)
+
+    def pop_sol_tx_list(self, tx_name_list: List[str]) -> List[SolTx]:
+        return self._neon_tx_exec_cfg.pop_sol_tx_list(tx_name_list)
+
+    def add_sol_tx_list(self, tx_list: List[SolTx]) -> None:
+        self._neon_tx_exec_cfg.add_sol_tx_list(tx_list)

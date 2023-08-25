@@ -2,6 +2,7 @@ import os
 import re
 import time
 import sys
+
 import docker
 import subprocess
 import pathlib
@@ -12,6 +13,7 @@ from urllib.parse import urlparse
 from python_terraform import Terraform
 from paramiko import SSHClient
 from scp import SCPClient
+from github_api_client import GithubClient
 
 try:
     import click
@@ -43,15 +45,15 @@ TFSTATE_KEY_PREFIX = "tests/test-"
 TFSTATE_REGION = "us-east-2"
 IMAGE_NAME = "neonlabsorg/proxy"
 
-UNISWAP_V2_CORE_COMMIT = 'stable'
+UNISWAP_V2_CORE_COMMIT = 'latest'
 UNISWAP_V2_CORE_IMAGE = f'neonlabsorg/uniswap-v2-core:{UNISWAP_V2_CORE_COMMIT}'
 
 FAUCET_COMMIT = 'latest'
 
-FTS_NAME = "neonlabsorg/full_test_suite:develop"
+NEON_TESTS_IMAGE = "neonlabsorg/neon_tests:latest"
 
 CONTAINERS = ['proxy', 'solana', 'neon_test_invoke_program_loader',
-              'dbcreation', 'faucet', 'airdropper', 'indexer']
+              'dbcreation', 'faucet', 'gas_tank', 'indexer']
 
 docker_client = docker.APIClient()
 terraform = Terraform(working_dir=pathlib.Path(
@@ -62,6 +64,10 @@ def docker_compose(args: str):
     command = f'docker-compose {args}'
     click.echo(f"run command: {command}")
     out = subprocess.run(command, shell=True)
+    click.echo("return code: " + str(out.returncode))
+    if out.returncode != 0:
+        raise RuntimeError(f"Command {command} failed. Err: {out.stderr}")
+
     return out
 
 
@@ -73,15 +79,23 @@ def check_neon_evm_tag(tag):
             f"evm_loader image with {tag} tag isn't found. Response: {response.json()}")
 
 
-def update_neon_evm_tag_if_same_branch_exists(branch, neon_evm_tag):
-    if branch != "":
+def is_neon_evm_branch_exist(branch):
+    if branch:
         proxy_branches_obj = requests.get(
             "https://api.github.com/repos/neonlabsorg/neon-evm/branches?per_page=100").json()
         proxy_branches = [item["name"] for item in proxy_branches_obj]
+
         if branch in proxy_branches:
             click.echo(f"The same branch {branch} is found in neon_evm repository")
-            neon_evm_tag = branch.split('/')[-1]
-            check_neon_evm_tag(neon_evm_tag)
+            return True
+    else:
+        return False
+
+
+def update_neon_evm_tag_if_same_branch_exists(branch, neon_evm_tag):
+    if is_neon_evm_branch_exist(branch):
+        neon_evm_tag = branch.split('/')[-1]
+        check_neon_evm_tag(neon_evm_tag)
     return neon_evm_tag
 
 
@@ -91,8 +105,7 @@ def update_neon_evm_tag_if_same_branch_exists(branch, neon_evm_tag):
 @click.option('--head_ref_branch')
 @click.option('--skip_pull', is_flag=True, default=False, help="skip pulling of docker images from the docker-hub")
 def build_docker_image(neon_evm_tag, proxy_tag, head_ref_branch, skip_pull):
-    if head_ref_branch is not None:
-        neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
+    neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
     neon_evm_image = f'neonlabsorg/evm_loader:{neon_evm_tag}'
     click.echo(f"neon-evm image: {neon_evm_image}")
     neon_test_invoke_program_image = "neonlabsorg/neon_test_invoke_program:develop"
@@ -107,8 +120,7 @@ def build_docker_image(neon_evm_tag, proxy_tag, head_ref_branch, skip_pull):
         click.echo('skip pulling of docker images')
 
     buildargs = {"NEON_EVM_COMMIT": neon_evm_tag,
-                 "PROXY_REVISION": proxy_tag,
-                 "PROXY_LOG_CFG": "log_cfg.json"}
+                 "PROXY_REVISION": proxy_tag}
 
     click.echo("Start build")
 
@@ -208,43 +220,14 @@ def destroy_terraform(proxy_tag, run_number):
     terraform.destroy()
 
 
-@cli.command(name="openzeppelin")
-@click.option('--run_number')
-def openzeppelin_test(run_number):
-    container_name = f'fts_{run_number}'
-    fts_threshold = 2370
-    os.environ["FTS_CONTAINER_NAME"] = container_name
-    os.environ["FTS_IMAGE"] = FTS_NAME
-    os.environ["FTS_USERS_NUMBER"] = '15'
-    os.environ["FTS_JOBS_NUMBER"] = '8'
-    os.environ["NETWORK_NAME"] = f'full-test-suite-{run_number}'
-    os.environ["NETWORK_ID"] = '111'
-    os.environ["REQUEST_AMOUNT"] = '20000'
-    os.environ["USE_FAUCET"] = 'true'
-
-    proxy_ip = os.environ.get("PROXY_IP")
-    solana_ip = os.environ.get("SOLANA_IP")
-
-    os.environ["PROXY_URL"] = f"http://{proxy_ip}:9090/solana"
-    os.environ["FAUCET_URL"] = f"http://{proxy_ip}:3333/request_neon"
-    os.environ["SOLANA_URL"] = f"http://{solana_ip}:8899"
-
-    click.echo(f"Env: {os.environ}")
-    click.echo(f"Running tests....")
-
-    docker_compose("-f docker-compose/docker-compose-full-test-suite.yml pull")
-    fts_result = docker_compose(
-        "-f docker-compose/docker-compose-full-test-suite.yml up")
-    click.echo(fts_result)
-    command = f'docker cp {container_name}:/opt/allure-reports.tar.gz ./'
-    click.echo(f"run command: {command}")
-    subprocess.run(command, shell=True)
-
-    dump_docker_logs(container_name)
+@cli.command(name="get_container_logs")
+def get_all_containers_logs():
     home_path = os.environ.get("HOME")
     artifact_logs = "./logs"
     ssh_key = f"{home_path}/.ssh/ci-stands"
     os.mkdir(artifact_logs)
+    proxy_ip = os.environ.get("PROXY_IP")
+    solana_ip = os.environ.get("SOLANA_IP")
 
     subprocess.run(
         f'ssh-keyscan -H {solana_ip} >> {home_path}/.ssh/known_hosts', shell=True)
@@ -262,61 +245,6 @@ def openzeppelin_test(run_number):
     services = ["postgres", "dbcreation", "indexer", "proxy", "faucet"]
     for service in services:
         upload_remote_logs(ssh_client, service, artifact_logs)
-    dump_docker_logs(container_name)
-    docker_compose(
-        "-f docker-compose/docker-compose-full-test-suite.yml rm -f")
-    check_tests_results(fts_threshold, f"{container_name}.log")
-
-
-def check_tests_results(fts_threshold, log_file):
-    passing_test_count = 0
-    with open(log_file, "r") as file:
-        while True:
-            line = file.readline()
-            if not line:
-                break
-            if re.match(r".*Passing - ", line):
-                passing_test_count = int(line.split('-')[1].strip())
-                break
-    if passing_test_count < fts_threshold:
-        raise RuntimeError(
-            f"Tests failed: Passing - {passing_test_count}\n Threshold - {fts_threshold}")
-
-
-@cli.command(name="basic_tests")
-@click.option('--run_number')
-def run_basic_tests(run_number):
-    neon_test_image = "neonlabsorg/neon_tests:latest"
-    click.echo('pull docker images...')
-    out = docker_client.pull(neon_test_image, stream=True, decode=True)
-    process_output(out)
-    env = {
-        "PROXY_IP": os.environ.get("PROXY_IP"),
-        "SOLANA_IP": os.environ.get("SOLANA_IP")
-    }
-    container_name = f"basic_tests-{run_number}"
-    docker_client.create_container(neon_test_image, command="/bin/bash", name=container_name,
-                                   detach=True, tty=True)
-    docker_client.start(container_name)
-    inst = docker_client.exec_create(
-        container_name, './clickfile.py run basic -n aws --numprocesses 4', environment=env)
-
-    out = docker_client.exec_start(inst['Id'], stream=True)
-    failed_tests = 0
-    for line in out:
-        click.echo(line.decode())
-        if " ERROR " in line.decode() or " FAILED " in line.decode():
-            failed_tests += 1
-    if failed_tests > 0:
-        raise RuntimeError(f"Tests failed! Errors count: {failed_tests}")
-
-
-@cli.command(name="remove_basic_test_container")
-@click.option('--run_number')
-def remove_basic_test_container(run_number):
-    container_name = f"basic_tests-{run_number}"
-    docker_client.stop(container_name)
-    docker_client.remove_container(container_name)
 
 
 def upload_remote_logs(ssh_client, service, artifact_logs):
@@ -337,28 +265,29 @@ def upload_remote_logs(ssh_client, service, artifact_logs):
 @click.option('--proxy_tag', help="the neonlabsorg/proxy image tag")
 @click.option('--neon_evm_tag', help="the neonlabsorg/evm_loader image tag")
 @click.option('--head_ref_branch')
-@click.option('--skip_uniswap', is_flag=True, show_default=True, default=False, help="flag for skipping uniswap tests")
+@click.option('--skip_uniswap', is_flag=True, show_default=True, default=True, help="flag for skipping uniswap tests")
 @click.option('--test_files', help="comma-separated file names if you want to run a specific list of tests")
 @click.option('--skip_pull', is_flag=True, default=False, help="skip pulling of docker images from the docker-hub")
 def deploy_check(proxy_tag, neon_evm_tag, head_ref_branch, skip_uniswap, test_files, skip_pull):
     if head_ref_branch is not None:
         neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
 
+
     os.environ["REVISION"] = proxy_tag
     os.environ["NEON_EVM_COMMIT"] = neon_evm_tag
     os.environ["FAUCET_COMMIT"] = FAUCET_COMMIT
-
-    cleanup_docker()
+    project_name = proxy_tag
+    cleanup_docker(project_name)
 
     if not skip_pull:
         click.echo('pull docker images...')
-        out = docker_compose(f"-f proxy/docker-compose-test.yml pull")
+        out = docker_compose(f"-p {project_name} -f docker-compose/docker-compose-ci.yml pull")
         click.echo(out)
     else:
         click.echo('skip pulling of docker images')
 
     try:
-        docker_compose(f"-f proxy/docker-compose-test.yml up -d")
+        docker_compose(f"-p {project_name} -f docker-compose/docker-compose-ci.yml up -d")
     except:
         raise RuntimeError("Docker-compose failed to start")
 
@@ -366,48 +295,49 @@ def deploy_check(proxy_tag, neon_evm_tag, head_ref_branch, skip_uniswap, test_fi
                   for item in docker_client.containers() if item['State'] == 'running']
     click.echo(f"Running containers: {containers}")
 
-    wait_for_faucet()
+    for service_name in ['SOLANA', 'PROXY', 'FAUCET']:
+        wait_for_service(project_name, service_name)
 
     if not skip_uniswap:
-        run_uniswap_test()
+        run_uniswap_test(project_name)
 
     if test_files is None:
-        test_list = get_test_list()
+        test_list = get_test_list(project_name)
     else:
         test_list = test_files.split(',')
 
-    prepare_run_test()
+    prepare_run_test(project_name)
 
     errors_count = 0
     for file in test_list:
-        errors_count += run_test(file)
+        errors_count += run_test(project_name, file)
 
     if errors_count > 0:
         raise RuntimeError(f"Tests failed! Errors count: {errors_count}")
 
 
-def get_test_list():
+def get_test_list(project_name):
     inst = docker_client.exec_create(
-        "proxy", 'find . -type f -name "test_*.py" -printf "%f\n"')
+        f"{project_name}_proxy_1", 'find . -type f -name "test_*.py" -printf "%f\n"')
     out = docker_client.exec_start(inst['Id'])
     test_list = out.decode('utf-8').strip().split('\n')
     return test_list
 
 
-def prepare_run_test():
+def prepare_run_test(project_name):
     inst = docker_client.exec_create(
-        "proxy", './proxy/prepare-deploy-test.sh')
+        f"{project_name}_proxy_1", './proxy/prepare-deploy-test.sh')
     out, test_logs = docker_client.exec_start(inst['Id'], demux=True)
     test_logs = test_logs.decode('utf-8')
     click.echo(out)
     click.echo(test_logs)
 
 
-def run_test(file_name):
+def run_test(project_name, file_name):
     click.echo(f"Running {file_name} tests")
     env = {"SKIP_PREPARE_DEPLOY_TEST": "YES", "TESTNAME": file_name}
     inst = docker_client.exec_create(
-        "proxy", './proxy/deploy-test.sh', environment=env)
+        f"{project_name}_proxy_1", './proxy/deploy-test.sh', environment=env)
     out, test_logs = docker_client.exec_start(inst['Id'], demux=True)
     test_logs = test_logs.decode('utf-8')
     click.echo(out)
@@ -420,8 +350,9 @@ def run_test(file_name):
 
 
 @cli.command(name="dump_apps_logs")
-def dump_apps_logs():
-    for container in CONTAINERS:
+@click.option('--proxy_tag', help="the neonlabsorg/proxy image tag")
+def dump_apps_logs(proxy_tag):
+    for container in [f"{proxy_tag}_{item}_1" for item in CONTAINERS]:
         dump_docker_logs(container)
 
 
@@ -435,62 +366,98 @@ def dump_docker_logs(container):
 
 
 @cli.command(name="stop_containers")
-def stop_containers():
-    cleanup_docker()
+@click.option('--proxy_tag', help="the neonlabsorg/proxy image tag")
+def stop_containers(proxy_tag):
+    cleanup_docker(proxy_tag)
 
 
-def cleanup_docker():
+def cleanup_docker(project_name):
     click.echo(f"Cleanup docker-compose...")
-    docker_compose("-f proxy/docker-compose-test.yml down -t 1")
+
+    docker_compose(f"-p {project_name} -f docker-compose/docker-compose-ci.yml down -t 1")
     click.echo(f"Cleanup docker-compose done.")
+
     click.echo(f"Removing temporary data volumes...")
     command = "docker volume prune -f"
     subprocess.run(command, shell=True)
     click.echo(f"Removing temporary data done.")
 
 
-def get_faucet_url():
-    inspect_out = docker_client.inspect_container("proxy")
+def get_service_url(project_name: str, service_name: str):
+    inspect_out = docker_client.inspect_container(f"{project_name}_proxy_1")
     env = inspect_out["Config"]["Env"]
-    faucet_url = ""
+    service_url = ""
     for item in env:
-        if "FAUCET_URL=" in item:
-            faucet_url = item.replace("FAUCET_URL=", "")
+        if f"{service_name}_URL=" in item:
+            service_url = item.replace(f"{service_name}_URL=", "")
             break
-    click.echo(f"fauset_url: {faucet_url}")
-    return faucet_url
+    click.echo(f"service_url: {service_url}")
+    return service_url
 
 
-def wait_for_faucet():
-    faucet_url = get_faucet_url()
-    faucet_ip, faucet_port = faucet_url.replace("http://", "").split(':')
+def wait_for_service(project_name: str, service_name: str):
+    service_url = get_service_url(project_name, service_name)
+    service_info = urlparse(service_url)
+    service_ip, service_port = service_info.hostname, service_info.port
 
-    command = f'docker exec proxy nc -zvw1 {faucet_ip} {faucet_port}'
+    command = f'docker exec {project_name}_proxy_1 nc -zvw1 {service_ip} {service_port}'
     timeout_sec = 120
     start_time = time.time()
     while True:
         if time.time() - start_time > timeout_sec:
-            raise RuntimeError(f'Faucet {faucet_url} is unavailable - time is over')
+            raise RuntimeError(f'Service {service_name} {service_url} is unavailable - time is over')
         try:
-            if subprocess.run(
-                command, shell=True, capture_output=True, text=True).returncode == 0:
-                click.echo(f"Faucet {faucet_url} is available")
+            if subprocess.run(command, shell=True, capture_output=True, text=True).returncode == 0:
+                click.echo(f"Service {service_name} is available")
                 break
             else:
-                click.echo(f"Faucet {faucet_url} is unavailable - sleeping")
+                click.echo(f"Service {service_name} {service_url} is unavailable - sleeping")
         except:
             raise RuntimeError(f"Error during run command {command}")
         time.sleep(1)
 
 
-def run_uniswap_test():
-    faucet_url = get_faucet_url()
-    os.environ["FAUCET_URL"] = faucet_url
+def run_uniswap_test(project_name):
+    faucet_name = 'FAUCET'
+    faucet_url = get_service_url(project_name, faucet_name)
+    os.environ[f'{faucet_name}_URL'] = faucet_url
 
     docker_client.pull(UNISWAP_V2_CORE_IMAGE)
-    command = f'docker run --rm --network=container:proxy -e FAUCET_URL \
+    command = f'docker run --rm --network=container:{project_name}_proxy_1 -e {faucet_name}_URL \
         --entrypoint ./deploy-test.sh {UNISWAP_V2_CORE_IMAGE} all 2>&1'
-    subprocess.run(command, shell=True)
+    out = subprocess.run(command, shell=True)
+    click.echo("return code: " + str(out.returncode))
+    if out.returncode != 0:
+        raise RuntimeError(f"Uniswap tests failed. Err: {out.stderr}")
+
+
+@cli.command(name="trigger_dapps_tests", help="Run dapps tests workflow")
+@click.option("--solana_ip", help="solana ip")
+@click.option("--proxy_ip", help="proxy ip")
+@click.option('--token', help="github token")
+def trigger_dapps_tests(solana_ip, proxy_ip, token):
+    github = GithubClient(token)
+
+    runs_before = github.get_dapps_runs_list()
+    runs_count_before = github.get_dapps_runs_count()
+    proxy_url = f"http://{proxy_ip}:9090/solana"
+    solana_url = f"http://{solana_ip}:8899/"
+    faucet_url = f"http://{proxy_ip}:3333/"
+
+    github.run_dapps_dispatches(proxy_url, solana_url, faucet_url)
+    wait_condition(lambda: github.get_dapps_runs_count() > runs_count_before, timeout_sec=180)
+
+    runs_after = github.get_dapps_runs_list()
+    run_id = list(set(runs_after) - set(runs_before))[0]
+    link = f"https://github.com/neonlabsorg/neon-tests/actions/runs/{run_id}"
+    click.echo(f"Dapps tests run link: {link}")
+    click.echo("Waiting completed status...")
+    wait_condition(lambda: github.get_dapps_run_info(run_id)["status"] == "completed", timeout_sec=7200, delay=5)
+
+    if github.get_dapps_run_info(run_id)["conclusion"] == "success":
+        click.echo("Dapps tests passed successfully")
+    else:
+        raise RuntimeError(f"Dapps tests failed! See {link}")
 
 
 @cli.command(name="send_notification", help="Send notification to slack")
@@ -508,6 +475,19 @@ def send_notification(url, build_url):
         f"\n<{build_url}|View build details>"
     )
     requests.post(url=url, data=json.dumps(tpl))
+
+
+def wait_condition(func_cond, timeout_sec=60, delay=0.5):
+    start_time = time.time()
+    while True:
+        if time.time() - start_time > timeout_sec:
+            raise RuntimeError(f"The condition not reached within {timeout_sec} sec")
+        try:
+            if func_cond():
+                break
+        except:
+            raise
+        time.sleep(delay)
 
 
 def process_output(output):

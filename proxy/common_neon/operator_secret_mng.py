@@ -6,9 +6,9 @@ from typing import List, Optional
 import hvac
 from hvac.api.secrets_engines.kv_v2 import DEFAULT_MOUNT_POINT
 
-from ..common_neon.config import Config
-from ..common_neon.environment_utils import SolanaCli
-from ..common_neon.solana_tx import SolAccount
+from .config import Config
+from .environment_utils import SolanaCli
+from .solana_tx import SolAccount
 
 
 LOG = logging.getLogger(__name__)
@@ -68,7 +68,8 @@ class OpSecretMng:
 
         return secret_list
 
-    def _read_secret_file(self, name: str) -> Optional[SolAccount]:
+    @staticmethod
+    def _read_secret_file(name: str) -> Optional[SolAccount]:
         LOG.debug(f"Open a secret file: {name}")
         with open(name.strip(), mode='r') as d:
             pkey = (d.read())
@@ -81,8 +82,8 @@ class OpSecretMng:
     def _read_secret_list_from_fs(self) -> List[bytes]:
         LOG.debug('Read secret keys from filesystem...')
 
-        res = SolanaCli(self._config).call('config', 'get')
-        LOG.debug(f"Got solana config: {res}")
+        res = SolanaCli(self._config, False).call('config', 'get')
+        LOG.debug(f"Read solana config with the length {len(res)}")
         substr = "Keypair Path: "
         path = ""
         for line in res.splitlines():

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 from .utils import str_fmt_object
 
 
 @dataclass(frozen=True)
-class SolanaBlockInfo:
+class SolBlockInfo:
     block_slot: int
     block_hash: str = None
     block_time: Optional[int] = None
@@ -15,6 +15,7 @@ class SolanaBlockInfo:
     parent_block_slot: Optional[int] = None
     parent_block_hash: str = None
     is_finalized: bool = False
+    tx_receipt_list: List[Dict[str, Any]] = None
 
     _str = ''
 

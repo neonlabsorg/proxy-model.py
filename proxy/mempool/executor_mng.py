@@ -2,6 +2,7 @@ import asyncio
 import dataclasses
 import socket
 import logging
+
 from abc import ABC, abstractmethod
 from collections import deque
 from typing import Dict, Tuple, Deque, Set
@@ -10,7 +11,6 @@ from .mempool_api import MPRequest, MPTask
 from .mempool_executor import MPExecutor
 
 from ..common_neon.config import Config
-from ..common_neon.utils.json_logger import logging_context
 from ..common_neon.pickable_data_server import PipePickableDataClient
 
 from ..statistic.data import NeonExecutorStatData
@@ -89,8 +89,7 @@ class MPExecutorMng:
         await self.set_executor_cnt(0)
 
     def submit_mp_request(self, mp_request: MPRequest) -> MPTask:
-        with logging_context(req_id=mp_request.req_id):
-            executor_id, executor = self._get_executor()
+        executor_id, executor = self._get_executor()
         task = asyncio.get_event_loop().create_task(executor.send_data_async(mp_request))
         return MPTask(executor_id=executor_id, aio_task=task, mp_request=mp_request)
 
@@ -102,7 +101,7 @@ class MPExecutorMng:
 
     def _get_executor(self) -> Tuple[int, MPExecutorClient]:
         executor_id = self._available_executor_pool.pop()
-        LOG.debug(f"Acquire executor: {executor_id}")
+        # LOG.debug(f"Acquire executor: {executor_id}")
         self._busy_executor_pool.add(executor_id)
         self._commit_stat()
 
@@ -112,7 +111,7 @@ class MPExecutorMng:
     def release_executor(self, executor_id: int):
         self._busy_executor_pool.remove(executor_id)
         if executor_id in self._executor_dict:
-            LOG.debug(f"Release executor: {executor_id}")
+            # LOG.debug(f"Release executor: {executor_id}")
             self._available_executor_pool.appendleft(executor_id)
             self._user.on_executor_released(executor_id)
         else:
