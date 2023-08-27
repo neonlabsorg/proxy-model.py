@@ -272,27 +272,39 @@ class Indexer:
     def _has_new_blocks(self) -> bool:
         if self._db.is_reindexing_mode():
             # reindexing can't precede of indexing
-            finalized_slot = self._db.finalized_slot
-            # reindexing should stop on the terminated slot
-            finalized_slot = min(self._term_slot, finalized_slot)
-            result = self._last_processed_slot < finalized_slot
-            self._last_finalized_slot = finalized_slot
-        else:
-            self._last_confirmed_slot = self._solana.get_confirmed_slot()
-            result = self._last_processed_slot != self._last_confirmed_slot
+            new_finalized_slot = self._db.finalized_slot
+
+            # - the first goal is to reach the stop slot
+            # - the second goal is to reach the termination slot
+            # on termination slot stop anyway
+            if self._last_finalized_slot < self._db.stop_slot:
+                new_finalized_slot = min(self._db.stop_slot, new_finalized_slot)
+            else:
+                new_finalized_slot = min(self._term_slot, new_finalized_slot)
+
+            result = new_finalized_slot > self._last_finalized_slot
             if result:
+                self._last_finalized_slot = new_finalized_slot
+        else:
+            new_confirmed_slot = self._solana.get_confirmed_slot()
+            result = new_confirmed_slot > self._last_confirmed_slot
+            if result:
+                self._last_confirmed_slot = new_confirmed_slot
                 self._last_finalized_slot = self._solana.get_finalized_slot()
                 self._last_tracer_slot = self._tracer_api.max_slot()
         return result
 
     def _is_done_parsing(self) -> bool:
-        """Stop parsing can happen only in reindexing mode"""
+        """The stop of parsing can happen only in reindexing mode.
+        If reindexing has reached the stop slot - check that there is no stuck object.
+        If reindexing has reached the termination slot - exit anyway.
+        """
         if not self._db.is_reindexing_mode():
             return False
 
-        if self._last_processed_slot < self._db.stop_slot:
+        if self._last_finalized_slot < self._db.stop_slot:
             return False
-        elif self._last_processed_slot >= self._term_slot:
+        elif self._last_finalized_slot >= self._term_slot:
             return True
 
         neon_block = self._neon_block_dict.finalized_neon_block
