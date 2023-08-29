@@ -56,7 +56,6 @@ class SolTxSendState:
 
     status: Status
     tx: SolTx
-    valid_block_height: int
     receipt: Optional[SolTxReceipt]
     error: Optional[BaseException]
 
@@ -95,7 +94,6 @@ class SolTxListSender:
         self._solana = solana
         self._signer = signer
         self._block_hash: Optional[SolBlockHash] = None
-        self._block_hash_dict: Dict[SolBlockHash, int] = dict()
         self._bad_block_hash_set: Set[SolBlockHash] = set()
         self._tx_list: List[SolTx] = list()
         self._tx_state_dict: Dict[str, SolTxSendState] = dict()
@@ -249,7 +247,6 @@ class SolTxListSender:
             raise BlockHashNotFound()
 
         self._block_hash = resp.block_hash
-        self._block_hash_dict[resp.block_hash] = resp.last_valid_block_height
 
         return self._block_hash
 
@@ -448,14 +445,12 @@ class SolTxListSender:
             res = self._DecodeResult(no_receipt_status, None)
         else:
             res = self._decode_tx_status(tx, tx_receipt)
-        valid_block_height = self._block_hash_dict.get(tx.recent_block_hash, self._big_block_height)
 
         tx_send_state = SolTxSendState(
             status=res.tx_status,
             tx=tx,
             receipt=tx_receipt,
             error=res.error,
-            valid_block_height=valid_block_height
         )
 
         status = SolTxSendState.Status
