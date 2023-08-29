@@ -76,9 +76,6 @@ class SolTxSendState:
 
 
 class SolTxListSender:
-    _big_block_height = 2 ** 64 - 1
-    _big_block_slot = 2 ** 64 - 1
-
     _completed_tx_status_set = {
         SolTxSendState.Status.WaitForReceipt,
         SolTxSendState.Status.GoodReceipt,
@@ -98,7 +95,6 @@ class SolTxListSender:
         self._solana = solana
         self._signer = signer
         self._block_hash: Optional[SolBlockHash] = None
-        self._valid_block_height = self._big_block_height
         self._block_hash_dict: Dict[SolBlockHash, int] = dict()
         self._bad_block_hash_set: Set[SolBlockHash] = set()
         self._tx_list: List[SolTx] = list()
@@ -203,20 +199,20 @@ class SolTxListSender:
         if commit_level == SolCommit.Confirmed:
             return
 
-        # find minimal block slot
-        min_block_slot = self._big_block_slot
+        # find maximum block slot
+        max_block_slot = 0
         for tx_state in self._tx_state_dict.values():
             tx_block_slot = tx_state.block_slot
             if tx_block_slot is not None:
-                min_block_slot = min(min_block_slot, tx_block_slot)
+                max_block_slot = max(max_block_slot, tx_block_slot)
 
-        if min_block_slot == self._big_block_slot:
+        if max_block_slot == 0:
             LOG.debug('Tx list does not contain a block - skip validating of the commit level')
             return
 
-        min_block_status = self._solana.get_block_status(min_block_slot)
-        if SolCommit.level(min_block_status.commitment) < SolCommit.level(commit_level):
-            raise CommitLevelError(commit_level, min_block_status.commitment)
+        max_block_status = self._solana.get_block_status(max_block_slot)
+        if SolCommit.level(max_block_status.commitment) < SolCommit.level(commit_level):
+            raise CommitLevelError(commit_level, max_block_status.commitment)
 
     def _fmt_stat(self) -> str:
         if not LOG.isEnabledFor(logging.DEBUG):
