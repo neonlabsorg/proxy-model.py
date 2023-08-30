@@ -92,7 +92,18 @@ class ElfParams:
             evm_version = self.neon_evm_version
             major_evm_version, minor_evm_version, _ = evm_version.split('.')
             major_proxy_version, minor_proxy_version, _ = proxy_version.split('.')
-            return (major_evm_version == major_proxy_version) and (minor_evm_version == minor_proxy_version)
+
+            if major_evm_version != major_proxy_version:
+                return False
+            if minor_evm_version == minor_proxy_version:
+                return True
+
+            # Custom version compatibility checking
+            if (major_proxy_version == '1') and (minor_proxy_version == '4') and (minor_evm_version in ('2', '4')):
+                return True
+            #
+
+            return False
         except BaseException as exc:
             LOG.error(f'Cannot compare evm version {evm_version} with proxy version {proxy_version}.', exc_info=exc)
             return False
