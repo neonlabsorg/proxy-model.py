@@ -12,7 +12,6 @@ from solders.system_program import CreateAccountWithSeedParams, create_account_w
 from .address import neon_2program, NeonAddress
 from .constants import INCINERATOR_ID, COMPUTE_BUDGET_ID, ADDRESS_LOOKUP_TABLE_ID, SYS_PROGRAM_ID, EVM_PROGRAM_ID
 from .elf_params import ElfParams
-from .config import Config
 from .utils.eth_proto import NeonTx
 from .utils.utils import str_enum
 from .layouts import CREATE_ACCOUNT_LAYOUT
@@ -163,14 +162,23 @@ class NeonIxBuilder:
 
     def create_holder_ix(self, holder: SolPubKey, seed: bytes) -> SolTxIx:
         LOG.debug(f'createHolderIx {self._operator_account} account({holder})')
+
+        ix_data = EvmIxCode.HolderCreate.value.to_bytes(1, byteorder='little')
+
+        # TODO: remove in the future versions
+        evm_major_ver, evm_minor_ver, _ = self._elf_params.neon_evm_version.split('.')
+        LOG.debug(f'{evm_major_ver}|{evm_minor_ver}')
+        if (int(evm_major_ver) == 1) and (int(evm_minor_ver) >= 2):
+        #
+            ix_data += len(seed).to_bytes(8, 'little') + seed
+
         return SolTxIx(
             accounts=[
                 SolAccountMeta(pubkey=holder, is_signer=False, is_writable=True),
                 SolAccountMeta(pubkey=self._operator_account, is_signer=True, is_writable=True),
             ],
             program_id=EVM_PROGRAM_ID,
-            data=EvmIxCode.HolderCreate.value.to_bytes(1, byteorder='little') +
-                len(seed).to_bytes(8, 'little') + seed
+            data=ix_data
         )
 
     def make_create_neon_account_ix(self, neon_address: NeonAddress) -> SolTxIx:
