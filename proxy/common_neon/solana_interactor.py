@@ -105,24 +105,25 @@ class SolInteractor:
                 s = s.replace(self._solana_url, 'XXXXX')
             return s
 
+        def _clean_solana_url() -> str:
+            if self._config.hide_solana_url:
+                return ''
+            return ' ' + self._solana_url
+
         for retry in itertools.count():
             try:
                 return self._send_post_request_impl(request)
 
-            except httpx.HTTPStatusError as exc:
+            except BaseException as exc:
                 if retry > 1:
                     str_err = _clean_solana_err(exc)
+                    solana_url = _clean_solana_url()
                     LOG.debug(
-                        f'Receive connection error {str_err} on connection to Solana. '
+                        f'Receive connection error {str_err} on connection to Solana{solana_url}. '
                         f'Attempt {retry + 1} to send the request to Solana node...'
                     )
 
                 time.sleep(1)
-
-            except BaseException as exc:
-                str_err = _clean_solana_err(exc)
-                LOG.error(f'Unknown exception on send request to Solana: {str_err}')
-                raise SolanaUnavailableError(str_err)
 
     def _build_rpc_request(self, method: str, can_flush_id: bool, *param_list: Any) -> Dict[str, Any]:
         request_id = next(self._request_cnt) + 1
