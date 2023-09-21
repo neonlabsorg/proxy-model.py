@@ -61,7 +61,9 @@ class Config(DBConfig):
     def __init__(self):
         super().__init__()
         self._solana_url = os.environ.get('SOLANA_URL', 'http://localhost:8899')
+        self._solana_timeout = self._env_num('SOLANA_TIMEOUT', Decimal('15.0'), Decimal('1.0'), Decimal('3600'))
         self._solana_ws_url = os.environ.get('SOLANA_WS_URL', parse_solana_ws_url(self._solana_url))
+        self._hide_solana_url = self._env_bool('HIDE_SOLANA_URL', True)
 
         self._enable_private_api = self._env_bool('ENABLE_PRIVATE_API', False)
         self._enable_send_tx_api = self._env_bool('ENABLE_SEND_TX_API', True)
@@ -308,8 +310,16 @@ class Config(DBConfig):
         return self._solana_url
 
     @property
+    def solana_timeout(self) -> float:
+        return float(self._solana_timeout)
+
+    @property
     def solana_ws_url(self) -> str:
         return self._solana_ws_url
+
+    @property
+    def hide_solana_url(self) -> bool:
+        return self._hide_solana_url
 
     @property
     def enable_private_api(self) -> bool:
@@ -570,8 +580,8 @@ class Config(DBConfig):
         config_dict = {
             'EVM_LOADER_ID': EVM_PROGRAM_ID_STR,
 
-            # 'SOLANA_URL': self.solana_url,
-            # 'SOLANA_WS_URL': self.solana_ws_url,
+            'SOLANA_TIMEOUT': self.solana_timeout,
+            'HIDE_SOLANA_URL': self.hide_solana_url,
 
             'ENABLE_PRIVATE_API': self.enable_private_api,
             'ENABLE_SEND_TX_API': self.enable_send_tx_api,
@@ -650,5 +660,10 @@ class Config(DBConfig):
             # Testing settings
             'FUZZ_FAIL_PCT': self.fuzz_fail_pct,
         }
+        if not self.hide_solana_url:
+            config_dict.update({
+                'SOLANA_URL': self.solana_url,
+                'SOLANA_WS_URL': self.solana_ws_url,
+            })
         config_dict.update(super().as_dict())
         return config_dict

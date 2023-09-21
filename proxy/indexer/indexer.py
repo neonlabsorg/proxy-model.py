@@ -20,7 +20,7 @@ from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_tx import SolCommit
 from ..common_neon.utils.json_logger import logging_context
 from ..common_neon.utils.solana_block import SolBlockInfo
-from ..common_neon.errors import SolHistoryNotFound
+from ..common_neon.errors import SolHistoryNotFound, SolHistoryCriticalNotFound
 
 from ..statistic.data import NeonBlockStatData, NeonDoneBlockStatData
 from ..statistic.indexer_client import IndexerStatClient
@@ -64,6 +64,8 @@ class Indexer:
             ix_code = decoder.ix_code()
             assert ix_code not in self._sol_neon_ix_decoder_dict
             self._sol_neon_ix_decoder_dict[ix_code] = decoder
+
+        self._check_start_slot(self._db.start_slot)
 
     def _save_checkpoint(self, dctx: SolNeonDecoderCtx) -> None:
         if dctx.is_neon_block_queue_empty():
@@ -252,10 +254,15 @@ class Indexer:
             self._save_checkpoint(dctx)
 
     def run(self):
+        try:
+            self._run()
+        except BaseException as exc:
+            LOG.warning('Exception on run Indexer', exc_info=exc)
+
+    def _run(self):
         check_sec = float(self._config.indexer_check_msec) / 1000
         while not self._is_done_parsing():
             time.sleep(check_sec)
-
             if not self._has_new_blocks():
                 continue
 
@@ -314,8 +321,12 @@ class Indexer:
         dctx = SolNeonDecoderCtx(self._config, self._decoder_stat)
         try:
             self._collect_neon_txs(dctx, self._last_finalized_slot, SolCommit.Finalized)
+        except SolHistoryCriticalNotFound as err:
+            LOG.debug(f'block branch: {str(dctx)}, fail to parse finalized history: {str(err)}')
+            self._check_start_slot(err.slot)
+            return
         except SolHistoryNotFound as err:
-            self._check_start_slot()
+            self._check_start_slot(self._db.start_slot)
             LOG.debug(f'block branch: {str(dctx)}, skip parsing of finalized history: {str(err)}')
             return
 
@@ -328,7 +339,7 @@ class Indexer:
         # and there are no reason to parse confirmed blocks,
         # because on next iteration there will be the next portion of finalized blocks
         finalized_block_slot = self._solana.get_finalized_slot()
-        if (finalized_block_slot - dctx.stop_slot) >= 3:
+        if (finalized_block_slot - self._last_finalized_slot) >= 5:
             LOG.debug(f'skip parsing of not-finalized history: {finalized_block_slot} > {dctx.stop_slot}')
             return
 
@@ -337,16 +348,19 @@ class Indexer:
         except SolHistoryNotFound as err:
             # There are a lot of reason for skipping not-finalized history on live systems
             # so uncomment the debug message only if you need investigate the root cause
-            # LOG.debug(f'skip parsing of not-finalized history: {str(err)}')
+            LOG.debug(f'skip parsing of not-finalized history: {str(err)}')
             pass
 
-    def _check_start_slot(self) -> None:
-        first_slot = self._solana.find_exist_block_slot(self._db.start_slot)
+    def _check_start_slot(self, slot: int) -> None:
+        first_slot = self._solana.get_first_available_slot()
+        if first_slot < slot:
+            first_slot = self._solana.find_exist_block_slot(slot)
+
         if self._db.start_slot < first_slot:
+            LOG.debug(f'Move start slot from {self._db.start_slot} to {first_slot}')
             self._db.set_start_slot(first_slot)
 
-        # Skip history if it was cleaned by the Solana Node
+        # Skip history if it was cleaned by the Solana node
         finalized_neon_block = self._neon_block_dict.finalized_neon_block
         if (finalized_neon_block is not None) and (first_slot > finalized_neon_block.block_slot):
             self._neon_block_dict.clear()
-
