@@ -84,7 +84,7 @@ jobs:
         run: |
           if [[ "${{ contains(github.event.pull_request.labels.*.name, 'extendedFullTestSuite') }}"=='true' && "${{ github.event.pull_request.draft }}"=='false' || "${{ github.event.inputs.test_set }}" == "extendedFullTestSuite" ]]; then
             value="extendedFullTestSuite"
-          elif [[ "(${{ contains(github.event.pull_request.labels.*.name, 'fullTestSuite') }}"=='true' && "${{ github.event.pull_request.draft }}"=='false || "${{ github.event.inputs.test_set }}" == "fullTestSuite" ]]; then
+          elif [[ "(${{ contains(github.event.pull_request.labels.*.name, 'fullTestSuite') }}"=='true' && "${{ github.event.pull_request.draft }}"=='false' || "${{ github.event.inputs.test_set }}" == "fullTestSuite" ]]; then
             value="fullTestSuite"
           else
             value="basic"
