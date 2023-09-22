@@ -82,9 +82,9 @@ jobs:
       - name: Define test set
         id: test_set
         run: |
-          if [[ (${{ contains(github.event.pull_request.labels.*.name, 'extendedFullTestSuite') }} && !${{ github.event.pull_request.draft }} ) || "${{ github.event.inputs.test_set }}" == "extendedFullTestSuite" ]]; then
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'extendedFullTestSuite') }}"=='true' && "${{ github.event.pull_request.draft }}"=='false' || "${{ github.event.inputs.test_set }}" == "extendedFullTestSuite" ]]; then
             value="extendedFullTestSuite"
-          elif [[ (${{ contains(github.event.pull_request.labels.*.name, 'fullTestSuite') }} && !${{ github.event.pull_request.draft }} ) || "${{ github.event.inputs.test_set }}" == "fullTestSuite" ]]; then
+          elif [[ "(${{ contains(github.event.pull_request.labels.*.name, 'fullTestSuite') }}"=='true' && "${{ github.event.pull_request.draft }}"=='false || "${{ github.event.inputs.test_set }}" == "fullTestSuite" ]]; then
             value="fullTestSuite"
           else
             value="basic"
