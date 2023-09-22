@@ -297,7 +297,7 @@ jobs:
           --solana_ip=${{env.SOLANA_IP}} \
           --proxy_ip=${{ env.PROXY_IP }} \
           --pr_url_for_report=${{github.event.inputs.initial_pr}} \
-          --token=${{secrets.GHTOKEN}} \\
+          --token=${{secrets.GHTOKEN}} \
           --test_set=${{needs.build-image.outputs.test_set }}
 
   destroy-terraform:
