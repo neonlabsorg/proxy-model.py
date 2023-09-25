@@ -298,7 +298,7 @@ jobs:
           --token=${{secrets.GHTOKEN}} \
           --test_set=${{needs.build-image.outputs.test_set }}
 
-  economy:
+  economy-tests:
     if: needs.build-image.outputs.test_set=='extendedFullTestSuite'
     needs:
       - prepare-infrastructure
@@ -335,7 +335,7 @@ jobs:
       - openzeppelin-tests
       - basic-tests
       - dapps-tests
-      - economy
+      - economy-tests
       - build-image
     runs-on: test-runner
     if: ${{always() && needs.prepare-infrastructure.result != 'skipped'}}
@@ -375,13 +375,13 @@ jobs:
       - openzeppelin-tests
       - basic-tests
       - dapps-tests
-      - economy
+      - economy-tests
       - deploy-check
     if: |
       always() &&
       needs.deploy-check.result == 'success' &&
       ((needs.openzeppelin-tests.result == 'success' && needs.basic-tests.result == 'success'
-      && needs.dapps-tests.result == 'success' && contains(fromJSON('["failure", "skipped"]'), needs.economy.result)) ||
+      && needs.dapps-tests.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.economy.result)) ||
       needs.prepare-infrastructure.result == 'skipped')
     steps:
       - uses: actions/checkout@v3
@@ -402,7 +402,7 @@ jobs:
       - openzeppelin-tests
       - basic-tests
       - dapps-tests
-      - economy
+      - economy-tests
       - deploy-check
       - build-image
     if: |
