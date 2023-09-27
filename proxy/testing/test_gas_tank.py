@@ -1,7 +1,7 @@
 import unittest
 import base58
 
-from unittest.mock import patch
+from unittest.mock import patch, call
 from typing import Optional, Union
 
 from ..common_neon.config import Config, StartSlot
