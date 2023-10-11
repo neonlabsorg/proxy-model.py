@@ -41,8 +41,13 @@ class TracerAPIClient:
             return None
 
         request = f'''
+            SELECT MAX(slot)
+              FROM events.update_account_distributed
+             WHERE slot <=
+            (
             SELECT MAX(slot)-{self._config.slot_processing_delay}
               FROM events.update_account_distributed
+            )
         '''
 
         while True:
