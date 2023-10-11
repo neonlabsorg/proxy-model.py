@@ -60,7 +60,9 @@ class TracerAPIClient:
                 if ch_conn.ch_client is None:
                     ch_conn.ch_client = ch_get_client(dsn=ch_conn.ch_dsn)
 
+                LOG.debug(f'request from {ch_conn.ch_dsn}')
                 slot = ch_conn.ch_client.query(request).result_set[0][0]
+                LOG.debug(f'done {slot}')
                 return slot
 
             except BaseException as exc:

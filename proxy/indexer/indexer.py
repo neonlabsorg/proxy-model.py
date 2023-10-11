@@ -299,6 +299,7 @@ class Indexer:
                 self._last_finalized_slot = self._solana.get_finalized_slot()
                 self._last_tracer_slot = self._tracer_api.max_slot()
                 self._commit_progress_stat()
+                self._print_progress_stat()
         return result
 
     def _is_done_parsing(self) -> bool:
