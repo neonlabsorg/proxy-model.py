@@ -226,7 +226,7 @@ jobs:
       - name: Define test image tag
         id: neon_test_tag
         run: |
-          tag='v1.0.x'
+          tag='v1.2.x'
           echo "value=${tag}"
           echo "value=${tag}" >> $GITHUB_OUTPUT
       - name: Run docker container
