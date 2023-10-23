@@ -32,7 +32,7 @@ services:
     entrypoint: /opt/neon-test-invoke-program.sh
 
   postgres:
-    image: postgres:15.3
+    image: postgres:15.4
     command: postgres -c 'max_connections=1000'
     environment:
       POSTGRES_DB: neon-db

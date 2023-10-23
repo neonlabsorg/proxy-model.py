@@ -214,6 +214,10 @@ jobs:
             do echo  "Proxy is not ready yet. Waiting 5 seconds...";
             sleep 5;
           done
+      - name: Test ping time
+        timeout-minutes: 3
+        run: |
+          nmap -p 909 0 ${{ env.PROXY_IP }}
       - name: Run OpenZeppelin tests
         run: |
           docker exec -i ${{ env.CONTAINER }} python3 ./clickfile.py run oz \
