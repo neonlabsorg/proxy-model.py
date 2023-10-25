@@ -96,11 +96,11 @@ services:
       CONFIG: ci
       MIN_OPERATOR_BALANCE_TO_WARN: 4565760000 # = 913152000 * 5 (5 storage accounts) = 4.56576 SOL
       MIN_OPERATOR_BALANCE_TO_ERR: 913152000 # = solana rent 131072 (= Rent-exempt minimum: 0.913152 SOL) SOLs to create a storage
-      PP_SOLANA_URL: ${CI_PP_SOLANA_URL:-https://api.devnet.solana.com}
-      PYTH_MAPPING_ACCOUNT: ${CI_PYTH_MAPPING_ACCOUNT:-BmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2}
+      #PP_SOLANA_URL: ${CI_PP_SOLANA_URL:-https://api.devnet.solana.com}
+      #PYTH_MAPPING_ACCOUNT: ${CI_PYTH_MAPPING_ACCOUNT:-BmA9Z6FjioHJPpjT39QazZyhDRUdZy2ezwx4GiDdE2u2}
       # Set to 0 + CONST_GAS_PRICE to 0, if you want 0 gas-price
       #MINIMAL_GAS_PRICE: 1
-      #CONST_GAS_PRICE: 2
+      CONST_GAS_PRICE: 2
       GAS_PRICE_SLIPPAGE: 0.3
       ENABLE_PRIVATE_API: "NO"
       ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID: "YES"
