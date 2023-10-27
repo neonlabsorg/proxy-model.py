@@ -32,6 +32,7 @@ class _NeonCoreApiClient:
         self._emulate_url = base_url + '/emulate'
         self._get_storage_at_url = base_url + '/get-storage-at'
         self._get_neon_account_url = base_url + '/get-ether-account-data'
+        self._get_neon_account_list_url = base_url + '/get-batch-ether-account-data'
 
         self._headers = {
             'Content-Type': 'application/json',
@@ -61,6 +62,9 @@ class _NeonCoreApiClient:
 
     def get_neon_account_info(self, request: RPCRequest) -> RPCResponse:
         return self._get(self._get_neon_account_url, request)
+
+    def get_neon_account_info_list(self, request: RPCRequest) -> RPCResponse:
+        return self._post(self._get_neon_account_list_url, request)
 
     def _post(self, url: str, request: RPCRequest) -> RPCResponse:
         return self._send_request(lambda: self._client.post(url, json=request))
@@ -196,8 +200,26 @@ class NeonCoreApiClient:
         self,
         addr_list: List[Union[str, bytes, NeonAddress]],
         block: Optional[SolBlockInfo] = None
-    ) -> List[NeonAccountInfo]:
-        return [self.get_neon_account_info(addr, block) for addr in addr_list]
+    ) -> List[Optional[NeonAccountInfo]]:
+        def _get_str(_addr: Union[str, bytes, NeonAddress]):
+            if isinstance(_addr, bytes):
+                _addr = NeonAddress(_addr)
+            if isinstance(_addr, NeonAddress):
+                _addr = str(_addr)
+            return _addr
+
+        addr_list = [_get_str(addr) for addr in addr_list]
+        request = self._add_block(dict(ether=addr_list), block)
+        response = self._call(_NeonCoreApiClient.get_neon_account_info_list, request)
+        if not response:
+            return [None for _ in addr_list]
+
+        json_acct_list = response.get('value')
+        return [
+            NeonAccountInfo.from_json(json_acct)
+            if json_acct else None
+            for json_acct in json_acct_list
+        ]
 
     def get_state_tx_cnt(
         self,
