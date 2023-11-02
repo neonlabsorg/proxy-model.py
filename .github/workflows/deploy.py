@@ -239,12 +239,12 @@ def get_all_containers_logs():
         f'ssh-keyscan -H {proxy_ip} >> {home_path}/.ssh/known_hosts', shell=True)
     ssh_client = SSHClient()
     ssh_client.load_system_host_keys()
-    ssh_client.connect(solana_ip, username='ubuntu',
+    ssh_client.connect(solana_ip, username='root',
                        key_filename=ssh_key, timeout=120)
 
     upload_remote_logs(ssh_client, "solana", artifact_logs)
 
-    ssh_client.connect(proxy_ip, username='ubuntu',
+    ssh_client.connect(proxy_ip, username='root',
                        key_filename=ssh_key, timeout=120)
     services = ["postgres", "dbcreation", "indexer", "proxy", "faucet"]
     for service in services:
