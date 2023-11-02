@@ -33,14 +33,6 @@ class NeonGasPriceData:
     min_gas_price: int
     sol_price_usd: Decimal
     neon_price_usd: Decimal
-    operator_fee: Decimal
-
-
-class NeonTxBeginCode(Enum):
-    Failed = enum_auto()
-    Started = enum_auto()
-    Restarted = enum_auto()
-    StuckPushed = enum_auto()
 
 
 @dataclass
@@ -72,7 +64,7 @@ class NeonTxEndData:
     processing_stuck_cnt: int = 0
     in_reschedule_queue_cnt: int = 0
     in_stuck_queue_cnt: int = 0
-    in_waiting_queue_cnt: int = 0
+    in_mempool_cnt: int = 0
 
     def add_value(self, code: NeonTxEndCode) -> None:
         if code in {NeonTxEndCode.Done, NeonTxEndCode.StuckDone}:
@@ -108,8 +100,17 @@ class NeonExecutorStatData:
 
 @dataclass(frozen=True)
 class NeonBlockStatData:
+    reindex_ident: str
     start_block: int
     parsed_block: int
+    stop_block: int
+    term_block: int
     finalized_block: int
     confirmed_block: int
     tracer_block: Optional[int]
+
+
+@dataclass
+class NeonDoneBlockStatData:
+    reindex_ident: str
+    parsed_block: int

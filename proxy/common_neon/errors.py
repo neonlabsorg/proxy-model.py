@@ -84,8 +84,6 @@ class SenderAccountNotExists(RescheduleError):
 
 
 class BlockedAccountError(RescheduleError):
-    pass
-
     def __str__(self) -> str:
         return 'Blocked accounts error'
 
@@ -99,8 +97,14 @@ class NodeBehindError(RescheduleError):
         return f'The Solana node is behind by {self._slots_behind} from the Solana cluster'
 
 
-class SolanaUnavailableError(RescheduleError):
-    pass
+class ALTInvalidIndexError(RescheduleError):
+    def __str__(self) -> str:
+        return 'ALT does not have index'
+
+
+class ALTAlreadyExistError(RescheduleError):
+    def __str__(self) -> str:
+        return 'ALT already exists'
 
 
 class NoMoreRetriesError(RescheduleError):
@@ -168,6 +172,16 @@ class NonceTooHighError(RescheduleError):
         return 'tx nonce is too high for execution'
 
 
+class OutOfGasError(BaseException):
+    def __init__(self, has_gas_limit: int, req_gas_limit: int):
+        super().__init__(has_gas_limit, req_gas_limit)
+        self._has_gas_limit = has_gas_limit
+        self._req_gas_limit = req_gas_limit
+
+    def __str__(self) -> str:
+        return 'gas limit reached'
+
+
 class BigTxError(BaseException):
     def __str__(self) -> str:
         return 'transaction is too big for execution'
@@ -180,7 +194,7 @@ class WrongStrategyError(BaseException):
 
 class CUBudgetExceededError(WrongStrategyError):
     def __str__(self) -> str:
-        return 'The Neon transaction is too complicated. Solana`s computing budget is exceeded'
+        return "The Neon transaction is too complicated. Solana's computing budget is exceeded"
 
 
 class InvalidIxDataError(WrongStrategyError):
@@ -205,3 +219,34 @@ class SolTxSizeError(WrongStrategyError):
 
 class SolHistoryNotFound(RuntimeError):
     pass
+
+
+class SolHistoryCriticalNotFound(RuntimeError):
+    def __init__(self, slot: int, msg: str):
+        super().__init__(slot, msg)
+        self._slot = slot
+        self._msg = msg
+
+    @property
+    def slot(self) -> int:
+        return self._slot
+
+    def __str__(self) -> str:
+        return self._msg
+
+
+class PythNetworkError(RuntimeError):
+    pass
+
+
+class TxAccountCntTooBig(RuntimeError):
+    def __init__(self, current_cnt: int, limit_cnt: int):
+        super().__init__(current_cnt, limit_cnt)
+        self._current_cnt = current_cnt
+        self._limit_cnt = limit_cnt
+
+    def __str__(self) -> str:
+        return (
+            f'The transaction requests {self._current_cnt} accounts '
+            f'and exceeds the upper limit of {self._limit_cnt}'
+        )

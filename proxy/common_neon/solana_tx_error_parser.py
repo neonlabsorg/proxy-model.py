@@ -6,17 +6,19 @@ import enum
 from typing import Union, Optional, Any, Tuple, List, cast
 
 from .solana_tx import SolTxReceipt, SolPubKey
-from .utils import get_from_dict
+from .utils import get_from_dict, cached_method
 from .solana_neon_tx_receipt import SolTxLogDecoder, SolIxLogState
-from .constants import ADDRESS_LOOKUP_TABLE_ID, COMPUTE_BUDGET_ID, SYS_PROGRAM_ID, METAPLEX_PROGRAM_ID, TOKEN_PROGRAM_ID
+from .constants import (
+    ADDRESS_LOOKUP_TABLE_ID, COMPUTE_BUDGET_ID, SYS_PROGRAM_ID, METAPLEX_PROGRAM_ID, TOKEN_PROGRAM_ID,
+    EVM_PROGRAM_ID
+)
 
 
 class SolTxError(BaseException):
-    def __init__(self, evm_program_id: SolPubKey, receipt: SolTxReceipt):
-        super().__init__(evm_program_id, receipt)
+    def __init__(self, receipt: SolTxReceipt):
+        super().__init__(receipt)
 
         self._receipt = receipt
-        self._evm_program_id = evm_program_id
 
         log_list = self._filter_raw_log_list(receipt)
         if len(log_list) == 0:
@@ -34,7 +36,8 @@ class SolTxError(BaseException):
         self._filter_log_msg_list(ix_log_state, log_msg_list)
         return log_msg_list
 
-    def _get_program_name(self, uid: SolPubKey) -> str:
+    @staticmethod
+    def _get_program_name(uid: SolPubKey) -> str:
         if uid == COMPUTE_BUDGET_ID:
             return 'ComputeBudget'
         elif uid == SYS_PROGRAM_ID:
@@ -45,7 +48,7 @@ class SolTxError(BaseException):
             return 'Metaplex'
         elif uid == TOKEN_PROGRAM_ID:
             return 'Token'
-        elif uid == self._evm_program_id:
+        elif uid == EVM_PROGRAM_ID:
             return 'NeonEVM'
         return str(uid)
 
@@ -78,7 +81,7 @@ class SolTxError(BaseException):
         level_msg = self._get_level_msg(level, self._LevelChangeType.Same, status)
 
         for log_msg in subrange_log_msg_list:
-            for prefix in ['Program log: ', 'Program failed to complete: ']:
+            for prefix in ('Program log: ', 'Program failed to complete: '):
                 if not log_msg.startswith(prefix):
                     continue
 
@@ -97,7 +100,7 @@ class SolTxError(BaseException):
         subrange_log_msg_list: List[str] = list()
         if ix_log_state.level > 0:
             level_msg = self._get_level_msg(ix_log_state.level - 1, self._LevelChangeType.Up, status.Success)
-            invoke_msg = f'{level_msg} {self._get_program_name(ix_log_state.program)}'
+            invoke_msg = f'{level_msg} {self._get_program_name(ix_log_state.program_key)}'
             log_msg_list.append(invoke_msg)
 
         for ix_log_rec in ix_log_state.log_list:
@@ -129,23 +132,23 @@ class SolTxError(BaseException):
 
 
 def get_log_list(receipt: SolTxReceipt) -> List[str]:
-    log_from_receipt = get_from_dict(receipt, 'result', 'meta', 'logMessages')
+    log_from_receipt = get_from_dict(receipt, ('result', 'meta', 'logMessages'), None)
     if log_from_receipt is not None:
         return log_from_receipt
 
-    log_from_receipt_result = get_from_dict(receipt, 'meta', 'logMessages')
+    log_from_receipt_result = get_from_dict(receipt, ('meta', 'logMessages'), None)
     if log_from_receipt_result is not None:
         return log_from_receipt_result
 
-    log_from_receipt_result_meta = get_from_dict(receipt, 'logMessages')
+    log_from_receipt_result_meta = get_from_dict(receipt, ('logMessages', ), None)
     if log_from_receipt_result_meta is not None:
         return log_from_receipt_result_meta
 
-    log_from_send_trx_error = get_from_dict(receipt, 'data', 'logs')
+    log_from_send_trx_error = get_from_dict(receipt, ('data', 'logs'), None)
     if log_from_send_trx_error is not None:
         return log_from_send_trx_error
 
-    log_from_prepared_receipt = get_from_dict(receipt, 'logs')
+    log_from_prepared_receipt = get_from_dict(receipt, ('logs', ), None)
     if log_from_prepared_receipt is not None:
         return log_from_prepared_receipt
 
@@ -157,15 +160,21 @@ class SolTxErrorParser:
     _simulation_failed_hdr = f'Transaction simulation failed: Error processing Instruction {_neon_evm_ix_idx}: '
 
     _computation_budget_exceeded_type = 'ComputationalBudgetExceeded'
-    _program_failed_to_complete_type = 'ProgramFailedToComplete'
 
     _invalid_ix_data_msg = _simulation_failed_hdr + 'invalid instruction data'
     _program_failed_msg = _simulation_failed_hdr + 'Program failed to complete'
     _alt_invalid_idx_msg = 'invalid transaction: Transaction address table lookup uses an invalid index'
     _already_process_msg = 'AlreadyProcessed'
 
+    _alt_already_exist_msg = [0, 'AccountAlreadyInitialized']
+    _alt_already_exist_log_msg = (
+        f'Program {ADDRESS_LOOKUP_TABLE_ID} failed: instruction requires an uninitialized account'
+    )
+
     _exceeded_cu_number_log = 'Program failed to complete: exceeded maximum number of instructions allowed'
-    _exceeded_cu_number_log_v2 = 'Program failed to complete: exceeded CUs meter at BPF instruction'
+    _exceeded_cu_number_re = re.compile(
+        r'Program (\w+) failed: exceeded CUs meter at BPF instruction #(\d+)$'
+    )
     _read_write_blocked_log = 'trying to execute transaction on rw locked account'
     _already_finalized_log = 'Program log: Storage Account is finalized'
 
@@ -191,7 +200,11 @@ class SolTxErrorParser:
         r'Program log: Invalid Nonce, origin \w+ nonce (\d+) != Transaction nonce (\d+)'
     )
 
-    def __init__(self, evm_program_id: SolPubKey, receipt: Union[SolTxReceipt, BaseException, str]):
+    _out_of_gas_re = re.compile(
+        r'Program log: Out of Gas, limit = (\d+), required = (\d+)'
+    )
+
+    def __init__(self, receipt: Union[SolTxReceipt, BaseException, str]):
         assert isinstance(receipt, dict) or isinstance(receipt, BaseException) or isinstance(receipt, str)
 
         if isinstance(receipt, SolTxError):
@@ -199,78 +212,59 @@ class SolTxErrorParser:
         else:
             self._receipt = receipt
 
-        self._evm_program_id = evm_program_id
-        self._log_list: Optional[List[str]] = None
-        self._evm_log_list: Optional[List[str]] = None
-
-        self._error: Union[str, list, None] = None
-        self._is_error_init = False
-
-        self._error_code_msg: Optional[Tuple[int, str]] = None
-        self._is_error_code_msg_init = False
-
-    def _get_value(self, *path) -> Any:
+    def _get_value(self, path: Tuple[Any, ...]) -> Any:
         if not self._receipt:
             return None
         if isinstance(self._receipt, BaseException):
             return None
 
-        return get_from_dict(self._receipt, *path)
+        return get_from_dict(self._receipt, path, None)
 
-    def _get_error_impl(self) -> Union[str, list, None]:
+    @cached_method
+    def _get_error(self) -> Union[str, list, None]:
         if not self._receipt:
             return None
         if isinstance(self._receipt, BaseException):
             return str(self._receipt)
 
-        err_from_receipt = self._get_value('result', 'meta', 'err', 'InstructionError')
+        err_from_receipt = self._get_value(('result', 'meta', 'err', 'InstructionError'))
         if err_from_receipt is not None:
             return err_from_receipt
 
-        err_from_receipt_result = self._get_value('meta', 'err', 'InstructionError')
+        err_from_receipt_result = self._get_value(('meta', 'err', 'InstructionError'))
         if err_from_receipt_result is not None:
             return err_from_receipt_result
 
-        err_from_send_trx_error = self._get_value('data', 'err', 'InstructionError')
+        err_from_send_trx_error = self._get_value(('data', 'err', 'InstructionError'))
         if err_from_send_trx_error is not None:
             return err_from_send_trx_error
 
-        err_from_send_trx_error = self._get_value('data', 'err')
+        err_from_send_trx_error = self._get_value(('data', 'err'))
         if err_from_send_trx_error is not None:
             return err_from_send_trx_error
 
-        err_from_prepared_receipt = self._get_value('err', 'InstructionError')
+        err_from_prepared_receipt = self._get_value(('err', 'InstructionError'))
         if err_from_prepared_receipt is not None:
             return err_from_prepared_receipt
 
         return None
 
-    def _get_error(self) -> Union[str, list, None]:
-        if not self._is_error_init:
-            self._is_error_init = True
-            self._error = self._get_error_impl()
-        return self._error
-
-    def _get_error_code_msg_impl(self) -> Optional[Tuple[int, str]]:
+    @cached_method
+    def _get_error_code_msg(self) -> Optional[Tuple[int, str]]:
         if not self._receipt:
             return None
         if isinstance(self._receipt, BaseException):
             return None
 
-        code = self._get_value('code')
-        msg = self._get_value('message')
+        code = self._get_value(('code', ))
+        msg = self._get_value(('message', ))
 
         if (code is None) or (msg is None):
             return None
         return code, msg
 
-    def _get_error_code_msg(self) -> Optional[Tuple[int, str]]:
-        if not self._is_error_code_msg_init:
-            self._is_error_code_msg_init = True
-            self._error_code_msg = self._get_error_code_msg_impl()
-        return self._error_code_msg
-
-    def _get_log_list_impl(self) -> List[str]:
+    @cached_method
+    def _get_log_list(self) -> List[str]:
         if not self._receipt:
             return list()
         if isinstance(self._receipt, BaseException):
@@ -278,13 +272,8 @@ class SolTxErrorParser:
 
         return get_log_list(self._receipt)
 
-    def _get_log_list(self) -> List[str]:
-        if self._log_list is None:
-            self._log_list = self._get_log_list_impl()
-
-        return self._log_list
-
-    def _get_evm_log_list_impl(self) -> List[str]:
+    @cached_method
+    def _get_evm_log_list(self) -> List[str]:
         log_list: List[str] = list()
         if not self._receipt:
             return log_list
@@ -294,23 +283,20 @@ class SolTxErrorParser:
         raw_log_msg_list = self._get_log_list()
         ix_log_state = SolTxLogDecoder().decode(raw_log_msg_list)
         for ix_log_msg in ix_log_state.inner_log_list:
-            if ix_log_msg.program != self._evm_program_id:
+            if ix_log_msg.program_key != EVM_PROGRAM_ID:
                 continue
             log_list.extend(ix_log_msg.iter_str_log_msg())
         return log_list
 
-    def _get_evm_log_list(self) -> List[str]:
-        if self._evm_log_list is None:
-            self._evm_log_list = self._get_evm_log_list_impl()
-
-        return self._evm_log_list
-
+    @cached_method
     def check_if_error(self) -> bool:
         return (self._get_error() is not None) or (self._get_error_code_msg() is not None)
 
+    @cached_method
     def check_if_invalid_ix_data(self) -> bool:
         return self._get_error_code_msg() == (-32002, self._invalid_ix_data_msg)
 
+    @cached_method
     def check_if_budget_exceeded(self) -> bool:
         error_type = self._get_error()
         if not error_type:
@@ -324,20 +310,18 @@ class SolTxErrorParser:
         if error_type == self._computation_budget_exceeded_type:
             return True
 
-        if error_type != self._program_failed_to_complete_type:
-            return False
-
         log_list = self._get_log_list()
         for log_rec in reversed(log_list):
             if log_rec.startswith(self._exceeded_cu_number_log):
                 return True
-            elif log_rec.startswith(self._exceeded_cu_number_log_v2):
+            elif self._exceeded_cu_number_re.match(log_rec) is not None:
                 return True
             elif log_rec == self._log_truncated_log:
                 return True
 
         return False
 
+    @cached_method
     def check_if_require_resize_iter(self) -> bool:
         if self._get_error_code_msg() != (-32002, self._program_failed_msg):
             return False
@@ -348,6 +332,7 @@ class SolTxErrorParser:
                 return True
         return False
 
+    @cached_method
     def check_if_account_already_exists(self) -> bool:
         evm_log_list = self._get_evm_log_list()
         for log_rec in evm_log_list:
@@ -361,6 +346,7 @@ class SolTxErrorParser:
 
         return False
 
+    @cached_method
     def check_if_already_finalized(self) -> bool:
         log_list = self._get_evm_log_list()
         for log_rec in log_list:
@@ -368,6 +354,7 @@ class SolTxErrorParser:
                 return True
         return False
 
+    @cached_method
     def check_if_accounts_blocked(self) -> bool:
         log_list = self._get_evm_log_list()
         for log_rec in log_list:
@@ -375,26 +362,34 @@ class SolTxErrorParser:
                 return True
         return False
 
+    @cached_method
     def check_if_block_hash_notfound(self) -> bool:
         if self._receipt is None:
             return True
         return self._get_error() == self._block_hash_notfound_err
 
+    @cached_method
     def check_if_alt_uses_invalid_index(self) -> bool:
         return self._get_error_code_msg() == (-32602, self._alt_invalid_idx_msg)
 
-    def check_if_already_processed(self) -> bool:
-        return self._get_value('data', 'err') == self._already_process_msg
-
-    def check_if_preprocessed_error(self) -> bool:
-        error_code_msg = self._get_error_code_msg()
-        if error_code_msg is None:
+    @cached_method
+    def check_if_alt_already_exists(self) -> bool:
+        if self._get_value(('meta', 'err', 'InstructionError')) != self._alt_already_exist_msg:
             return False
-        return error_code_msg[1].startswith(self._simulation_failed_hdr)
+        for log_msg in self._get_log_list():
+            if log_msg == self._alt_already_exist_log_msg:
+                return True
+        return False
 
+    @cached_method
+    def check_if_already_processed(self) -> bool:
+        return self._get_value(('data', 'err')) == self._already_process_msg
+
+    @cached_method
     def get_slots_behind(self) -> Optional[int]:
-        return self._get_value('data', self._numslots_behind_data)
+        return self._get_value(('data', self._numslots_behind_data))
 
+    @cached_method
     def get_nonce_error(self) -> Tuple[Optional[int], Optional[int]]:
         log_list = self._get_evm_log_list()
         for log_rec in log_list:
@@ -402,4 +397,14 @@ class SolTxErrorParser:
             if match is not None:
                 state_tx_cnt, tx_nonce = match[1], match[2]
                 return int(state_tx_cnt), int(tx_nonce)
+        return None, None
+
+    @cached_method
+    def get_out_of_gas_error(self) -> Tuple[Optional[int], Optional[int]]:
+        log_list = self._get_evm_log_list()
+        for log_rec in log_list:
+            match = self._out_of_gas_re.match(log_rec)
+            if match is not None:
+                has_gas_limit, req_gas_limit = match[1], match[2]
+                return int(has_gas_limit), int(req_gas_limit)
         return None, None

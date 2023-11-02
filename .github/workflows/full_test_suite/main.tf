@@ -1,4 +1,3 @@
-
 resource "hcloud_server" "proxy" {
   name        = "proxy-${var.run_number}-${var.branch}"
   image       = data.hcloud_image.ci-image.id

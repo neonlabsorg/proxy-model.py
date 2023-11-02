@@ -201,7 +201,7 @@ class MPGasPriceRequest(MPRequest):
 
 @dataclass
 class MPElfParamDictRequest(MPRequest):
-    elf_param_dict: Dict[str, str] = None
+    last_deployed_slot: int = 0
 
     def __post_init__(self):
         self.type = MPRequestType.GetElfParamDict
@@ -325,16 +325,21 @@ class MPGasPriceResult:
     gas_price_slippage: int
 
     suggested_gas_price: int
+    is_const_gas_price: bool
     min_acceptable_gas_price: int
     min_executable_gas_price: int
 
     min_wo_chainid_acceptable_gas_price: int
     allow_underpriced_tx_wo_chainid: bool
-    accept_reverted_tx_into_mempool: bool
-
     last_update_mapping_sec: int
     sol_price_account: SolPubKey
     neon_price_account: SolPubKey
+
+
+@dataclass(frozen=True)
+class MPElfParamDictResult:
+    last_deployed_slot: int
+    elf_param_dict: Dict[str, str]
 
 
 @dataclass(frozen=True)

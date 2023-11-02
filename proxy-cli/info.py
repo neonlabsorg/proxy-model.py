@@ -6,12 +6,13 @@ import json
 import base58
 from typing import Dict, Any, List
 
-from proxy.common_neon.address import NeonAddress, account_with_seed, perm_account_seed
+from proxy.common_neon.address import NeonAddress
 from proxy.common_neon.solana_interactor import SolInteractor
 from proxy.common_neon.operator_resource_info import OpResInfo, OpResIdent
-from proxy.common_neon.solana_tx import SolAccount, SolPubKey
+from proxy.common_neon.solana_tx import SolAccount
 from proxy.common_neon.config import Config
 from proxy.common_neon.constants import HOLDER_TAG, EMPTY_HOLDER_TAG, ACTIVE_HOLDER_TAG, FINALIZED_HOLDER_TAG
+from proxy.neon_core_api.neon_cli import NeonCli
 
 from .secret import get_res_ident_list, get_solana_acct_list
 
@@ -26,7 +27,8 @@ class DecimalEncoder(json.JSONEncoder):
 class InfoHandler:
     def __init__(self):
         self._config = Config()
-        self._solana = SolInteractor(self._config, self._config.solana_url)
+        self._solana = SolInteractor(self._config)
+        self._neon_cli = NeonCli(self._config, False)
         self.command = 'info'
 
     @staticmethod
@@ -168,15 +170,8 @@ class InfoHandler:
 
         return ret_js
 
-    def _generate_holder_address(self, base_address: SolPubKey, rid: int) -> SolPubKey:
-        return self._generate_resource_address(base_address, b'holder-', rid)
-
-    def _generate_resource_address(self, base_address: SolPubKey, prefix: bytes, rid: int) -> SolPubKey:
-        seed = perm_account_seed(prefix, rid)
-        return account_with_seed(self._config.evm_program_id, base_address, seed)
-
     def _get_neon_balance(self, neon_address: NeonAddress) -> Decimal:
-        neon_layout = self._solana.get_neon_account_info(neon_address)
+        neon_layout = self._neon_cli.get_neon_account_info(neon_address)
         return Decimal(neon_layout.balance) / 1_000_000_000 / 1_000_000_000 if neon_layout else 0
 
     def _get_solana_account_info(self, sol_acct: SolAccount, op_res_ident_list: List[OpResIdent]) -> Dict[str, Any]:

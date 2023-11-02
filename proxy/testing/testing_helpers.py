@@ -14,6 +14,7 @@ from typing import Type, Dict, Union, Optional
 
 from proxy.common_neon.web3 import NeonWeb3
 from proxy.common_neon.config import Config
+from proxy.common_neon.constants import MIN_FINALIZE_SEC
 from proxy.common_neon.solana_interactor import SolInteractor
 from proxy.common_neon.solana_tx import SolTx, SolAccount, SolSig, SolPubKey, SolCommit
 
@@ -162,7 +163,7 @@ class Proxy:
 
 class SolClient(SolInteractor):
     def __init__(self, config: Config):
-        super().__init__(config, config.solana_url)
+        super().__init__(config)
 
     def send_tx(self, tx: SolTx, signer: SolAccount, skip_preflight=False) -> Optional[SolSig]:
         recent_resp = self.get_recent_block_hash(SolCommit.Finalized)
@@ -179,7 +180,7 @@ class SolClient(SolInteractor):
         tx_sig = sent_resp.result
         print(f'-> success send solana tx {tx.name}: {tx_sig}')
 
-        confirm_timeout_sec = 32 * 0.4
+        confirm_timeout_sec = MIN_FINALIZE_SEC
         self.check_confirm_of_tx_sig_list([tx_sig], SolCommit.Confirmed, confirm_timeout_sec)
 
         tx_receipt = self.get_tx_receipt_list([tx_sig], SolCommit.Confirmed)

@@ -4,11 +4,12 @@ import logging
 from typing import Optional, List, Generator, cast
 
 from ..common_neon.elf_params import ElfParams
-from ..common_neon.solana_neon_tx_receipt import SolTxReceiptInfo, SolNeonIxReceiptInfo
+from ..common_neon.solana_neon_tx_receipt import SolNeonTxReceiptInfo, SolNeonIxReceiptInfo
 from ..common_neon.solana_tx import SolTx, SolTxIx
 from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_tx_list_sender import SolTxListSender, SolTxSendState
-from ..common_neon.utils import NeonTxResultInfo
+from ..common_neon.neon_tx_result_info import NeonTxResultInfo
+from ..common_neon.utils import cached_property
 
 from ..mempool.neon_tx_sender_ctx import NeonTxSendCtx
 
@@ -45,7 +46,6 @@ class BaseNeonTxStrategy(abc.ABC):
         self._prep_stage_list: List[BaseNeonTxPrepStage] = list()
         self._ctx = ctx
         self._evm_step_cnt = ElfParams().neon_evm_steps
-        self.__sol_tx_list_sender: Optional[SolTxListSender] = None
 
     @property
     def ctx(self) -> NeonTxSendCtx:
@@ -96,8 +96,8 @@ class BaseNeonTxStrategy(abc.ABC):
         for stage in self._prep_stage_list:
             stage.update_after_emulate()
 
-    def has_completed_receipt(self) -> bool:
-        return self._sol_tx_list_sender.has_completed_receipt()
+    def has_good_sol_tx_receipt(self) -> bool:
+        return self._sol_tx_list_sender.has_good_sol_tx_receipt()
 
     @abc.abstractmethod
     def execute(self) -> NeonTxResultInfo:
@@ -170,11 +170,9 @@ class BaseNeonTxStrategy(abc.ABC):
         tx_list_sender = self._sol_tx_list_sender
         self._ctx.add_sol_tx_list([tx_state.tx for tx_state in tx_list_sender.tx_state_list])
 
-    @property
+    @cached_property
     def _sol_tx_list_sender(self) -> SolTxListSender:
-        if self.__sol_tx_list_sender is None:
-            self.__sol_tx_list_sender = SolTxListSender(self._ctx.config, self._ctx.solana, self._ctx.signer)
-        return self.__sol_tx_list_sender
+        return SolTxListSender(self._ctx.config, self._ctx.solana, self._ctx.signer)
 
     def _build_cu_tx(self, ix: SolTxIx, name: str = '') -> SolLegacyTx:
         if len(name) == 0:
@@ -189,10 +187,11 @@ class BaseNeonTxStrategy(abc.ABC):
             ]
         )
 
-    def _find_sol_neon_ix(self, tx_send_state: SolTxSendState) -> Optional[SolNeonIxReceiptInfo]:
+    @staticmethod
+    def _find_sol_neon_ix(tx_send_state: SolTxSendState) -> Optional[SolNeonIxReceiptInfo]:
         block_slot = tx_send_state.receipt['slot']
-        tx_receipt_info = SolTxReceiptInfo.from_tx_receipt(block_slot, tx_send_state.receipt)
-        for sol_neon_ix in tx_receipt_info.iter_sol_ix(self._ctx.config.evm_program_id):
+        sol_neon_tx = SolNeonTxReceiptInfo.from_tx_receipt(block_slot, tx_send_state.receipt)
+        for sol_neon_ix in sol_neon_tx.iter_sol_neon_ix():
             return sol_neon_ix
         return None
 

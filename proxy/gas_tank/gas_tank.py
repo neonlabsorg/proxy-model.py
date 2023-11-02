@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import time
+
 from typing import Dict, Any, Union, List, Tuple
 
 from .gas_less_accounts_db import GasLessAccountsDB
@@ -11,30 +13,38 @@ from ..common_neon.address import NeonAddress
 from ..common_neon.config import Config
 from ..common_neon.neon_instruction import EvmIxCode
 from ..common_neon.db.db_connect import DBConnection
-from ..common_neon.db.sql_dict import SQLDict
+from ..common_neon.db.constats_db import ConstantsDB
 from ..common_neon.metrics_logger import MetricsLogger
+from ..common_neon.solana_not_empty_block import SolFirstBlockFinder
 from ..common_neon.solana_interactor import SolInteractor
-from ..common_neon.solana_neon_tx_receipt import SolTxReceiptInfo, SolNeonIxReceiptInfo
+from ..common_neon.solana_neon_tx_receipt import SolNeonTxReceiptInfo, SolNeonIxReceiptInfo
 from ..common_neon.utils.json_logger import logging_context
 from ..common_neon.utils.neon_tx_info import NeonTxInfo
+from ..common_neon.utils.utils import get_from_dict
 
 from ..indexer.indexed_objects import NeonIndexedHolderInfo
-from ..indexer.indexer_base import IndexerBase
+from ..indexer.indexer_utils import get_config_start_slot
 
 LOG = logging.getLogger(__name__)
 
 
-class GasTank(IndexerBase):
+class GasTank:
     def __init__(self, config: Config):
-        self._db = DBConnection(config)
-        self._constant_db = SQLDict(self._db, table_name='constants')
+        self._db_conn = DBConnection(config)
+        self._constant_db = ConstantsDB(self._db_conn)
 
-        self._gas_less_account_db = GasLessAccountsDB(self._db)
+        self._gas_less_account_db = GasLessAccountsDB(self._db_conn)
         self._gas_less_account_dict: Dict[str, GasLessPermit] = dict()
 
-        solana = SolInteractor(config, config.solana_url)
+        self._solana = SolInteractor(config)
+        self._config = config
+
+        block_finder = SolFirstBlockFinder(self._solana)
+        first_slot = block_finder.find_slot()
+        finalized_slot = block_finder.finalized_slot
         last_known_slot = self._constant_db.get('latest_gas_tank_slot', None)
-        super().__init__(config, solana, last_known_slot)
+
+        self._start_slot = get_config_start_slot(config, first_slot, finalized_slot, last_known_slot)
         self._last_block_slot = self._start_slot
         self._latest_gas_tank_slot = self._start_slot
         self._current_slot = 0
@@ -43,12 +53,12 @@ class GasTank(IndexerBase):
 
         sol_tx_meta_dict = SolTxMetaDict()
         self._sol_tx_collector = FinalizedSolTxMetaCollector(
-            self._db, config, self._solana, sol_tx_meta_dict, self._start_slot
+            self._db_conn, config, self._solana, sol_tx_meta_dict, self._start_slot
         )
 
         self._neon_holder_dict: Dict[str, NeonIndexedHolderInfo] = dict()
         self._neon_processed_tx_dict: Dict[str, GasTankTxInfo] = dict()
-        self._last_finalized_slot: int = 0
+        self._last_finalized_slot = 0
 
         self._neon_tx_analyzer_dict: Dict[Union[NeonAddress, bool], GasTankNeonTxAnalyzer] = dict()
         self._sol_tx_analyzer_dict: Dict[str, GasTankSolTxAnalyzer] = dict()
@@ -229,11 +239,11 @@ class GasTank(IndexerBase):
     # but does not process events generated from the Solidity contract.
     def _process_neon_ix(self, tx: Dict[str, Any]):
         block_slot = tx['slot']
-        tx_receipt_info = SolTxReceiptInfo.from_tx_receipt(block_slot, tx)
 
-        self._process_finalized_tx_list(tx_receipt_info.block_slot)
+        self._process_finalized_tx_list(block_slot)
 
-        for sol_neon_ix in tx_receipt_info.iter_sol_ix(self._config.evm_program_id):
+        sol_neon_tx = SolNeonTxReceiptInfo.from_tx_receipt(block_slot, tx)
+        for sol_neon_ix in sol_neon_tx.iter_sol_neon_ix():
             ix_code = sol_neon_ix.ix_data[0]
             LOG.debug(f'instruction: {ix_code} {sol_neon_ix.neon_tx_sig}')
             if ix_code == EvmIxCode.HolderWrite:
@@ -270,12 +280,15 @@ class GasTank(IndexerBase):
         if len(self._gas_less_account_dict) > 1000:
             self._save_cached_data()
 
-    def process_functions(self) -> None:
-        """
-        Overrides IndexerBase.process_functions
-        """
-        super().process_functions()
-        self._process_receipts()
+    def run(self):
+        check_sec = float(self._config.indexer_check_msec) / 1000
+        while True:
+            try:
+                self._process_receipts()
+            except BaseException as exc:
+                LOG.warning('Exception on receipts processing.', exc_info=exc)
+
+            time.sleep(check_sec)
 
     def _process_sol_tx(self, tx: Dict[str, Any]) -> bool:
         for sol_analyzer in self._sol_tx_analyzer_dict.values():
@@ -321,18 +334,7 @@ class GasTank(IndexerBase):
 
     @staticmethod
     def _check_error(tx: Dict[str, Any]) -> bool:
-        if 'meta' not in tx:
-            return False
-
-        meta = tx['meta']
-        if 'err' not in meta:
-            return False
-
-        err = meta['err']
-        if err is None:
-            return False
-
-        return True
+        return get_from_dict(tx, ('meta', 'err'), None) is not None
 
     def _clear_old_data(self) -> None:
         self._latest_gas_tank_slot = self._sol_tx_collector.last_block_slot
@@ -363,7 +365,7 @@ class GasTank(IndexerBase):
         if not len(self._gas_less_account_dict):
             return
 
-        self._db.run_tx(
+        self._db_conn.run_tx(
             lambda: self._gas_less_account_db.add_gas_less_permit_list(iter(self._gas_less_account_dict.values()))
         )
         self._gas_less_account_dict.clear()

@@ -3,32 +3,25 @@ from __future__ import annotations
 from typing import List, Set
 from dataclasses import dataclass
 
+from .utils.utils import cached_method, cached_property
 from .config import Config
 from .solana_tx import SolAccount, SolPubKey
-from .address import NeonAddress, perm_account_seed, account_with_seed
+from .address import NeonAddress, perm_account_seed, neon_account_with_seed
 
 
 @dataclass(frozen=True)
 class OpResIdent:
-    evm_program_id: SolPubKey
     public_key: str
     private_key: bytes
     res_id: int = -1
 
-    _str = ''
-    _hash = 0
-
+    @cached_method
     def __str__(self) -> str:
-        if self._str == '':
-            _str = f'{self.public_key}:{self.res_id}'
-            object.__setattr__(self, '_str', _str)
-        return self._str
+        return f'{self.public_key}:{self.res_id}'
 
+    @cached_method
     def __hash__(self) -> int:
-        if self._hash == 0:
-            _hash = hash(str(self))
-            object.__setattr__(self, '_hash', _hash)
-        return self._hash
+        return hash(str(self))
 
     def __eq__(self, other) -> bool:
         return (
@@ -54,7 +47,7 @@ class OpResInfo:
         assert ident.public_key == str(signer.pubkey())
 
         holder_seed = perm_account_seed(b'holder-', ident.res_id)
-        holder_acct = account_with_seed(ident.evm_program_id, signer.pubkey(), holder_seed)
+        holder_acct = neon_account_with_seed(signer.pubkey(), holder_seed)
         neon_address = NeonAddress.from_private_key(signer.secret())
 
         return OpResInfo(
@@ -68,11 +61,11 @@ class OpResInfo:
     def __str__(self) -> str:
         return str(self.ident)
 
-    @property
+    @cached_property
     def public_key(self) -> SolPubKey:
         return self.signer.pubkey()
 
-    @property
+    @cached_property
     def secret_key(self) -> bytes:
         return self.signer.secret()
 
@@ -89,7 +82,6 @@ class OpResIdentListBuilder:
             for ident in secret_list:
                 sol_account = SolAccount.from_seed(ident)
                 ident = OpResIdent(
-                    self._config.evm_program_id,
                     public_key=str(sol_account.pubkey()),
                     private_key=sol_account.secret(),
                     res_id=res_id

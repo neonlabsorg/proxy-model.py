@@ -3,7 +3,7 @@ import logging
 from typing import Dict, List, Union
 
 from ..common_neon.config import Config
-from ..common_neon.data import NeonAccountDict, NeonEmulatedResult
+from ..common_neon.data import NeonEmulatorResult
 from ..common_neon.neon_instruction import NeonIxBuilder
 from ..common_neon.operator_resource_info import OpResInfo
 from ..common_neon.solana_alt import ALTAddress
@@ -12,6 +12,8 @@ from ..common_neon.solana_tx import SolTx, SolPubKey, SolAccountMeta, SolAccount
 from ..common_neon.utils.neon_tx_info import NeonTxInfo
 from ..common_neon.utils.eth_proto import NeonTx
 
+from ..neon_core_api.neon_core_api_client import NeonCoreApiClient
+
 from .mempool_api import MPTxExecRequest
 
 
@@ -19,14 +21,20 @@ LOG = logging.getLogger(__name__)
 
 
 class NeonTxSendCtx:
-    def __init__(self, config: Config, solana: SolInteractor, resource: OpResInfo, mp_tx_req: MPTxExecRequest):
+    def __init__(
+        self, config: Config,
+        solana: SolInteractor,
+        core_api_client: NeonCoreApiClient,
+        mp_tx_req: MPTxExecRequest
+    ):
         self._config = config
         self._mp_tx_req = mp_tx_req
         self._neon_tx_exec_cfg = mp_tx_req.neon_tx_exec_cfg
         self._solana = solana
-        self._resource = resource
+        self._core_api_client = core_api_client
+        self._resource = OpResInfo.from_ident(mp_tx_req.res_ident)
 
-        self._ix_builder = NeonIxBuilder(config, resource.public_key)
+        self._ix_builder = NeonIxBuilder(self._resource.public_key)
         self._ix_builder.init_operator_neon(self._resource.neon_address)
         self._ix_builder.init_iterative(self.holder_account)
         if not mp_tx_req.is_stuck_tx():
@@ -36,7 +44,7 @@ class NeonTxSendCtx:
 
         self._neon_meta_dict: Dict[SolPubKey, SolAccountMeta] = dict()
         if not mp_tx_req.is_stuck_tx():
-            self._build_account_list(self._neon_tx_exec_cfg.account_dict)
+            self._build_account_list()
 
     def _add_meta(self, pubkey: Union[str, SolPubKey], is_writable: bool) -> None:
         if isinstance(pubkey, str):
@@ -46,14 +54,14 @@ class NeonTxSendCtx:
             is_writable |= meta.is_writable
         self._neon_meta_dict[pubkey] = SolAccountMeta(pubkey=pubkey, is_signer=False, is_writable=is_writable)
 
-    def _build_account_list(self, emulated_account_dict: NeonAccountDict) -> None:
+    def _build_account_list(self) -> None:
         self._neon_meta_dict.clear()
 
         # Parse information from the emulator output
-        for account_desc in emulated_account_dict['accounts']:
+        for account_desc in self._neon_tx_exec_cfg.emulator_result.account_list:
             self._add_meta(account_desc['account'], True)
 
-        for account_desc in emulated_account_dict['solana_accounts']:
+        for account_desc in self._neon_tx_exec_cfg.emulator_result.solana_account_list:
             self._add_meta(account_desc['pubkey'], account_desc['is_writable'])
 
         neon_meta_list = list(self._neon_meta_dict.values())
@@ -72,9 +80,16 @@ class NeonTxSendCtx:
     def len_account_list(self) -> int:
         return len(self._neon_meta_dict)
 
-    def set_emulated_result(self, emulated_result: NeonEmulatedResult) -> None:
-        self._neon_tx_exec_cfg.set_emulated_result(emulated_result)
-        self._build_account_list(self._neon_tx_exec_cfg.account_dict)
+    def has_emulator_result(self) -> bool:
+        return not self._neon_tx_exec_cfg.emulator_result.is_empty()
+
+    def emulate(self) -> None:
+        emulator_result = self._core_api_client.emulate_neon_tx(self.neon_tx)
+        self.set_emulator_result(emulator_result)
+
+    def set_emulator_result(self, emulator_result: NeonEmulatorResult) -> None:
+        self._neon_tx_exec_cfg.set_emulator_result(emulator_result)
+        self._build_account_list()
 
     def set_state_tx_cnt(self, value: int) -> None:
         self._neon_tx_exec_cfg.set_state_tx_cnt(value)
@@ -114,14 +129,20 @@ class NeonTxSendCtx:
         return self._solana
 
     @property
+    def core_api_client(self) -> NeonCoreApiClient:
+        return self._core_api_client
+
+    @property
     def resize_iter_cnt(self) -> int:
-        assert self._neon_tx_exec_cfg.resize_iter_cnt >= 0
-        return self._neon_tx_exec_cfg.resize_iter_cnt
+        resize_iter_cnt = self._neon_tx_exec_cfg.emulator_result.resize_iter_cnt
+        assert resize_iter_cnt >= 0
+        return resize_iter_cnt
 
     @property
     def emulated_evm_step_cnt(self) -> int:
-        assert self._neon_tx_exec_cfg.evm_step_cnt >= 0
-        return self._neon_tx_exec_cfg.evm_step_cnt
+        evm_step_cnt = self._neon_tx_exec_cfg.emulator_result.evm_step_cnt
+        assert evm_step_cnt >= 0
+        return evm_step_cnt
 
     @property
     def state_tx_cnt(self) -> int:
@@ -146,11 +167,11 @@ class NeonTxSendCtx:
     def sol_tx_cnt(self) -> int:
         return self._neon_tx_exec_cfg.sol_tx_cnt
 
-    def has_completed_receipt(self) -> bool:
+    def has_good_sol_tx_receipt(self) -> bool:
         return self._neon_tx_exec_cfg.has_completed_receipt()
 
-    def set_completed_receipt(self, value: bool) -> None:
-        self._neon_tx_exec_cfg.set_completed_receipt(value)
+    def mark_good_sol_tx_receipt(self) -> None:
+        self._neon_tx_exec_cfg.mark_good_sol_tx_receipt()
 
     def mark_resource_use(self) -> None:
         if self._neon_tx_exec_cfg.holder_account is None:

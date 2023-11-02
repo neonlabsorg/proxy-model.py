@@ -6,7 +6,7 @@ from .mempool_executor_task_base import MPExecutorBaseTask
 
 from ..common_neon.address import neon_2program
 from ..common_neon.config import Config
-from ..common_neon.constants import ACTIVE_HOLDER_TAG, FINALIZED_HOLDER_TAG, HOLDER_TAG
+from ..common_neon.constants import ACTIVE_HOLDER_TAG, FINALIZED_HOLDER_TAG, HOLDER_TAG, EVM_PROGRAM_ID
 from ..common_neon.elf_params import ElfParams
 from ..common_neon.errors import BadResourceError, RescheduleError, StuckTxError
 from ..common_neon.neon_instruction import NeonIxBuilder
@@ -22,7 +22,6 @@ from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_tx_list_sender import SolTxListSender
 
 from ..statistic.data import NeonOpResListData
-from ..statistic.proxy_client import ProxyStatClient
 
 
 LOG = logging.getLogger(__name__)
@@ -39,7 +38,7 @@ class OpResInit:
         try:
             self._validate_operator_balance(resource)
 
-            builder = NeonIxBuilder(self._config, resource.public_key)
+            builder = NeonIxBuilder(resource.public_key)
             self._create_holder_account(builder, resource)
             self._create_neon_account(builder, resource)
         except (RescheduleError, StuckTxError):
@@ -74,7 +73,7 @@ class OpResInit:
         tx_sender.send([stage.tx])
 
     def _create_neon_account(self, builder: NeonIxBuilder, resource: OpResInfo):
-        solana_address = neon_2program(builder.evm_program_id, resource.neon_address)[0]
+        solana_address = neon_2program(resource.neon_address)[0]
 
         account_info = self._solana.get_account_info(solana_address)
         if account_info is not None:
@@ -82,25 +81,29 @@ class OpResInit:
             return
 
         LOG.debug(f'Create neon account {str(solana_address)}({str(resource.neon_address)}) for resource {resource}')
-        stage = NeonCreateAccountTxStage(builder, {'address': resource.neon_address})
-        stage.set_balance(self._solana.get_multiple_rent_exempt_balances_for_size([stage.size])[0])
+        stage = NeonCreateAccountTxStage(builder, resource.neon_address)
         self._execute_stage(stage, resource)
 
     def _create_holder_account(self, builder: NeonIxBuilder, resource: OpResInfo) -> None:
         holder_address = str(resource.holder_account)
         holder_info = self._solana.get_holder_account_info(resource.holder_account)
         size = self._config.holder_size
-        balance = self._solana.get_multiple_rent_exempt_balances_for_size([size])[0]
+        balance = self._solana.get_rent_exempt_balance_for_size(size)
 
         if holder_info is None:
             LOG.debug(f'Create account {holder_address} for resource {resource}')
-            self._execute_stage(NeonCreateHolderAccountStage(builder, resource.holder_seed, size, balance), resource)
+            stage = NeonCreateHolderAccountStage(builder, resource.holder_account, resource.holder_seed, size, balance)
+            self._execute_stage(stage, resource)
 
-        elif holder_info.lamports < balance:
-            LOG.debug(f'Resize account {holder_address} for resource {resource}')
+        elif (holder_info.lamports < balance) or (holder_info.data_size != size):
+            LOG.debug(
+                f'Resize account {holder_address} '
+                f'(balance: {holder_info.lamports}, size: {holder_info.data_size}) '
+                f'for resource {resource}'
+            )
             self._recreate_holder(builder, resource, balance)
 
-        elif holder_info.owner != self._config.evm_program_id:
+        elif holder_info.owner != EVM_PROGRAM_ID:
             raise BadResourceError(f'Wrong owner of {str(holder_info.owner)} for resource {resource}')
 
         elif holder_info.tag == ACTIVE_HOLDER_TAG:
@@ -115,15 +118,13 @@ class OpResInit:
 
     def _recreate_holder(self, builder: NeonIxBuilder, resource: OpResInfo, balance: int) -> None:
         size = self._config.holder_size
-        self._execute_stage(NeonDeleteHolderAccountStage(builder, resource.holder_seed), resource)
-        self._execute_stage(NeonCreateHolderAccountStage(builder, resource.holder_seed, size, balance), resource)
+        del_stage = NeonDeleteHolderAccountStage(builder, resource.holder_account)
+        new_stage = NeonCreateHolderAccountStage(builder, resource.holder_account, resource.holder_seed, size, balance)
+        self._execute_stage(del_stage, resource)
+        self._execute_stage(new_stage, resource)
 
 
 class MPExecutorOpResTask(MPExecutorBaseTask):
-    def __init__(self, config: Config, solana: SolInteractor, stat_client: ProxyStatClient):
-        super().__init__(config, solana)
-        self._stat_client = stat_client
-
     def get_op_res_list(self) -> MPOpResGetListResult:
         try:
             secret_list = OpSecretMng(self._config).read_secret_list()

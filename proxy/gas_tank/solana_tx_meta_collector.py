@@ -6,6 +6,7 @@ from multiprocessing.dummy import Pool as ThreadPool
 from typing import Optional, Dict, Iterator, List, Any
 
 from ..common_neon.config import Config
+from ..common_neon.constants import EVM_PROGRAM_ID
 from ..common_neon.solana_tx import SolCommit
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_neon_tx_receipt import SolTxMetaInfo, SolTxSigSlotInfo
@@ -30,8 +31,8 @@ class SolTxMetaDict:
             raise SolHistoryNotFound(f'Solana receipt {sig_slot} not found')
 
         block_slot = tx_receipt['slot']
-        sol_sig = tx_receipt['transaction']['signatures'][0]
         if block_slot != sig_slot.block_slot:
+            sol_sig = tx_receipt['transaction']['signatures'][0]
             raise SolHistoryNotFound(f'Solana receipt {sig_slot} on another history branch: {sol_sig}:{block_slot}')
         self._tx_meta_dict[sig_slot] = SolTxMetaInfo.from_tx_receipt(block_slot, tx_receipt)
 
@@ -62,7 +63,7 @@ class SolTxMetaCollector(ABC):
         self._thread_pool = ThreadPool(config.gas_tank_parallel_request_cnt)
 
     @property
-    def commitment(self) -> str:
+    def commitment(self) -> SolCommit.Type:
         return self._commitment
 
     @property
@@ -98,7 +99,7 @@ class SolTxMetaCollector(ABC):
         response_list_len = 1
         while response_list_len:
             response_list = self._solana.get_sig_list_for_address(
-                self._config.evm_program_id,
+                EVM_PROGRAM_ID,
                 start_sig, self._config.gas_tank_poll_tx_cnt, self._commitment
             )
             response_list_len = len(response_list)
@@ -117,11 +118,11 @@ class SolTxMetaCollector(ABC):
 
 
 class FinalizedSolTxMetaCollector(SolTxMetaCollector):
-    def __init__(self, db: DBConnection, config: Config, solana: SolInteractor,
+    def __init__(self, db_conn: DBConnection, config: Config, solana: SolInteractor,
                  tx_meta_dict: SolTxMetaDict, stop_slot: int):
         super().__init__(config, solana, tx_meta_dict, commitment=SolCommit.Finalized, is_finalized=True)
         LOG.debug(f'Finalized commitment: {self._commitment}')
-        self._sigs_db = SolSigsDB(db)
+        self._sigs_db = SolSigsDB(db_conn)
         self._stop_slot = stop_slot
         self._sig_cnt = 0
         self._last_info: Optional[SolTxSigSlotInfo] = None

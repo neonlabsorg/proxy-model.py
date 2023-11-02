@@ -105,7 +105,6 @@ class ALTNeonTxPrepStage(BaseNeonTxPrepStage):
 
         if self._actual_alt_info is not None:
             self._ctx.add_alt_address(self._actual_alt_info.alt_address)
-            self._actual_alt_info = None
 
         return self._alt_builder.build_prep_alt_list(self._alt_tx_set)
 

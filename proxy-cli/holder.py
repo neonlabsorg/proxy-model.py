@@ -18,7 +18,7 @@ from .secret import get_res_ident_list
 class HolderHandler:
     def __init__(self):
         self._config = Config()
-        self._solana = SolInteractor(self._config, self._config.solana_url)
+        self._solana = SolInteractor(self._config)
         self.command = 'holder-account'
 
     @staticmethod
@@ -56,9 +56,9 @@ class HolderHandler:
             return
 
         size = self._config.holder_size
-        balance = self._solana.get_multiple_rent_exempt_balances_for_size([size])[0]
-        builder = NeonIxBuilder(self._config, res_info.public_key)
-        stage = NeonCreateHolderAccountStage(builder, res_info.holder_seed, size, balance)
+        balance = self._solana.get_rent_exempt_balance_for_size(size)
+        builder = NeonIxBuilder(res_info.public_key)
+        stage = NeonCreateHolderAccountStage(builder, res_info.holder_account, res_info.holder_seed, size, balance)
         self._execute_stage(stage, res_info)
         print(
             f'Holder account {str(res_info.holder_account)} '
@@ -82,8 +82,8 @@ class HolderHandler:
             return
 
         res_info = OpResInfo.from_ident(res_ident)
-        builder = NeonIxBuilder(self._config, res_info.public_key)
-        stage = NeonDeleteHolderAccountStage(builder, res_info.holder_seed)
+        builder = NeonIxBuilder(res_info.public_key)
+        stage = NeonDeleteHolderAccountStage(builder, res_info.holder_account)
         self._execute_stage(stage, res_info)
         print(
             f'Holder account {str(res_info.holder_account)} '

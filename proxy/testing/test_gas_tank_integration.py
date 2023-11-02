@@ -15,12 +15,12 @@ import spl.token.instructions as SplTokenInstrutions
 
 from proxy.common_neon.metaplex import create_metadata_instruction_data, create_metadata_instruction
 from proxy.common_neon.solana_tx import SolAccountMeta, SolTxIx, SolAccount, SolPubKey
-from proxy.common_neon.neon_instruction import create_account_layout
+from proxy.common_neon.neon_instruction import create_account_layout, NeonIxBuilder
 from proxy.common_neon.erc20_wrapper import ERC20Wrapper
 from proxy.common_neon.config import Config
 from proxy.common_neon.elf_params import ElfParams
 from proxy.common_neon.address import neon_2program
-from proxy.common_neon.constants import COMPUTE_BUDGET_ID
+from proxy.common_neon.constants import COMPUTE_BUDGET_ID, EVM_PROGRAM_ID
 from proxy.common_neon.solana_tx_legacy import SolLegacyTx
 
 from proxy.testing.testing_helpers import Proxy, SolClient, NeonLocalAccount
@@ -56,11 +56,11 @@ class TestGasTankIntegration(TestCase):
         cls.create_token_mint()
         cls.deploy_erc20_for_spl()
         cls.acc_num = 0
-        cls.elf_params = ElfParams()
+        cls.neon_ix_builder = NeonIxBuilder(cls.mint_authority)
 
     @classmethod
     def create_token_mint(cls):
-        sol_client = RPCSolClient(Config().solana_url, commitment=RPCSolConfirmed)
+        sol_client = RPCSolClient(Config().random_solana_url, commitment=RPCSolConfirmed)
 
         with open("proxy/operator-keypairs/id2.json") as f:
             d = json.load(f)
@@ -105,7 +105,6 @@ class TestGasTankIntegration(TestCase):
     @classmethod
     def deploy_erc20_for_spl(cls):
         cls.erc20_for_spl = ERC20Wrapper(
-            cls.config,
             cls.proxy.web3,
             NAME,
             SYMBOL,
@@ -117,9 +116,9 @@ class TestGasTankIntegration(TestCase):
 
     @classmethod
     def create_account_instruction(cls, neon_address: str, payer: SolPubKey):
-        dest_address_solana, nonce = neon_2program(cls.config.evm_program_id, neon_address)
+        dest_address_solana, nonce = neon_2program(neon_address)
         return SolTxIx(
-            program_id=cls.config.evm_program_id,
+            program_id=EVM_PROGRAM_ID,
             data=create_account_layout(bytes.fromhex(neon_address[2:])),
             accounts=[
                 SolAccountMeta(pubkey=payer, is_signer=True, is_writable=True),
@@ -150,22 +149,14 @@ class TestGasTankIntegration(TestCase):
         return SolLegacyTx(
             name=name,
             ix_list=[
-                SolTxIx(
-                    program_id=COMPUTE_BUDGET_ID,
-                    accounts=[],
-                    data=bytes.fromhex("01") + self.elf_params.neon_heap_frame.to_bytes(4, "little")
-                ),
-                SolTxIx(
-                    program_id=COMPUTE_BUDGET_ID,
-                    accounts=[],
-                    data=bytes.fromhex("02") + self.elf_params.neon_compute_units.to_bytes(4, "little")
-                ),
+                self.neon_ix_builder.make_compute_budget_heap_ix(),
+                self.neon_ix_builder.make_compute_budget_cu_ix()
             ] + ix_list
         )
 
     def neon_gas_price_impl(self, param: Dict[str, Any]) -> int:
         gas_price = self.proxy.web3.neon.neon_gasPrice(param)
-        return int(gas_price[2:], 16)
+        return int(gas_price.gas_price[2:], 16)
 
     def neon_gas_price(self, account: str) -> int:
         gas = 1_000_000
