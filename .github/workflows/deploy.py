@@ -40,17 +40,18 @@ ERR_MSG_TPL = {
 DOCKER_USERNAME = os.environ.get("DOCKER_USERNAME")
 DOCKER_PASSWORD = os.environ.get("DOCKER_PASSWORD")
 
-TFSTATE_BUCKET = "nl-ci-stands"
-TFSTATE_KEY_PREFIX = "tests/test-"
-TFSTATE_REGION = "us-east-2"
-IMAGE_NAME = "neonlabsorg/proxy"
+TFSTATE_BUCKET = os.environ.get("TFSTATE_BUCKET")
+TFSTATE_KEY_PREFIX = os.environ.get("TFSTATE_KEY_PREFIX")
+TFSTATE_REGION = os.environ.get("TFSTATE_REGION")
+IMAGE_NAME = os.environ.get("IMAGE_NAME")
 
-UNISWAP_V2_CORE_COMMIT = 'latest'
-UNISWAP_V2_CORE_IMAGE = f'neonlabsorg/uniswap-v2-core:{UNISWAP_V2_CORE_COMMIT}'
+UNISWAP_V2_CORE_REPO = os.environ.get("UNISWAP_V2_CORE_REPO")
+UNISWAP_V2_CORE_COMMIT = os.environ.get("UNISWAP_V2_CORE_COMMIT")
+UNISWAP_V2_CORE_IMAGE = f'{UNISWAP_V2_CORE_REPO}:{UNISWAP_V2_CORE_COMMIT}'
 
-FAUCET_COMMIT = 'latest'
+FAUCET_COMMIT = os.environ.get("FAUCET_COMMIT")
 
-NEON_TESTS_IMAGE = "neonlabsorg/neon_tests:latest"
+NEON_TESTS_IMAGE = os.environ.get("NEON_TESTS_IMAGE")
 
 CONTAINERS = ['proxy', 'solana', 'neon_test_invoke_program_loader',
               'dbcreation', 'faucet', 'gas_tank', 'indexer']
@@ -73,7 +74,7 @@ def docker_compose(args: str):
 
 def check_neon_evm_tag(tag):
     response = requests.get(
-        url=f"https://registry.hub.docker.com/v2/repositories/neonlabsorg/evm_loader/tags/{tag}")
+        url=f"https://registry.hub.docker.com/v2/repositories/{DOCKERHUB_ORG_NAME}/evm_loader/tags/{tag}")
     if response.status_code != 200:
         raise RuntimeError(
             f"evm_loader image with {tag} tag isn't found. Response: {response.json()}")
@@ -82,7 +83,7 @@ def check_neon_evm_tag(tag):
 def is_neon_evm_branch_exist(branch):
     if branch:
         proxy_branches_obj = requests.get(
-            "https://api.github.com/repos/neonlabsorg/neon-evm/branches?per_page=100").json()
+            "https://api.github.com/repos/{GH_ORG_NAME}/neon-evm/branches?per_page=100").json()
         proxy_branches = [item["name"] for item in proxy_branches_obj]
 
         if branch in proxy_branches:
@@ -100,15 +101,15 @@ def update_neon_evm_tag_if_same_branch_exists(branch, neon_evm_tag):
 
 
 @cli.command(name="build_docker_image")
-@click.option('--neon_evm_tag', help="the neonlabsorg/evm_loader image tag that will be used for the build")
+@click.option('--neon_evm_tag', help="the neon evm_loader image tag that will be used for the build")
 @click.option('--proxy_tag', help="a tag to be generated for the proxy image")
 @click.option('--head_ref_branch')
 @click.option('--skip_pull', is_flag=True, default=False, help="skip pulling of docker images from the docker-hub")
 def build_docker_image(neon_evm_tag, proxy_tag, head_ref_branch, skip_pull):
     neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
-    neon_evm_image = f'neonlabsorg/evm_loader:{neon_evm_tag}'
+    neon_evm_image = f'{DOCKERHUB_ORG_NAME}/evm_loader:{neon_evm_tag}'
     click.echo(f"neon-evm image: {neon_evm_image}")
-    neon_test_invoke_program_image = "neonlabsorg/neon_test_invoke_program:develop"
+    neon_test_invoke_program_image = f"{DOCKERHUB_ORG_NAME}/neon_test_invoke_program:develop"
     if not skip_pull:
         click.echo('pull docker images...')
         out = docker_client.pull(neon_evm_image, stream=True, decode=True)
@@ -266,8 +267,8 @@ def upload_remote_logs(ssh_client, service, artifact_logs):
 
 
 @cli.command(name="deploy_check")
-@click.option('--proxy_tag', help="the neonlabsorg/proxy image tag")
-@click.option('--neon_evm_tag', help="the neonlabsorg/evm_loader image tag")
+@click.option('--proxy_tag', help="the neon proxy image tag")
+@click.option('--neon_evm_tag', help="the neon evm_loader image tag")
 @click.option('--head_ref_branch')
 @click.option('--skip_uniswap', is_flag=True, show_default=True, default=False, help="flag for skipping uniswap tests")
 @click.option('--test_files', help="comma-separated file names if you want to run a specific list of tests")
@@ -354,7 +355,7 @@ def run_test(project_name, file_name):
 
 
 @cli.command(name="dump_apps_logs")
-@click.option('--proxy_tag', help="the neonlabsorg/proxy image tag")
+@click.option('--proxy_tag', help="the neon proxy image tag")
 def dump_apps_logs(proxy_tag):
     for container in [f"{proxy_tag}_{item}_1" for item in CONTAINERS]:
         dump_docker_logs(container)
@@ -370,7 +371,7 @@ def dump_docker_logs(container):
 
 
 @cli.command(name="stop_containers")
-@click.option('--proxy_tag', help="the neonlabsorg/proxy image tag")
+@click.option('--proxy_tag', help="the neon proxy image tag")
 def stop_containers(proxy_tag):
     cleanup_docker(proxy_tag)
 
@@ -455,7 +456,7 @@ def trigger_dapps_tests(solana_ip, proxy_ip, pr_url_for_report, token, test_set)
 
     runs_after = github.get_dapps_runs_list()
     run_id = list(set(runs_after) - set(runs_before))[0]
-    link = f"https://github.com/neonlabsorg/neon-tests/actions/runs/{run_id}"
+    link = f"{NEON_TEST_RUN_LINK}/{run_id}"
     click.echo(f"Dapps tests run link: {link}")
     click.echo("Waiting completed status...")
     wait_condition(lambda: github.get_dapps_run_info(run_id)["status"] == "completed", timeout_sec=7200, delay=5)
