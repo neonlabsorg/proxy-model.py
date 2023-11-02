@@ -27,6 +27,8 @@ env:
   DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
   BUILD_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
   NEON_TEST_IMAGE:  neonlabsorg/neon_tests
+  TF_VAR_run_number: ${{ github.run_number }}
+  TF_VAR_ci_pp_solana_url: ${{secrets.DEVNET_INTERNAL_RPC}}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}${{ github.event.inputs.neon_evm_commit }}
