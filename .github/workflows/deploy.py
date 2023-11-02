@@ -230,6 +230,10 @@ def get_all_containers_logs():
     solana_ip = os.environ.get("SOLANA_IP")
 
     subprocess.run(
+        f'ssh-keygen -R {solana_ip} -f {home_path}/.ssh/known_hosts', shell=True)
+    subprocess.run(
+        f'ssh-keygen -R {proxy_ip} -f {home_path}/.ssh/known_hosts', shell=True)
+    subprocess.run(
         f'ssh-keyscan -H {solana_ip} >> {home_path}/.ssh/known_hosts', shell=True)
     subprocess.run(
         f'ssh-keyscan -H {proxy_ip} >> {home_path}/.ssh/known_hosts', shell=True)
