@@ -31,6 +31,7 @@ env:
   NEON_TEST_IMAGE:  neonlabsorg/neon_tests
   TF_VAR_run_number: ${{ github.run_number }}
   TF_VAR_ci_pp_solana_url: ${{secrets.DEVNET_INTERNAL_RPC}}
+  HCLOUD_TOKEN: ${{secrets.HCLOUD_TOKEN}}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}${{ github.event.inputs.neon_evm_commit }}
