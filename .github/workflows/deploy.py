@@ -88,7 +88,7 @@ def check_neon_evm_tag(tag):
 def is_neon_evm_branch_exist(branch):
     if branch:
         proxy_branches_obj = requests.get(
-            "https://api.github.com/repos/{GH_ORG_NAME}/neon-evm/branches?per_page=100").json()
+            f"https://api.github.com/repos/{GH_ORG_NAME}/neon-evm/branches?per_page=100").json()
         proxy_branches = [item["name"] for item in proxy_branches_obj]
 
         if branch in proxy_branches:
