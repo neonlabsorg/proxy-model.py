@@ -56,6 +56,8 @@ FAUCET_COMMIT = os.environ.get("FAUCET_COMMIT")
 
 NEON_TESTS_IMAGE = os.environ.get("NEON_TESTS_IMAGE")
 
+GH_ORG_NAME  = os.environ.get("GH_ORG_NAME")
+
 CONTAINERS = ['proxy', 'solana', 'neon_test_invoke_program_loader',
               'dbcreation', 'faucet', 'gas_tank', 'indexer']
 
