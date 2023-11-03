@@ -192,7 +192,7 @@ jobs:
       SOLANA_IP: ${{ needs.prepare-infrastructure.outputs.solana_ip }}
       PROXY_IP: ${{ needs.prepare-infrastructure.outputs.proxy_ip }}
       CONTAINER: oz-${{ github.run_id }}
-      NETWORK_NAME: aws_custom
+      NETWORK_NAME: aws
     steps:
       - name: Pull docker image
         run: docker pull ${{ env.NEON_TEST_IMAGE }}
