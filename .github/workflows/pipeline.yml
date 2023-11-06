@@ -176,6 +176,8 @@ jobs:
         run: |
           echo "${{ secrets.CI_STANDS_KEY_HCLOUD }}" > ${HOME}/.ssh/ci-stands
           chmod 644 ${HOME}/.ssh/ci-stands
+      - name: Remove known_host
+        run: rm -f ${HOME}/.ssh/known_hosts
       - name: Terraform build infra structure
         id: terraform
         run: |
