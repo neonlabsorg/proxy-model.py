@@ -245,7 +245,7 @@ def get_all_containers_logs():
         f'ssh-keyscan -H {proxy_ip} >> {home_path}/.ssh/known_hosts', shell=True)
     ssh_client = SSHClient()
     ssh_client.load_system_host_keys()
-    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.set_missing_host_key_policy(SSHClient.AutoAddPolicy())
     ssh_client.connect(hostname=solana_ip, username='root',
                        key_filename=ssh_key, timeout=120)
 
