@@ -20,7 +20,6 @@ resource "hcloud_server" "proxy" {
   provisioner "file" {
     content     = data.template_file.proxy_init.rendered
     destination = "/tmp/proxy_init.sh"
-  }
 
   connection {
     type        = "ssh"
@@ -29,12 +28,22 @@ resource "hcloud_server" "proxy" {
     private_key = file("~/.ssh/ci-stands")
   }
 
+  }
+
+
   provisioner "remote-exec" {
     inline = [
       "echo '${hcloud_server.solana.network.*.ip[0]}' > /tmp/solana_host",
       "chmod a+x /tmp/proxy_init.sh",
       "sudo /tmp/proxy_init.sh"
     ]
+  connection {
+    type        = "ssh"
+    user        = "root"
+    host        = hcloud_server.proxy.ipv4_address
+    private_key = file("~/.ssh/ci-stands")
+  }
+  
   }
 
   labels = {
