@@ -363,6 +363,10 @@ jobs:
       - name: Get container logs
         if: always()
         run: python3 ./.github/workflows/deploy.py get_container_logs
+      - name: Add private key
+        run: |
+          echo "${{ secrets.CI_STANDS_KEY_HCLOUD }}" > ${HOME}/.ssh/ci-stands
+          chmod 644 ${HOME}/.ssh/ci-stands
       - uses: actions/upload-artifact@v3
         if: always()
         with:
@@ -373,10 +377,6 @@ jobs:
         with:
           name: Terraform infrastructure logs
           path: ./terraform.log
-      - name: Add private key
-        run: |
-          echo "${{ secrets.CI_STANDS_KEY_HCLOUD }}" > ${HOME}/.ssh/ci-stands
-          chmod 644 ${HOME}/.ssh/ci-stands
       - name: Destroy terraform infrastructure
         if: ${{always() && needs.prepare-infrastructure.result != 'skipped'}}
         run: |
