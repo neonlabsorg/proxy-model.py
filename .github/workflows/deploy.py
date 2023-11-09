@@ -246,13 +246,13 @@ def get_all_containers_logs():
     ssh_client = SSHClient()
     ssh_client.load_system_host_keys()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh_client.connect(solana_ip, username='root',
+    ssh_client.connect(hostname=solana_ip, username='root',
                        key_filename=ssh_key, timeout=120)
 
     upload_remote_logs(ssh_client, "solana", artifact_logs)
 
-    ssh_client.connect(proxy_ip, username='root',
-                       pkey=ssh_key, timeout=120)
+    ssh_client.connect(hostname=proxy_ip, username='root',
+                       key_filename=ssh_key, timeout=120)
     services = ["postgres", "dbcreation", "indexer", "proxy", "faucet"]
     for service in services:
         upload_remote_logs(ssh_client, service, artifact_logs)
