@@ -46,4 +46,6 @@ class GithubClient():
     def get_dapps_run_info(self, id):
         response = requests.get(
             f"{NEON_TESTS_ENDPOINT}/actions/runs/{id}", headers=self.headers)
+        if response.status_code != 200:
+            raise RuntimeError(f"Can't get dapps tests run info. Error: {response.json()}")
         return response.json()
