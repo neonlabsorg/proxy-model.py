@@ -382,7 +382,7 @@ jobs:
         if: ${{always() && needs.prepare-infrastructure.result != 'skipped'}}
         run: |
           python3 ./.github/workflows/deploy.py destroy_terraform \
-          --run_number=${GITHUB_RUN_NUMBER} \
+          --run_number=${{env.GITHUB_RUN_NUMBER}} \
           --proxy_tag=${{ needs.build-image.outputs.proxy_tag }}
   finalize-image:
     runs-on: build-runner
