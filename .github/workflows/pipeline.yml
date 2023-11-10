@@ -43,6 +43,7 @@ env:
   TFSTATE_REGION: ${{vars.TFSTATE_REGION}}
   UNISWAP_V2_CORE_COMMIT: ${{vars.UNISWAP_V2_CORE_COMMIT}}
   UNISWAP_V2_CORE_REPO: ${{vars.UNISWAP_V2_CORE_REPO}}
+  GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}${{ github.event.inputs.neon_evm_commit }}
