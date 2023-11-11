@@ -361,13 +361,13 @@ jobs:
       PROXY_IP: ${{ needs.prepare-infrastructure.outputs.proxy_ip }}
     steps:
       - uses: actions/checkout@v3
-      - name: Get container logs
-        if: always()
-        run: python3 ./.github/workflows/deploy.py get_container_logs
       - name: Add private key
         run: |
           echo "${{ secrets.CI_STANDS_KEY_HCLOUD }}" > ${HOME}/.ssh/ci-stands
           chmod 644 ${HOME}/.ssh/ci-stands
+      - name: Get container logs
+        if: always()
+        run: python3 ./.github/workflows/deploy.py get_container_logs
       - uses: actions/upload-artifact@v3
         if: always()
         with:
