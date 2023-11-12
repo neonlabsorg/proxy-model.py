@@ -223,7 +223,7 @@ def destroy_terraform(proxy_tag, run_number):
     backend_config = {"bucket": TFSTATE_BUCKET,
                       "key": thstate_key, "region": TFSTATE_REGION}
     terraform.init(backend_config=backend_config)
-    terraform.destroy()
+    terraform.apply('-destroy', skip_plan=True)
 
 
 @cli.command(name="get_container_logs")
