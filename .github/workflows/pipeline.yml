@@ -31,7 +31,6 @@ env:
   NEON_TEST_IMAGE:  neonlabsorg/neon_tests
   TF_VAR_run_number: ${{ github.run_number }}
   TF_VAR_ci_pp_solana_url: ${{secrets.DEVNET_INTERNAL_RPC}}
-  TF_VAR_branch: ${{GITHUB_REF##*/}}
   TF_VAR_proxy_model_commit: ${{GITHUB_SHA}}
   TF_VAR_neon_evm_commit: "latest"
   TF_VAR_faucet_model_commit: ${{vars.FAUCET_COMMIT}}
@@ -382,8 +381,13 @@ jobs:
         with:
           name: Terraform infrastructure logs
           path: ./terraform.log
+      - name: Set output
+        id: vars
+        run: echo "bname=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}" >> $GITHUB_OUTPUT
       - name: Destroy terraform infrastructure
         if: ${{always() && needs.prepare-infrastructure.result != 'skipped'}}
+        env: 
+          TF_VAR_branch: ${{ steps.vars.outputs.bname }}
         run: |
           python3 ./.github/workflows/deploy.py destroy_terraform \
           --run_number=${{env.GITHUB_RUN_NUMBER}} \
