@@ -9,6 +9,7 @@ import pathlib
 import requests
 import json
 import typing as tp
+import logging
 from urllib.parse import urlparse
 from python_terraform import Terraform
 from paramiko import SSHClient
