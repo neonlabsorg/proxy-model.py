@@ -31,7 +31,7 @@ env:
   NEON_TEST_IMAGE:  neonlabsorg/neon_tests
   TF_VAR_run_number: ${{ github.run_number }}
   TF_VAR_ci_pp_solana_url: ${{secrets.DEVNET_INTERNAL_RPC}}
-  TF_VAR_proxy_model_commit: ${{GITHUB_SHA}}
+  TF_VAR_proxy_model_commit: ${{github.sha}}
   TF_VAR_neon_evm_commit: "latest"
   TF_VAR_faucet_model_commit: ${{vars.FAUCET_COMMIT}}
   HCLOUD_TOKEN: ${{secrets.HCLOUD_TOKEN}}
