@@ -218,12 +218,29 @@ def set_github_env(envs: tp.Dict, upper=True) -> None:
 @click.option('--proxy_tag')
 @click.option('--run_number')
 def destroy_terraform(proxy_tag, run_number):
+    ####
+    log = logging.getLogger()
+    log.handlers = []
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter(
+        '%(asctime)4s %(name)4s [%(filename)s:%(lineno)s - %(funcName)s()] %(levelname)4s %(message)4s')
+    handler.setFormatter(formatter)
+    log.addHandler(handler)
+    log.setLevel(logging.INFO)
+
+    def format_tf_output(output):
+        return re.sub(r'(?m)^', ' ' * TF_OUTPUT_OFFSET, str(output))
+
+    TF_OUTPUT_OFFSET = 16
+    ####
     thstate_key = f'{TFSTATE_KEY_PREFIX}{proxy_tag}-{run_number}'
 
     backend_config = {"bucket": TFSTATE_BUCKET,
                       "key": thstate_key, "region": TFSTATE_REGION}
     terraform.init(backend_config=backend_config)
-    terraform.apply('-destroy', skip_plan=True)
+    #### terraform.apply('-destroy', skip_plan=True)
+    tf_destroy = terraform.apply('-destroy', skip_plan=True)
+    log.info(format_tf_output(tf_destroy))
 
 
 @cli.command(name="get_container_logs")
