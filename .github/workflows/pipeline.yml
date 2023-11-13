@@ -21,7 +21,7 @@ on:
     tags:
       - "*"
 env:
-  NEON_EVM_TAG: "219f770fa07022233eb845a50c5e325d3ee930fe"
+  NEON_EVM_TAG: "f29e0546a1cc7f5d75404b27664ef147abc6c1ca"
   FAUCET_TAG: "5b8e6500459de8ab0042e1e68ca5ceec9aed7091"
   AWS_ACCESS_KEY_ID: ${{secrets.AWS_ACCESS_KEY_ID}}
   AWS_DEFAULT_REGION: ${{secrets.AWS_DEFAULT_REGION}}
