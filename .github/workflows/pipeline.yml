@@ -126,7 +126,7 @@ jobs:
       - name: Set latest tag for test image if feature/version branch doesn't exist
         id: neon_test_final_tag
         run: |
-          if [[ "${{ steps.test_image_exists.conclusion }}" != 'success' ]]; then
+          if [[ "${{ steps.test_image_exists.conclusion }}" == "success" ]]; then
             tag=${{ steps.neon_test_tag.outputs.value}}
           else
             tag='latest'
