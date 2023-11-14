@@ -213,6 +213,7 @@ jobs:
     if: ${{needs.prepare-infrastructure.result != 'skipped'}}
     needs:
       - prepare-infrastructure
+      - build-image
     runs-on: test-runner
     env:
       SOLANA_IP: ${{ needs.prepare-infrastructure.outputs.solana_ip }}
@@ -221,7 +222,7 @@ jobs:
       NETWORK_NAME: aws_custom
     steps:
       - name: Pull docker image
-        run: docker pull ${{ env.NEON_TEST_IMAGE }}
+        run: docker pull ${{ env.NEON_TEST_IMAGE }}:${{ needs.build-image.outputs.neon_test_tag }}
       - name: Run docker container
         run: |
           docker run -i -e PROXY_IP=${{env.PROXY_IP}} \
