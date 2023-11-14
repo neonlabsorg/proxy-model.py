@@ -115,10 +115,11 @@ jobs:
       - name: Check image
         id: test_image_exists
         uses: cloudposse/github-action-docker-image-exists@main
+        continue-on-error: true
         with:
           registry: registry.hub.docker.com
           organization: "neonlabsorg"
-          repository: "neon_test"
+          repository: "neon_tests"
           login: ${{secrets.DOCKER_USERNAME}}
           password: ${{secrets.DOCKER_PASSWORD}}
           tag: ${{ steps.neon_test_tag.outputs.value}}
