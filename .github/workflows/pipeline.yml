@@ -21,8 +21,8 @@ on:
     tags:
       - "*"
 env:
-  NEON_EVM_TAG: "f29e0546a1cc7f5d75404b27664ef147abc6c1ca"
-  FAUCET_TAG: "5b8e6500459de8ab0042e1e68ca5ceec9aed7091"
+  NEON_EVM_TAG: "latest"
+  FAUCET_TAG: "latest"
   AWS_ACCESS_KEY_ID: ${{secrets.AWS_ACCESS_KEY_ID}}
   AWS_DEFAULT_REGION: ${{secrets.AWS_DEFAULT_REGION}}
   AWS_SECRET_ACCESS_KEY: ${{secrets.AWS_SECRET_ACCESS_KEY}}
@@ -42,7 +42,7 @@ jobs:
       neon_evm_tag: ${{ steps.tags.outputs.neon_evm }}
       is_version_proxy_branch: ${{ steps.is_version_proxy_branch.outputs.value }}
       test_set: ${{ steps.test_set.outputs.value }}
-      neon_test_tag: ${{ steps.neon_test_tag.outputs.value }}
+      neon_test_tag: ${{ steps.neon_test_final_tag.outputs.value }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -105,6 +105,28 @@ jobs:
           elif [[ "${{ github.base_ref }}" =~ "refs/heads/"[vt][0-9]+\.[0-9]+\.x ]]; then # pr to version branch
             tag=${GITHUB_BASE_REF/refs\/heads\//}
 
+          elif [[ "${{ github.ref }}" =~ "refs/heads/".+ ]]; then
+            tag=${GITHUB_REF/refs\/heads\//}
+          else
+            tag='latest'
+          fi
+          echo "value=${tag}"
+          echo "value=${tag}" >> $GITHUB_OUTPUT
+      - name: Check image
+        id: test_image_exists
+        uses: cloudposse/github-action-docker-image-exists@main
+        with:
+          registry: registry.hub.docker.com
+          organization: "neonlabsorg"
+          repository: "neon_test"
+          login: ${{secrets.DOCKER_USERNAME}}
+          password: ${{secrets.DOCKER_PASSWORD}}
+          tag: ${{ steps.neon_test_tag.outputs.value}}
+      - name: Set latest tag for test image if feature/version branch doesn't exist
+        id: neon_test_final_tag
+        run: |
+          if [[ "${{ steps.test_image_exists.conclusion }}" != 'success' ]]; then
+            tag=${{ steps.neon_test_tag.outputs.value}}
           else
             tag='latest'
           fi
@@ -263,10 +285,10 @@ jobs:
           docker pull $image
           docker run -i -d -e PROXY_IP=${{ env.PROXY_IP }} -e SOLANA_IP=${{ env.SOLANA_IP }} \
           --name=${{ env.CONTAINER }} $image /bin/bash
-#      - name: Update contracts in the container
-#        run: |
-#          docker exec -i ${{ env.CONTAINER }} \
-#            python3 ./clickfile.py update-contracts --branch ${{ github.head_ref || github.ref_name }}
+      - name: Update contracts in the container
+        run: |
+          docker exec -i ${{ env.CONTAINER }} \
+            python3 ./clickfile.py update-contracts --branch ${{ github.head_ref || github.ref_name }}
       - name: Wait until proxy is ready
         timeout-minutes: 5
         run: |

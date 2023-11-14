@@ -77,24 +77,30 @@ def check_neon_evm_tag(tag):
             f"evm_loader image with {tag} tag isn't found. Response: {response.json()}")
 
 
-def is_neon_evm_branch_exist(branch):
+def is_branch_exist(branch, repo):
     if branch:
         proxy_branches_obj = requests.get(
-            "https://api.github.com/repos/neonlabsorg/neon-evm/branches?per_page=100").json()
+            f"https://api.github.com/repos/neonlabsorg/{repo}/branches?per_page=100").json()
         proxy_branches = [item["name"] for item in proxy_branches_obj]
 
         if branch in proxy_branches:
-            click.echo(f"The same branch {branch} is found in neon_evm repository")
+            click.echo(f"The same branch {branch} is found in {repo} repository")
             return True
     else:
         return False
 
 
 def update_neon_evm_tag_if_same_branch_exists(branch, neon_evm_tag):
-    if is_neon_evm_branch_exist(branch):
+    if is_branch_exist(branch, "neon-evm"):
         neon_evm_tag = branch.split('/')[-1]
         check_neon_evm_tag(neon_evm_tag)
     return neon_evm_tag
+
+def update_faucet_tag_if_same_branch_exists(branch, faucet_tag):
+    if is_branch_exist(branch, "neon-faucet"):
+        faucet_tag = branch.split('/')[-1]
+    print(f"faucet image tag: {faucet_tag}")
+    return faucet_tag
 
 
 @cli.command(name="build_docker_image")
@@ -102,7 +108,7 @@ def update_neon_evm_tag_if_same_branch_exists(branch, neon_evm_tag):
 @click.option('--proxy_tag', help="a tag to be generated for the proxy image")
 @click.option('--head_ref_branch')
 @click.option('--skip_pull', is_flag=True, default=False, help="skip pulling of docker images from the docker-hub")
-def build_docker_image(neon_evm_tag, proxy_tag, head_ref_branch, skip_pull):
+def build_docker_image(neon_evm_tag,  proxy_tag, head_ref_branch, skip_pull):
     neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
     neon_evm_image = f'neonlabsorg/evm_loader:{neon_evm_tag}'
     click.echo(f"neon-evm image: {neon_evm_image}")
@@ -164,13 +170,14 @@ def finalize_image(head_ref_branch, github_ref, proxy_tag):
 @cli.command(name="terraform_infrastructure")
 @click.option('--head_ref_branch')
 @click.option('--github_ref_name')
-@click.option('--neon_evm_tag')
 @click.option('--proxy_tag')
+@click.option('--neon_evm_tag')
 @click.option('--faucet_tag')
 @click.option('--run_number')
 def terraform_build_infrastructure(head_ref_branch, github_ref_name, proxy_tag, neon_evm_tag, faucet_tag, run_number):
     branch = head_ref_branch if head_ref_branch != "" else github_ref_name
     neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
+    faucet_tag = update_faucet_tag_if_same_branch_exists(head_ref_branch, faucet_tag)
     os.environ["TF_VAR_branch"] = branch
     os.environ["TF_VAR_proxy_model_commit"] = proxy_tag
     os.environ["TF_VAR_neon_evm_commit"] = neon_evm_tag
@@ -269,9 +276,8 @@ def upload_remote_logs(ssh_client, service, artifact_logs):
 @click.option('--test_files', help="comma-separated file names if you want to run a specific list of tests")
 @click.option('--skip_pull', is_flag=True, default=False, help="skip pulling of docker images from the docker-hub")
 def deploy_check(proxy_tag, neon_evm_tag, faucet_tag, head_ref_branch, skip_uniswap, test_files, skip_pull):
-    if head_ref_branch is not None:
-        neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
-
+    neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
+    faucet_tag = update_faucet_tag_if_same_branch_exists(head_ref_branch, faucet_tag)
 
     os.environ["REVISION"] = proxy_tag
     os.environ["NEON_EVM_COMMIT"] = neon_evm_tag
