@@ -223,22 +223,6 @@ def set_github_env(envs: tp.Dict, upper=True) -> None:
                 env_file.write(f"\n{key.upper() if upper else key}={str(value)}")
 
 
-@cli.command(name="wait_terraform_proxy")
-@click.option('--proxy_ip')
-def wait_terraform_proxy(proxy_ip):
-    url = f"http://{proxy_ip}:9090/solana"
-    header = "Content-Type: application/json"
-    data = '{"jsonrpc":"2.0", "method":"eth_blockNumber", "params":[], "id":1 }'
-    command = ["curl", url, "-s", "-X", "POST", "-H", header, "-d", data]
-    while True:
-        out = subprocess.run(command, stdout=subprocess.PIPE, encoding='utf-8').stdout
-        click.echo(f"Proxy returns {out}")
-        if out.find('"result"') != -1:
-            break
-        click.echo("Proxy is not ready yet. Waiting 5 seconds...")
-        time.sleep(5)
-
-
 @cli.command(name="destroy_terraform")
 @click.option('--proxy_tag')
 @click.option('--run_number')

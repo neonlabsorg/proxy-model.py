@@ -29,7 +29,7 @@ env:
   DOCKER_USERNAME: ${{secrets.DOCKER_USERNAME}}
   DOCKER_PASSWORD: ${{secrets.DOCKER_PASSWORD}}
   BUILD_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-  NEON_TEST_IMAGE:  neonlabsorg/neon_tests
+  NEON_TEST_IMAGE:  ${{vars.DOCKERHUB_ORG_NAME}}/neon_tests
   TF_VAR_run_number: ${{ github.run_number }}
   TF_VAR_ci_pp_solana_url: ${{secrets.DEVNET_INTERNAL_RPC}}
   TF_VAR_proxy_model_commit: ${{github.sha}}
@@ -230,10 +230,6 @@ jobs:
         run: |
           echo "solana_ip=${{ env.SOLANA_IP }}" >> $GITHUB_OUTPUT
           echo "proxy_ip=${{ env.PROXY_IP }}" >> $GITHUB_OUTPUT
-      - name: Wait until proxy is ready
-        timeout-minutes: 5
-        run: |
-          python3 ./.github/workflows/deploy.py wait_terraform_proxy --proxy_ip=${{ steps.share.outputs.proxy_ip }}
     outputs:
       solana_ip: ${{ steps.share.outputs.solana_ip }}
       proxy_ip: ${{ steps.share.outputs.proxy_ip }}
@@ -299,7 +295,6 @@ jobs:
       SOLANA_IP: ${{ needs.prepare-infrastructure.outputs.solana_ip }}
       PROXY_IP: ${{ needs.prepare-infrastructure.outputs.proxy_ip }}
       NUMPROCESSES: 4
-      IMAGE: neonlabsorg/neon_tests
       CONTAINER: basic-${{ github.run_id }}
       NETWORK: aws
     steps:
@@ -352,7 +347,6 @@ jobs:
     env:
       SOLANA_IP: ${{ needs.prepare-infrastructure.outputs.solana_ip }}
       PROXY_IP: ${{ needs.prepare-infrastructure.outputs.proxy_ip }}
-      IMAGE: neonlabsorg/neon_tests
       CONTAINER: economy-${{ github.run_id }}
       NETWORK: aws
     steps:

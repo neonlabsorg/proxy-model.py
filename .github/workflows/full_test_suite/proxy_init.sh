@@ -36,15 +36,17 @@ version: "3"
 
 services:
   solana:
-    container_name: fake_solana
+    container_name: solana
     healthcheck:
       test: [ CMD-SHELL, "/echo done" ]
     entrypoint: "/usr/bin/sleep 10000"
+
   gas_tank:
-    container_name: fake_gas_tank
+    container_name: gas_tank
     entrypoint: "/usr/bin/sleep 10000"
+
   neon_test_invoke_program_loader:
-    container_name: fake_neon_test_invoke_program_loader
+    container_name: neon_test_invoke_program_loader
     command: bash -c "echo done"
 
 services:
@@ -55,54 +57,76 @@ services:
       EXTRA_ARGS: "--num-workers 16"
     ports:
       - "9090:9090"
+
   faucet:
     container_name: faucet
     environment:
       SOLANA_URL: $SOLANA_URL
     ports:
       - "3333:3333"
+
   indexer:
     container_name: indexer
     environment:
       SOLANA_URL: $SOLANA_URL
+
   postgres:
     container_name: postgres
+
   dbcreation:
     container_name: dbcreation
 EOF
 
 
 # Get list of services
-SERVICES=$(docker-compose -f docker-compose-ci.yml -f docker-compose-ci.override.yml config --services | grep -vP "solana|gas_tank|neon_test_invoke_program_loader")
+#SERVICES=$(docker-compose -f docker-compose-ci.yml -f docker-compose-ci.override.yml config --services | grep -vP "solana|gas_tank|neon_test_invoke_program_loader")
+SERVICES=(proxy indexer faucet postgres dbcreation)
 
 # Pull latest versions
 docker-compose -f docker-compose-ci.yml -f docker-compose-ci.override.yml pull $SERVICES
 
 
-# Check if Solana is available, max attepts is 100(each for 2 seconds)
-CHECK_COMMAND='curl $SOLANA_URL -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":1, \"method\":\"getHealth\"}" 2> /dev/null'
-MAX_COUNT=100
-CURRENT_ATTEMPT=1
-while [[ $CURRENT_ATTEMPT -lt $MAX_COUNT ]]
-do
-  echo "solana attempt: $CURRENT_ATTEMPT" 1>&2
-  CHECK_COMMAND_RESULT=$(eval $CHECK_COMMAND)
-  echo $CHECK_COMMAND_RESULT >> /tmp/output.txt
-  if [[ "$CHECK_COMMAND_RESULT" == "{\"jsonrpc\":\"2.0\",\"result\":\"ok\",\"id\":1}" ]]; then
-    echo 'solana is up' 1>&2
-    break
-  fi
+function wait_service() {
+  local SERVICE=$1
+  local URL=$2
+  local DATA=$3
+  local RESULT=$4
 
-  ((CURRENT_ATTEMPT=CURRENT_ATTEMPT+1))
-  sleep 2
-done;
+  # Max attepts is 100 (each for 2 seconds)
+  local MAX_COUNT=100
+  local CURRENT_ATTEMPT=1
 
+  local CHECK_COMMAND="curl $URL -s -X POST -H 'Content-Type: application/json' -d '$DATA' | grep -cF '$RESULT'"
+
+  while [[ $CURRENT_ATTEMPT -lt $MAX_COUNT ]]
+  do
+    echo "$SERVICE attempt: $CURRENT_ATTEMPT" 1>&2
+    local CHECK_COMMAND_RESULT=$(eval $CHECK_COMMAND)
+    echo $CHECK_COMMAND_RESULT >> /tmp/output.txt
+    if [[ "$CHECK_COMMAND_RESULT" == "1" ]]; then
+      echo "$SERVICE is up" 1>&2
+      break
+    fi
+
+    ((CURRENT_ATTEMPT=CURRENT_ATTEMPT+1))
+    sleep 2
+  done;
+}
+
+# Check if Solana is available
+SOLANA_DATA='{"jsonrpc":"2.0","id":1,"method":"getHealth"}'
+SOLANA_RESULT='"ok"'
+wait_service "solana" $SOLANA_URL $SOLANA_DATA $SOLANA_RESULT
 
 # Up all services
 docker-compose -f docker-compose-ci.yml -f docker-compose-ci.override.yml up -d $SERVICES
 
 
-# Remove unused
-docker rm -f fake_solana
-docker rm -f fake_gas_tank
-docker rm -f fake_neon_test_invoke_program_loader
+# Check if Proxy is available
+PROXY_URL="http://localhost:9090/solana"
+PROXY_DATA='{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}'
+PROXY_RESULT='"result"'
+wait_service "proxy" $PROXY_URL $PROXY_DATA $PROXY_RESULT
+
+
+docker rm -f opt_solana_1
