@@ -19,7 +19,7 @@ sudo chmod +x /usr/local/bin/docker-compose
 
 # Get docker-compose file
 cd /opt
-curl -O https://raw.githubusercontent.com/neonlabsorg/proxy-model.py/${proxy_model_commit}/docker-compose/docker-compose-test.yml
+curl -O https://raw.githubusercontent.com/neonlabsorg/proxy-model.py/${proxy_model_commit}/docker-compose/docker-compose-ci.yml
 
 
 # Set required environment variables
@@ -31,36 +31,52 @@ export CI_PP_SOLANA_URL=${ci_pp_solana_url}
 
 
 # Generate docker-compose override file
-cat > docker-compose-test.override.yml <<EOF
+cat > docker-compose-ci.override.yml <<EOF
 version: "3"
 
 services:
   solana:
+    container_name: fake_solana
     healthcheck:
       test: [ CMD-SHELL, "/echo done" ]
     entrypoint: "/usr/bin/sleep 10000"
+  gas_tank:
+    container_name: fake_gas_tank
+    entrypoint: "/usr/bin/sleep 10000"
+  neon_test_invoke_program_loader:
+    container_name: fake_neon_test_invoke_program_loader
+    command: bash -c "echo done"
 
 services:
   proxy:
+    container_name: proxy
     environment:
-      - SOLANA_URL=$SOLANA_URL
+      SOLANA_URL: $SOLANA_URL
+      EXTRA_ARGS: "--num-workers 16"
+    ports:
+      - "9090:9090"
   faucet:
+    container_name: faucet
     environment:
-      - SOLANA_URL=$SOLANA_URL
+      SOLANA_URL: $SOLANA_URL
+    ports:
+      - "3333:3333"
   indexer:
+    container_name: indexer
     environment:
-      - SOLANA_URL=$SOLANA_URL
-  neon_test_invoke_program_loader:
-    command: bash -c "echo done"
+      SOLANA_URL: $SOLANA_URL
+  postgres:
+    container_name: postgres
+  dbcreation:
+    container_name: dbcreation
 EOF
 
 
 # Get list of services
-SERVICES=$(docker-compose -f docker-compose-test.yml config --services | grep -vP "solana|gas_tank|neon_test_invoke_program_loader|hashicorp")
-
+SERVICES=$(docker-compose -f docker-compose-ci.yml -f docker-compose-ci.override.yml config --services | grep -vP "solana|gas_tank|neon_test_invoke_program_loader")
 
 # Pull latest versions
-docker-compose -f docker-compose-test.yml -f docker-compose-test.override.yml pull $SERVICES
+docker-compose -f docker-compose-ci.yml -f docker-compose-ci.override.yml pull $SERVICES
 
 
 # Check if Solana is available, max attepts is 100(each for 2 seconds)
@@ -83,8 +99,10 @@ done;
 
 
 # Up all services
-docker-compose -f docker-compose-test.yml -f docker-compose-test.override.yml up -d $SERVICES
+docker-compose -f docker-compose-ci.yml -f docker-compose-ci.override.yml up -d $SERVICES
 
 
 # Remove unused
-docker rm -f solana
+docker rm -f fake_solana
+docker rm -f fake_gas_tank
+docker rm -f fake_neon_test_invoke_program_loader

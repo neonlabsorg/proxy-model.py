@@ -43,8 +43,8 @@ export FAUCET_COMMIT=${faucet_model_commit}
 
 # Receive docker-compose file and create override file
 cd /opt
-curl -O https://raw.githubusercontent.com/neonlabsorg/proxy-model.py/${proxy_model_commit}/docker-compose/docker-compose-test.yml
-cat > docker-compose-test.override.yml<<EOF
+curl -O https://raw.githubusercontent.com/neonlabsorg/proxy-model.py/${proxy_model_commit}/docker-compose/docker-compose-ci.yml
+cat > docker-compose-ci.override.yml<<EOF
 version: "3"
 
 services:
@@ -59,5 +59,5 @@ EOF
 
 
 # wake up Solana
-docker-compose -f docker-compose-test.yml -f docker-compose-test.override.yml pull solana
-docker-compose -f docker-compose-test.yml -f docker-compose-test.override.yml up -d solana
+docker-compose -f docker-compose-ci.yml -f docker-compose-ci.override.yml pull solana
+docker-compose -f docker-compose-ci.yml -f docker-compose-ci.override.yml up -d solana
