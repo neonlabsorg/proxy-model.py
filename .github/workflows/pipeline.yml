@@ -217,6 +217,7 @@ jobs:
         id: terraform
         run: |
           python3 ./.github/workflows/deploy.py terraform_infrastructure \
+            --dockerhub_org_name=${{ env.DOCKERHUB_ORG_NAME }} \
             --github_ref_name=${{ github.ref_name }} \
             --head_ref_branch=${{ github.head_ref }} \
             --neon_evm_tag=${{ needs.build-image.outputs.neon_evm_tag }} \

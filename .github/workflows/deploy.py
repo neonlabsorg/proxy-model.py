@@ -299,6 +299,7 @@ def upload_remote_logs(ssh_client, service, artifact_logs):
 
 
 @cli.command(name="deploy_check")
+@click.option('--dockerhub_org_name')
 @click.option('--proxy_tag', help="the neon proxy image tag")
 @click.option('--neon_evm_tag', help="the neon evm_loader image tag")
 @click.option('--faucet_tag', help="the neon faucet image tag")
