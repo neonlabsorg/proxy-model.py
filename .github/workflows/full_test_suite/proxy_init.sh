@@ -28,7 +28,7 @@ export SOLANA_URL=http:\/\/${solana_ip}:8899
 export NEON_EVM_COMMIT=${neon_evm_commit}
 export FAUCET_COMMIT=${faucet_model_commit}
 export CI_PP_SOLANA_URL=${ci_pp_solana_url}
-export DOCKERHUB_ORG_NAME=${DOCKERHUB_ORG_NAME}
+export DOCKERHUB_ORG_NAME=${dockerhub_org_name}
 
 
 
