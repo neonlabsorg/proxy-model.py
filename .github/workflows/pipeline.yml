@@ -83,7 +83,7 @@ jobs:
           fi
       - name: Define base branch if the action is tag creation
         id: tag_creation
-        if:  startsWith(github.ref , 'refs/tags/'))
+        if:  startsWith(github.ref , 'refs/tags/')
         run: |
           base_branch=`echo ${{ github.ref_name }} | sed 's/\.[0-9]*$/\.x/'`
           echo "base_branch=$base_branch >> $GITHUB_OUTPUT
