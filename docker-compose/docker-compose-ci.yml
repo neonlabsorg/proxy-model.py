@@ -188,6 +188,7 @@ services:
       EVM_LOADER: 53DfF883gyixYNXnM7s5xhdeyV8mVk9T4i2hGV9vG9io
       START_SLOT: latest
       REINDEX_START_SLOT: continue
+      INDEXER_CHECK_MSEC: 50
     hostname: indexer
     depends_on:
       solana:

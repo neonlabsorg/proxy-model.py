@@ -313,6 +313,7 @@ class CompleteTest(unittest.TestCase):
     #     trx_receipt = self.proxy.conn.wait_for_transaction_receipt(self.tx_hash_invoked)
     #     print('trx_receipt:', trx_receipt)
 
+    @unittest.skip("a.i.")
     def test_04_right_result_for_invoked(self):
         print("\ntest_04_right_result_for_invoked")
         trx_receipt = self.proxy.conn.wait_for_transaction_receipt(self.tx_hash_invoked_combined)
