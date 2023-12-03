@@ -34,7 +34,7 @@ class NeonTxSendCtx:
         self._core_api_client = core_api_client
         self._resource = OpResInfo.from_ident(mp_tx_req.res_ident)
 
-        self._ix_builder = NeonIxBuilder(self._resource.public_key)
+        self._ix_builder = NeonIxBuilder(self._config, self._resource.public_key)
         self._ix_builder.init_operator_neon(self._resource.neon_address)
         self._ix_builder.init_iterative(self.holder_account)
         if not mp_tx_req.is_stuck_tx():

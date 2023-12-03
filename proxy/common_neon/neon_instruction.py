@@ -16,6 +16,7 @@ from .utils.eth_proto import NeonTx
 from .utils.utils import str_enum
 from .layouts import CREATE_ACCOUNT_LAYOUT
 from .solana_tx import SolTxIx, SolPubKey, SolAccountMeta
+from .config import Config
 
 
 LOG = logging.getLogger(__name__)
@@ -76,6 +77,7 @@ class AltIxCodeName:
 class ComputeBudgetIxCode(IntEnum):
     HeapRequest = 1
     CURequest = 2
+    PriceRequest = 3
 
 
 @singleton
@@ -100,7 +102,8 @@ def create_account_layout(ether):
 
 
 class NeonIxBuilder:
-    def __init__(self, operator: SolPubKey):
+    def __init__(self, config: Config, operator: SolPubKey):
+        self._config = config
         self._operator_account = operator
         self._operator_neon_address: Optional[SolPubKey] = None
         self._neon_account_list: List[SolAccountMeta] = []
@@ -373,7 +376,7 @@ class NeonIxBuilder:
         )
 
     @staticmethod
-    def make_compute_budget_heap_ix() -> SolTxIx:
+    def _make_compute_budget_heap_ix() -> SolTxIx:
         heap_frame_size = 256 * 1024
         ix_data = (
             int(ComputeBudgetIxCode.HeapRequest).to_bytes(1, 'little') +
@@ -386,8 +389,23 @@ class NeonIxBuilder:
 
         )
 
+    def _make_compute_budget_price_ix(self) -> Optional[SolTxIx]:
+        cu_price = self._config.cu_price
+        if cu_price is None:
+            return None
+
+        ix_data = (
+            int(ComputeBudgetIxCode.PriceRequest).to_bytes(1, 'little') +
+            cu_price.to_bytes(8, 'little')
+        )
+        return SolTxIx(
+            program_id=COMPUTE_BUDGET_ID,
+            accounts=[],
+            data=ix_data
+        )
+
     @staticmethod
-    def make_compute_budget_cu_ix() -> SolTxIx:
+    def _make_compute_budget_cu_ix() -> SolTxIx:
         compute_unit_cnt = 1_400_000
         ix_data = (
             int(ComputeBudgetIxCode.CURequest).to_bytes(1, 'little') +
@@ -398,3 +416,13 @@ class NeonIxBuilder:
             accounts=[],
             data=ix_data
         )
+
+    def make_compute_budget_ix_list(self) -> List[SolTxIx]:
+        ix_list = [
+            self._make_compute_budget_heap_ix(),
+            self._make_compute_budget_cu_ix()
+        ]
+        price_ix = self._make_compute_budget_price_ix()
+        if price_ix is not None:
+            ix_list.append(price_ix)
+        return ix_list

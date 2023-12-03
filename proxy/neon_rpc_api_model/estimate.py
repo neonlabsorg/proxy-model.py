@@ -11,6 +11,7 @@ from ..common_neon.solana_alt_limit import ALTLimit
 from ..common_neon.solana_tx import SolAccount, SolPubKey, SolAccountMeta, SolBlockHash, SolTxSizeError
 from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_block import SolBlockInfo
+from ..common_neon.config import Config
 
 from ..neon_core_api.neon_core_api_client import NeonCoreApiClient
 
@@ -34,7 +35,8 @@ class _GasTxBuilder:
         neon_address = NeonAddress.from_private_key(operator_key)
         self._block_hash = SolBlockHash.from_string('4NCYB3kRT8sCNodPNuCZo8VUh4xqpBQxsxed2wd9xaD4')
 
-        self._neon_ix_builder = NeonIxBuilder(self._signer.pubkey())
+        self._config = Config()
+        self._neon_ix_builder = NeonIxBuilder(self._config, self._signer.pubkey())
         self._neon_ix_builder.init_iterative(holder.pubkey())
         self._neon_ix_builder.init_operator_neon(neon_address)
 
@@ -42,14 +44,9 @@ class _GasTxBuilder:
         self._neon_ix_builder.init_neon_tx(tx)
         self._neon_ix_builder.init_neon_account_list(account_list)
 
-        tx = SolLegacyTx(
-            name='Estimate',
-            ix_list=[
-                self._neon_ix_builder.make_compute_budget_heap_ix(),
-                self._neon_ix_builder.make_compute_budget_cu_ix(),
-                self._neon_ix_builder.make_tx_step_from_data_ix(ElfParams().neon_evm_steps, 1)
-            ]
-        )
+        ix_list = self._neon_ix_builder.make_compute_budget_ix_list()
+        ix_list.append(self._neon_ix_builder.make_tx_step_from_data_ix(ElfParams().neon_evm_steps, 1))
+        tx = SolLegacyTx(name='Estimate', ix_list=ix_list)
 
         tx.recent_block_hash = self._block_hash
         tx.sign(self._signer)

@@ -56,7 +56,7 @@ class TestGasTankIntegration(TestCase):
         cls.create_token_mint()
         cls.deploy_erc20_for_spl()
         cls.acc_num = 0
-        cls.neon_ix_builder = NeonIxBuilder(cls.mint_authority)
+        cls.neon_ix_builder = NeonIxBuilder(cls.config, cls.mint_authority)
 
     @classmethod
     def create_token_mint(cls):
@@ -146,13 +146,9 @@ class TestGasTankIntegration(TestCase):
         return account
 
     def build_tx(self, name: str, ix_list) -> SolLegacyTx:
-        return SolLegacyTx(
-            name=name,
-            ix_list=[
-                self.neon_ix_builder.make_compute_budget_heap_ix(),
-                self.neon_ix_builder.make_compute_budget_cu_ix()
-            ] + ix_list
-        )
+        full_ix_list = self.neon_ix_builder.make_compute_budget_ix_list()
+        full_ix_list += ix_list
+        return SolLegacyTx(name=name, ix_list=ix_list)
 
     def neon_gas_price_impl(self, param: Dict[str, Any]) -> int:
         gas_price = self.proxy.web3.neon.neon_gasPrice(param)

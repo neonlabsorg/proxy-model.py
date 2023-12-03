@@ -13,6 +13,7 @@ from solcx import install_solc, compile_source
 
 from .solana_tx import SolAccountMeta, SolAccount, SolPubKey
 from .address import NeonAddress, neon_2program
+from .config import Config
 from .constants import ACCOUNT_SEED_VERSION, EVM_PROGRAM_ID
 from .utils.eth_proto import NeonTx
 from .neon_instruction import NeonIxBuilder
@@ -179,7 +180,7 @@ class ERC20Wrapper:
 
         neon_account_dict = list(neon_account_dict.values())
 
-        neon = NeonIxBuilder(owner)
+        neon = NeonIxBuilder(Config(), owner)
         neon.init_operator_neon(NeonAddress(signer_acct.address))
         neon.init_neon_tx(NeonTx.from_string(neon_tx))
         neon.init_neon_account_list(neon_account_dict)

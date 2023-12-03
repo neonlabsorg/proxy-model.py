@@ -139,7 +139,7 @@ class CompleteTest(unittest.TestCase):
         ))
         OpResInit(cls.config, cls.solana).init_resource(resource)
 
-        neon_ix_builder = NeonIxBuilder(resource.public_key)
+        neon_ix_builder = NeonIxBuilder(cls.config, resource.public_key)
         neon_ix_builder.init_operator_neon(NeonAddress.from_private_key(resource.secret_key))
 
         neon_tx = NeonTx.from_string(raw_tx)
@@ -170,14 +170,9 @@ class CompleteTest(unittest.TestCase):
         cls.tx_hash = tx_hash = tx_store.tx_signed.hash
         print(f'tx_hash: {tx_hash.hex()}')
 
-        tx = SolLegacyTx(
-            name='HangedTx',
-            ix_list=[
-                neon_ix_builder.make_compute_budget_heap_ix(),
-                neon_ix_builder.make_compute_budget_cu_ix(),
-                neon_ix_builder.make_tx_step_from_data_ix(10, 1)
-            ]
-        )
+        ix_list = neon_ix_builder.make_compute_budget_ix_list()
+        ix_list.append(neon_ix_builder.make_tx_step_from_data_ix(10, 1))
+        tx = SolLegacyTx(name='HangedTx', ix_list=ix_list)
         cls.solana.send_tx(tx, signer)
 
     @classmethod
@@ -204,20 +199,15 @@ class CompleteTest(unittest.TestCase):
         )
         noniterative = neon_ix_builder.make_tx_exec_from_data_ix()
 
-        tx = SolLegacyTx(
-            name='InvokedTx',
-            ix_list=[
-                neon_ix_builder.make_compute_budget_heap_ix(),
-                neon_ix_builder.make_compute_budget_cu_ix(),
-                SolTxIx(
-                    accounts=[
-                        SolAccountMeta(pubkey=EVM_PROGRAM_ID, is_signer=False, is_writable=False)
-                    ] + noniterative.accounts,
-                    data=noniterative.data,
-                    program_id=SolPubKey.from_string(proxy_program)
-                )
-            ]
-        )
+        ix_list = neon_ix_builder.make_compute_budget_ix_list()
+        ix_list.append(SolTxIx(
+            accounts=[
+                SolAccountMeta(pubkey=EVM_PROGRAM_ID, is_signer=False, is_writable=False)
+            ] + noniterative.accounts,
+            data=noniterative.data,
+            program_id=SolPubKey.from_string(proxy_program)
+        ))
+        tx = SolLegacyTx(name='InvokedTx', ix_list=ix_list)
 
         cls.solana.send_tx(tx, signer)
 
@@ -245,20 +235,15 @@ class CompleteTest(unittest.TestCase):
         )
 
         iterative = neon_ix_builder.make_tx_step_from_data_ix(250, 1)
-        tx = SolLegacyTx(
-            name='InvokedCombineTx',
-            ix_list=[
-                neon_ix_builder.make_compute_budget_heap_ix(),
-                neon_ix_builder.make_compute_budget_cu_ix(),
-                SolTxIx(
-                    accounts=[
-                        SolAccountMeta(pubkey=EVM_PROGRAM_ID, is_signer=False, is_writable=False)
-                    ] + iterative.accounts,
-                    data=b''.join([bytes.fromhex("ef"), iterative.data]),
-                    program_id=SolPubKey.from_string(proxy_program)
-                )
-            ]
-        )
+        ix_list = neon_ix_builder.make_compute_budget_ix_list()
+        ix_list.append(SolTxIx(
+            accounts=[
+                SolAccountMeta(pubkey=EVM_PROGRAM_ID, is_signer=False, is_writable=False)
+            ] + iterative.accounts,
+            data=b''.join([bytes.fromhex("ef"), iterative.data]),
+            program_id=SolPubKey.from_string(proxy_program)
+        ))
+        tx = SolLegacyTx(name='InvokedCombineTx', ix_list=ix_list)
 
         cls.solana.send_tx(tx, signer)
 
@@ -293,15 +278,10 @@ class CompleteTest(unittest.TestCase):
         neon_ix_builder.init_neon_tx(NeonTx.from_string(call2.tx_signed.rawTransaction))
         noniterative2 = neon_ix_builder.make_tx_exec_from_data_ix()
 
-        tx = SolLegacyTx(
-            name='TwoCallsTx',
-            ix_list=[
-                neon_ix_builder.make_compute_budget_heap_ix(),
-                neon_ix_builder.make_compute_budget_cu_ix(),
-                noniterative1,
-                noniterative2
-            ]
-        )
+        ix_list = neon_ix_builder.make_compute_budget_ix_list()
+        ix_list.append(noniterative1)
+        ix_list.append(noniterative2)
+        tx = SolLegacyTx(name='TwoCallsTx', ix_list=ix_list)
 
         cls.solana.send_tx(tx, signer)
 

@@ -178,6 +178,8 @@ class Config(DBConfig):
         # Testing settings
         self._fuzz_fail_pct = self._env_num('FUZZ_FAIL_PCT', 0, 0, 100)
 
+        self._cu_price = self._env_num('CU_PRICE', 0, 0, 1_000_000_000_000_000_000)
+
     def _validate(self) -> None:
         assert (self._const_gas_price < 0) or (self._const_gas_price >= self._min_gas_price)
 
@@ -590,6 +592,10 @@ class Config(DBConfig):
     def fuzz_fail_pct(self) -> int:
         return self._fuzz_fail_pct
 
+    @property
+    def cu_price(self) -> int:
+        return self._cu_price
+
     def as_dict(self) -> dict:
         config_dict = {
             'EVM_LOADER_ID': EVM_PROGRAM_ID_STR,
@@ -671,6 +677,8 @@ class Config(DBConfig):
 
             # Testing settings
             'FUZZ_FAIL_PCT': self.fuzz_fail_pct,
+
+            'CU_PRICE': self.cu_price,
         }
         if not self.hide_solana_url:
             config_dict.update({

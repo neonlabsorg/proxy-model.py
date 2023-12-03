@@ -57,7 +57,7 @@ class HolderHandler:
 
         size = self._config.holder_size
         balance = self._solana.get_rent_exempt_balance_for_size(size)
-        builder = NeonIxBuilder(res_info.public_key)
+        builder = NeonIxBuilder(self._config, res_info.public_key)
         stage = NeonCreateHolderAccountStage(builder, res_info.holder_account, res_info.holder_seed, size, balance)
         self._execute_stage(stage, res_info)
         print(
@@ -82,7 +82,7 @@ class HolderHandler:
             return
 
         res_info = OpResInfo.from_ident(res_ident)
-        builder = NeonIxBuilder(res_info.public_key)
+        builder = NeonIxBuilder(self._config, res_info.public_key)
         stage = NeonDeleteHolderAccountStage(builder, res_info.holder_account)
         self._execute_stage(stage, res_info)
         print(

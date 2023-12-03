@@ -112,7 +112,7 @@ class BlockedTest(unittest.TestCase):
         tx_store = self.proxy.sign_transaction(self.eth_account, tx_store)
         print(f'blocked tx hash: {tx_store.tx_signed.hash.hex()}')
 
-        neon_ix_builder = NeonIxBuilder(resource.public_key)
+        neon_ix_builder = NeonIxBuilder(self.config, resource.public_key)
         neon_ix_builder.init_operator_neon(NeonAddress.from_private_key(resource.secret_key))
 
         neon_tx = NeonTx.from_string(tx_store.tx_signed.rawTransaction)
@@ -124,14 +124,9 @@ class BlockedTest(unittest.TestCase):
 
         neon_ix_builder.init_iterative(resource.holder_account)
 
-        sol_tx = SolLegacyTx(
-            name='BlockAccount',
-            ix_list=[
-                neon_ix_builder.make_compute_budget_heap_ix(),
-                neon_ix_builder.make_compute_budget_cu_ix(),
-                neon_ix_builder.make_tx_step_from_data_ix(500, 1)
-            ]
-        )
+        ix_list = neon_ix_builder.make_compute_budget_ix_list()
+        ix_list.append(neon_ix_builder.make_tx_step_from_data_ix(500, 1))
+        sol_tx = SolLegacyTx(name='BlockAccount', ix_list=ix_list)
 
         self.solana.send_tx(sol_tx, resource.signer)
         return sol_tx

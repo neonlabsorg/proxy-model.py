@@ -38,7 +38,7 @@ class OpResInit:
         try:
             self._validate_operator_balance(resource)
 
-            builder = NeonIxBuilder(resource.public_key)
+            builder = NeonIxBuilder(self._config, resource.public_key)
             self._create_holder_account(builder, resource)
             self._create_neon_account(builder, resource)
         except (RescheduleError, StuckTxError):
