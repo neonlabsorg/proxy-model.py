@@ -116,8 +116,8 @@ class Config(DBConfig):
         self._operator_fee = self._env_num('OPERATOR_FEE', Decimal('0.1'), Decimal('0.0'), Decimal('100.0'))
         self._gas_price_slippage = self._env_num('GAS_PRICE_SLIPPAGE', Decimal('0.1'), Decimal('0.0'), Decimal('100.0'))
 
-        min_gas_price = self._env_num('MINIMAL_GAS_PRICE', 1, 0, 100_000_000)
-        self._min_gas_price = min_gas_price * (10 ** 9)
+        min_gas_price = self._env_num('MINIMAL_GAS_PRICE', Decimal(1), Decimal(0), Decimal(100_000_000))
+        self._min_gas_price = int(min_gas_price * (10 ** 9))
         self._min_wo_chainid_gas_price = self._env_num('MINIMAL_WO_CHAINID_GAS_PRICE', 10, 0, 100_000_000) * (10 ** 9)
         self._allow_underpriced_tx_wo_chainid = self._env_bool('ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID', False)
 
