@@ -19,17 +19,6 @@ services:
       start_period: 5s
     entrypoint: /opt/solana-run-neon.sh
 
-  neon_test_invoke_program_loader:
-    image: ${DOCKERHUB_ORG_NAME}/neon_test_invoke_program:develop
-    environment:
-      SOLANA_URL: http://solana:8899
-    networks:
-      - net
-    depends_on:
-      solana:
-        condition: service_healthy
-    entrypoint: /opt/neon-test-invoke-program.sh
-
   postgres:
     image: postgres:15.3
     command: postgres -c 'max_connections=1000'
