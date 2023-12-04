@@ -149,11 +149,7 @@ jobs:
       - name: Set latest tag for test image if feature/version branch doesn't exist
         id: neon_test_final_tag
         run: |
-          if [[ "${{ steps.test_image_exists.outcome }}" == "success" && "${{ github.ref_name }}" != "develop" ]]; then
-            tag=${{ steps.neon_test_tag.outputs.value}}
-          else
-            tag='latest'
-          fi
+          tag='v1.4.x'
           echo "value=${tag}"
           echo "value=${tag}" >> $GITHUB_OUTPUT
       - name: Build docker image
