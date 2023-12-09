@@ -257,7 +257,7 @@ jobs:
       NETWORK_NAME: aws_custom
     steps:
       - name: Pull docker image
-        run: docker pull ${{ env.NEON_TEST_IMAGE }}:${{ needs.build-image.outputs.neon_test_tag }}
+        run: docker pull ${{ env.NEON_TEST_IMAGE }}:4485c15b47aaffaa3c39d22b7d2fa6d2ed2ce751
       - name: Run docker container
         run: |
           docker run -i -e PROXY_IP=${{env.PROXY_IP}} \
@@ -310,7 +310,7 @@ jobs:
     steps:
       - name: Run docker container
         run: |
-          image="${{ env.NEON_TEST_IMAGE }}:${{ needs.build-image.outputs.neon_test_tag }}"
+          image="${{ env.NEON_TEST_IMAGE }}:4485c15b47aaffaa3c39d22b7d2fa6d2ed2ce751"
           docker pull $image
           docker run -i -d -e PROXY_IP=${{ env.PROXY_IP }} -e SOLANA_IP=${{ env.SOLANA_IP }} \
           --name=${{ env.CONTAINER }} $image /bin/bash
@@ -363,7 +363,7 @@ jobs:
     steps:
       - name: Run docker container
         run: |
-          image="${{ env.NEON_TEST_IMAGE }}:${{ needs.build-image.outputs.neon_test_tag }}"
+          image="${{ env.NEON_TEST_IMAGE }}:4485c15b47aaffaa3c39d22b7d2fa6d2ed2ce751"
           docker pull $image
           docker run -i -d -e PROXY_IP=${{ env.PROXY_IP }} -e SOLANA_IP=${{ env.SOLANA_IP }} \
           --name=${{ env.CONTAINER }} $image /bin/bash
