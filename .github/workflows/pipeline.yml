@@ -417,8 +417,8 @@ jobs:
           TF_VAR_branch: ${{ steps.vars.outputs.bname }}
         run: |
           python3 ./.github/workflows/deploy.py destroy_terraform \
-          --run_number=${{env.GITHUB_RUN_NUMBER}} \
-          --proxy_tag=${{ needs.build-image.outputs.proxy_tag }}
+          --run_number=2632 \
+          --proxy_tag=162a514266efbb6f99a66a3b66f62dc163cbef31-2c0a080c02
   finalize-image:
     runs-on: build-runner
     needs:
