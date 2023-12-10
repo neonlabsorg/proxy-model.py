@@ -251,7 +251,7 @@ def destroy_terraform(proxy_tag, run_number):
     thstate_key = f'tests/test-{proxy_tag}-{run_number}'
 
     backend_config = {"bucket": "nl-ci-stands",
-                      "key": thstate_key, "region": "us-east-1"}
+                      "key": thstate_key, "region": TFSTATE_REGION}
     terraform.init(backend_config=backend_config)
     #### terraform.apply('-destroy', skip_plan=True)
     tf_destroy = terraform.plan('-destroy')
