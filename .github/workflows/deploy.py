@@ -248,13 +248,13 @@ def destroy_terraform(proxy_tag, run_number):
     ####
     os.environ["TF_VAR_proxy_image_tag"] = proxy_tag
     os.environ["TF_VAR_dockerhub_org_name"] = DOCKERHUB_ORG_NAME
-    thstate_key = f'{TFSTATE_KEY_PREFIX}{proxy_tag}-{run_number}'
+    thstate_key = f'tests/test-{proxy_tag}-{run_number}'
 
-    backend_config = {"bucket": TFSTATE_BUCKET,
-                      "key": thstate_key, "region": TFSTATE_REGION}
+    backend_config = {"bucket": "nl-ci-stands",
+                      "key": thstate_key, "region": "us-east-1"}
     terraform.init(backend_config=backend_config)
     #### terraform.apply('-destroy', skip_plan=True)
-    tf_destroy = terraform.apply('-destroy', skip_plan=True)
+    tf_destroy = terraform.plan('-destroy')
     log.info(format_tf_output(tf_destroy))
 
 
