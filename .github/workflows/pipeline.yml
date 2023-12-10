@@ -60,7 +60,7 @@ jobs:
     steps:
       - name: Destroy terraform infrastructure
         env:
-          TF_VAR_branch: /refs/heads/develop
+          TF_VAR_branch: ""
         run: |
           python3 ./.github/workflows/deploy.py destroy_terraform \
           --run_number=2632 \
