@@ -1287,11 +1287,17 @@ class NeonRpcApiWorker:
         if to_addr:
             to_addr = to_addr.checksum_address
 
+        from_addr = neon_tx_info.addr
+        if from_addr is None:
+            from_addr = '0x' + '0' * 40
+        else:
+            from_addr = NeonAddress.from_raw(neon_tx_info.addr).checksum_address
+
         return {
             'blockHash': '0x' + '0' * 64,
             'blockNumber': None,
             'transactionIndex': None,
-            'from': NeonAddress.from_raw(neon_tx_info.addr).checksum_address,
+            'from': from_addr,
             'gas': hex(neon_tx_info.gas_limit),
             'gasPrice': hex(neon_tx_info.gas_price),
             'hash': neon_tx_info.sig,
