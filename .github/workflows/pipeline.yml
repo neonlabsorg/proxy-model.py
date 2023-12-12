@@ -306,7 +306,7 @@ jobs:
       PROXY_IP: ${{ needs.prepare-infrastructure.outputs.proxy_ip }}
       NUMPROCESSES: 4
       CONTAINER: basic-${{ github.run_id }}
-      NETWORK: aws
+      NETWORK: terraform
     steps:
       - name: Run docker container
         run: |
