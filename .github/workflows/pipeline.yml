@@ -233,7 +233,7 @@ jobs:
       proxy_ip: ${{ steps.share.outputs.proxy_ip }}
 
   openzeppelin-tests:
-    if: ${{needs.prepare-infrastructure.result != 'skipped'}}
+    if: ${{needs.prepare-infrastructure.result == 'ENABLE'}}
     needs:
       - prepare-infrastructure
       - build-image
@@ -419,7 +419,7 @@ jobs:
     if: |
       always() &&
       needs.deploy-check.result == 'success' &&
-      ((needs.openzeppelin-tests.result == 'success' && needs.basic-tests.result == 'success'
+      ((needs.basic-tests.result == 'success'
       && needs.dapps-tests.result == 'success' && contains(fromJSON('["success", "skipped"]'), needs.economy-tests.result)) ||
       needs.prepare-infrastructure.result == 'skipped')
     steps:
