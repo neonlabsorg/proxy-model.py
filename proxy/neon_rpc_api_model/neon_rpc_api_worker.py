@@ -637,12 +637,14 @@ class NeonRpcApiWorker:
         if not isinstance(obj, dict):
             raise InvalidParamError(message='invalid object type')
 
-        if not obj['data']:
+        if not obj.get('data'):
             raise InvalidParamError(message="missing data")
+
+        contract = obj.get('to')
+        contract = self._normalize_address(contract, 'to-address')
 
         try:
             sender = obj.get('from')
-            contract = obj.get('to')
             data = obj.get('data')
             value = obj.get('value')
             gas_limit = obj.get('gas')
