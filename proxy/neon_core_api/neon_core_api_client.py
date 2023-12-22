@@ -2,6 +2,7 @@ import json
 import logging
 import requests
 import re
+import time
 
 from typing import Optional, Dict, Any, Union, List, Tuple
 
@@ -93,10 +94,10 @@ class NeonCoreApiClient:
 
     def __init__(self, config: Config):
         self._config = config
-        self._retry_cnt = len(config.solana_url_list)
+        self._client_cnt = len(config.solana_url_list)
 
         port = config.neon_core_api_port
-        self._client_list = [_NeonCoreApiClient(port + idx) for idx in range(self._retry_cnt)]
+        self._client_list = [_NeonCoreApiClient(port + idx) for idx in range(self._client_cnt)]
         self._last_client_idx = 0
 
     def _get_client(self) -> _NeonCoreApiClient:
@@ -109,12 +110,15 @@ class NeonCoreApiClient:
         return self._client_list[idx]
 
     def _call(self, method, *args, **kwargs) -> Any:
-        for retry in range(self._retry_cnt):
-            client = self._get_client()
-            try:
-                return method(client, *args, **kwargs)
-            except BaseException as exc:
-                LOG.warning(f'Fail to call {method.__name__} on the neon_core_api({client.port})', exc_info=exc)
+        for retry in range(30):
+            for _ in range(self._client_cnt):
+                client = self._get_client()
+                try:
+                    return method(client, *args, **kwargs)
+                except BaseException as exc:
+                    LOG.warning(f'Fail to call {method.__name__} on the neon_core_api({client.port})', exc_info=exc)
+                LOG.warning(f'Fail to call {method.__name__} on the neon_core_api, sleep on 1 second...')
+                time.sleep(1)
 
     def emulate(
         self,
