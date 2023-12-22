@@ -73,13 +73,23 @@ class _NeonCoreApiClient:
     def _get(self, url: str, request: RPCRequest) -> RPCResponse:
         return self._send_request(lambda: self._client.get(url, params=request))
 
+    def _get_json(self, raw_response: requests.Response) -> RPCResponse:
+        json_response = raw_response.json()
+        error = json_response.get('error', None)
+        if error is None:
+            return json_response
+
+        if error.startswith('Solana client error.'):
+            raise ValueError(raw_response.content)
+        return json_response
+
     def _send_request(self, request) -> RPCResponse:
         raw_response: Optional[requests.Response] = None
         try:
             raw_response = request()
             # TODO: strange workflow in neon-core-api
             # raw_response.raise_for_status()
-            return raw_response.json()
+            return self._get_json(raw_response)
         except (BaseException,):
             self._close()
             if raw_response is not None:
