@@ -85,7 +85,7 @@ class NeonHandler:
         tx_hash = self._proxy.send_raw_transaction(tx_signed.rawTransaction)
         amount = self._get_neon_amount(amount)
 
-        print(f'send {amount:,.18} NEON from {str(from_addr)} to 0x{to_addr.hex()}: 0x{tx_hash.hex()}')
+        print(f'send {amount:,.18} NEON from {str(from_addr)} to 0x{to_addr.hex()}: {tx_hash.hex()}')
 
     def _estimate_tx(self, from_addr: NeonAddress, to_addr: Address) -> int:
         tx = self._create_tx(from_addr, to_addr, 1)

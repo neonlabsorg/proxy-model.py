@@ -76,8 +76,7 @@ class NeonCli(CliBase):
         if isinstance(addr, NeonAddress):
             addr = str(addr)
 
-        response = self.call('get-ether-account-data', addr)
-        json_acct = response.get('value')
+        json_acct = self.call('get-ether-account-data', addr)
         if not json_acct:
             return None
         return NeonAccountInfo.from_json(json_acct)
