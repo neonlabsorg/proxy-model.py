@@ -175,7 +175,6 @@ class SolTxListSender:
             tx = tx_state.tx
             if not tx.is_cloned():
                 self._tx_list.append(tx.clone())
-                return
 
     def _clear_rescheduled_error_list(self) -> None:
         """Mark all rescheduled errors as succeed."""
