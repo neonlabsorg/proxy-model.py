@@ -37,7 +37,6 @@ from ..common_neon.errors import StuckTxError
 from ..common_neon.operator_resource_info import OpResIdent
 from ..common_neon.operator_resource_mng import OpResMng
 from ..common_neon.utils.json_logger import logging_context
-from ..common_neon.constants import ONE_BLOCK_SEC
 
 from ..statistic.data import NeonTxBeginData, NeonTxEndCode, NeonTxEndData
 from ..statistic.proxy_client import ProxyStatClient
@@ -66,8 +65,8 @@ class MemPool:
         self._gas_price_task_loop = MPGasPriceTaskLoop(executor_mng)
         self._state_tx_cnt_task_loop = MPSenderTxCntTaskLoop(executor_mng, self._tx_schedule)
 
-        self._reschedule_timeout_sec = ONE_BLOCK_SEC * 3
-        self._check_task_timeout_sec = 0.05
+        self._reschedule_time_sec = config.mempool_reschedule_time_sec
+        self._check_task_time_sec = 0.05
 
         if not config.enable_send_tx_api:
             return
@@ -263,7 +262,7 @@ class MemPool:
 
     async def _process_tx_schedule_loop(self):
         while (not self.has_gas_price()) and (not ElfParams().has_params()):
-            await asyncio.sleep(self._check_task_timeout_sec)
+            await asyncio.sleep(self._check_task_time_sec)
 
         while True:
             try:
@@ -313,7 +312,7 @@ class MemPool:
             self._fill_mempool_stat(stat)
             self._stat_client.commit_tx_end(stat)
 
-            await asyncio.sleep(self._check_task_timeout_sec)
+            await asyncio.sleep(self._check_task_time_sec)
 
     def _complete_task(self, mp_task: MPTask) -> NeonTxEndCode:
         try:
@@ -394,9 +393,9 @@ class MemPool:
 
     async def _reschedule_tx(self, tx: MPTxExecRequest):
         with logging_context(req_id=tx.req_id):
-            LOG.debug(f'Tx will be rescheduled in {math.ceil(self._reschedule_timeout_sec * 1000)} msec')
+            LOG.debug(f'Tx will be rescheduled in {int(self._reschedule_time_sec * 1000)} msec')
 
-        await asyncio.sleep(self._reschedule_timeout_sec)
+        await asyncio.sleep(self._reschedule_time_sec)
 
         with logging_context(req_id=tx.req_id):
             try:
