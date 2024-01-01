@@ -16,7 +16,6 @@ from .config import Config
 from .solana_interactor import SolInteractor
 from .solana_tx import SolTx, SolBlockHash, SolTxReceipt, SolAccount, SolCommit
 from .solana_tx_error_parser import SolTxErrorParser, SolTxError
-from .utils import str_enum
 
 
 LOG = logging.getLogger(__name__)
@@ -64,13 +63,14 @@ class SolTxSendState:
 
     @property
     def block_slot(self) -> Optional[int]:
-        if self.receipt is None:
-            return None
-        return self.receipt.get('slot')
+        return self.receipt.get('slot') if self.receipt else None
 
     @property
     def name(self) -> str:
         return self.tx.name
+
+    def clear_error(self) -> None:
+        object.__setattr__(self, 'error', None)
 
 
 class SolTxListSender:
@@ -88,6 +88,7 @@ class SolTxListSender:
     _resubmitted_tx_status_list = (
         SolTxSendState.Status.NoReceiptError,
         SolTxSendState.Status.BlockHashNotFoundError,
+        SolTxSendState.Status.NodeBehindError,  # doesn't have error on resend, see _clear_rescheduled_error_list
     )
 
     _rescheduled_tx_status_list = (
@@ -138,8 +139,8 @@ class SolTxListSender:
         if not self.has_good_sol_tx_receipt():
             self._get_tx_list_to_block_account()
 
-        # This is the new attempt of sending,
-        # so here the Sender prevents the raising of the rescheduling errors
+        # This is the new sending attempt,
+        # so prevent the raising of the rescheduling errors
         self._clear_rescheduled_error_list()
 
         # If there were no problems with blocked accounts, do it in the direct way
@@ -166,27 +167,29 @@ class SolTxListSender:
 
     def _get_tx_list_to_block_account(self) -> None:
         """Try to find the not-cloned tx with blocked accounts error.
-        And add the clone of the tx to list for sending."""
+        Create the cloned tx, add keep the old tx in the state map for the next rechecking.
+        Add the cloned tx to list for sending."""
         tx_state_list = self._tx_state_list_dict.get(SolTxSendState.Status.BlockedAccountError, None)
-        if tx_state_list is None:
+        if not tx_state_list:
             return
 
         for tx_state in tx_state_list:
             tx = tx_state.tx
+            # Make a clone to save sent tx in the state map for the next rechecking
             if not tx.is_cloned():
                 self._tx_list.append(tx.clone())
+                return
 
     def _clear_rescheduled_error_list(self) -> None:
-        """Mark all rescheduled errors as succeed."""
+        """Clear rescheduled errors to prevent raising of errors on check status."""
         for status in self._rescheduled_tx_status_list:
-            tx_state_list = self._tx_state_list_dict.pop(status, None)
-            if tx_state_list is None:
+            tx_state_list = self._tx_state_list_dict.get(status, None)
+            if not tx_state_list:
                 continue
 
             for tx_state in tx_state_list:
-                LOG.debug(f'Clear reschedule state for {tx_state.sig}')
-                new_tx_state = dataclasses.replace(tx_state, status=status.GoodReceipt, error=None)
-                self._add_tx_state(new_tx_state)
+                LOG.debug(f'Clear error for {tx_state.sig} with the rescheduled status: {status.name}')
+                tx_state.clear_error()
 
     def _send(self) -> bool:
         try:
@@ -237,7 +240,7 @@ class SolTxListSender:
         # find maximum block slot
         max_block_slot = 0
         for tx_state in self._tx_state_dict.values():
-            if tx_state.block_slot is not None:
+            if tx_state.block_slot:
                 max_block_slot = max(max_block_slot, tx_state.block_slot)
 
         if max_block_slot == 0:
@@ -257,12 +260,11 @@ class SolTxListSender:
             if tx_status not in self._tx_state_list_dict:
                 continue
 
-            name = str_enum(tx_status)
             cnt = len(self._tx_state_list_dict[tx_status])
 
             if len(result) > 0:
                 result += ', '
-            result += f'{name} {cnt}'
+            result += f'{tx_status.name} {cnt}'
         return result
 
     def _get_fuzz_block_hash(self) -> SolBlockHash:
@@ -275,7 +277,7 @@ class SolTxListSender:
         if self._block_hash in self._bad_block_hash_set:
             self._block_hash = None
 
-        if self._block_hash is not None:
+        if self._block_hash:
             return self._block_hash
 
         resp = self._solana.get_recent_block_hash()
@@ -298,7 +300,7 @@ class SolTxListSender:
                     LOG.debug(f'Flash bad block hash: {tx.recent_block_hash} for tx {str(tx.sig)}')
                     tx.recent_block_hash = None
 
-            if tx.recent_block_hash is not None:
+            if tx.recent_block_hash:
                 LOG.debug(f'Skip signing, tx {str(tx.sig)} has block hash {tx.recent_block_hash}')
                 continue
 
@@ -326,7 +328,7 @@ class SolTxListSender:
 
         no_receipt_status = SolTxSendState.Status.WaitForReceipt
         for tx, send_result in zip(self._tx_list, send_result_list):
-            tx_receipt = send_result.error if send_result.result is None else None
+            tx_receipt = send_result.error if not send_result.result else None
             self._add_tx_receipt(tx, tx_receipt, no_receipt_status)
 
         if not fuzz_fail_pct:
@@ -365,20 +367,24 @@ class SolTxListSender:
         # Raise error if
         for tx_status_list in self._tx_state_list_dict.values():
             error = tx_status_list[0].error
-            if error is not None:
+            if error:
                 raise error
 
         # Resend txs with the resubmitted status
         for tx_status in self._resubmitted_tx_status_list:
             tx_state_list = self._tx_state_list_dict.pop(tx_status, None)
-            if tx_state_list is None:
-                continue
+            if tx_state_list:
+                self._tx_list.extend([tx_state.tx for tx_state in tx_state_list])
 
-            self._tx_list.extend([tx_state.tx for tx_state in tx_state_list])
+        # On rechecking there was the clearing of errors,
+        # If we here, the account are blocked, and we can send next transactions
+        tx_state_list = self._tx_state_list_dict.get(SolTxSendState.Status.BlockedAccountError, None)
+        if tx_state_list:
+            self._tx_list.extend([tx_state.tx.clone() for tx_state in tx_state_list if not tx_state.tx.is_cloned()])
 
     def _wait_for_tx_receipt_list(self) -> None:
         tx_state_list = self._tx_state_list_dict.pop(SolTxSendState.Status.WaitForReceipt, None)
-        if tx_state_list is None:
+        if not tx_state_list:
             LOG.debug('no new receipts, because the transaction list is empty')
             return
 
@@ -397,9 +403,10 @@ class SolTxListSender:
         self._get_tx_receipt_list(tx_sig_list, tx_list)
 
     def _get_tx_receipt_list(self, tx_sig_list: Optional[List[str]], tx_list: List[SolTx]) -> None:
+        no_receipt_status = SolTxSendState.Status.NoReceiptError
         tx_receipt_list = self._solana.get_tx_receipt_list(tx_sig_list, SolCommit.Confirmed)
         for tx, tx_receipt in zip(tx_list, tx_receipt_list):
-            self._add_tx_receipt(tx, tx_receipt, SolTxSendState.Status.NoReceiptError)
+            self._add_tx_receipt(tx, tx_receipt, no_receipt_status)
 
     @dataclasses.dataclass(frozen=True)
     class _DecodeResult:
@@ -411,7 +418,7 @@ class SolTxListSender:
         tx_error_parser = SolTxErrorParser(tx_receipt)
 
         slots_behind = tx_error_parser.get_slots_behind()
-        if slots_behind is not None:
+        if slots_behind:
             return self._DecodeResult(status.NodeBehindError, NodeBehindError(slots_behind))
         elif tx_error_parser.check_if_block_hash_notfound():
             if tx.recent_block_hash not in self._bad_block_hash_set:
@@ -458,7 +465,7 @@ class SolTxListSender:
         return self._DecodeResult(status.GoodReceipt, None)
 
     def _add_tx_receipt(self, tx: SolTx, tx_receipt: Optional[SolTxReceipt], no_receipt_status: SolTxSendState.Status):
-        if tx_receipt is None:
+        if not tx_receipt:
             res = self._DecodeResult(no_receipt_status, None)
         else:
             res = self._decode_tx_status(tx, tx_receipt)
@@ -471,12 +478,8 @@ class SolTxListSender:
         )
 
         status = SolTxSendState.Status
-        if tx_state.status not in {status.WaitForReceipt, status.UnknownError}:
-            log_fn = LOG.warning if tx_receipt is None else LOG.debug
-            log_fn(f'tx status {tx_state.sig}: {str_enum(tx_state.status)}')
+        if tx_state.status not in (status.WaitForReceipt, status.UnknownError):
+            LOG.debug(f'tx status {tx_state.sig} ({tx_state.name}): {tx_state.status.name}')
 
-        self._add_tx_state(tx_state)
-
-    def _add_tx_state(self, tx_state: SolTxSendState) -> None:
         self._tx_state_dict[tx_state.sig] = tx_state
         self._tx_state_list_dict.setdefault(tx_state.status, list()).append(tx_state)
