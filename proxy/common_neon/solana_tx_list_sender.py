@@ -76,26 +76,17 @@ class SolTxSendState:
 class SolTxListSender:
     _confirmed_level = SolCommit.to_level(SolCommit.Confirmed)
 
-    _good_tx_status_set = {
+    _good_tx_status_list = (
         SolTxSendState.Status.WaitForReceipt,
         SolTxSendState.Status.GoodReceipt,
         SolTxSendState.Status.AccountAlreadyExistsError,
         SolTxSendState.Status.AlreadyFinalizedError,
-    }
-
-    _good_tx_status_list = list(_good_tx_status_set)
+    )
 
     _resubmitted_tx_status_list = (
         SolTxSendState.Status.NoReceiptError,
         SolTxSendState.Status.BlockHashNotFoundError,
-        SolTxSendState.Status.NodeBehindError,  # doesn't have error on resend, see _clear_rescheduled_error_list
-    )
-
-    _rescheduled_tx_status_list = (
         SolTxSendState.Status.NodeBehindError,
-        SolTxSendState.Status.BlockedAccountError,
-        SolTxSendState.Status.AltInvalidIndexError,
-        SolTxSendState.Status.AltAlreadyExistError
     )
 
     def __init__(self, config: Config, solana: SolInteractor, signer: SolAccount):
@@ -105,6 +96,7 @@ class SolTxListSender:
         self._block_hash: Optional[SolBlockHash] = None
         self._bad_block_hash_set: Set[SolBlockHash] = set()
         self._tx_list: List[SolTx] = list()
+        self._rescheduled_tx_list: List[SolTx] = list()
         self._tx_state_dict: Dict[str, SolTxSendState] = dict()
         self._tx_state_list_dict: Dict[SolTxSendState.Status, List[SolTxSendState]] = dict()
 
@@ -140,8 +132,8 @@ class SolTxListSender:
             self._get_tx_list_to_block_account()
 
         # This is the new sending attempt,
-        # so prevent the raising of the rescheduling errors
-        self._clear_rescheduled_error_list()
+        # so prevent the raising of rescheduling errors
+        self._clear_errors()
 
         # If there were no problems with blocked accounts, do it in the direct way
         if not len(self._tx_list):
@@ -166,30 +158,32 @@ class SolTxListSender:
         self._tx_state_list_dict.clear()
 
     def _get_tx_list_to_block_account(self) -> None:
-        """Try to find the not-cloned tx with blocked accounts error.
-        Create the cloned tx, add keep the old tx in the state map for the next rechecking.
-        Add the cloned tx to list for sending."""
+        """
+        - Try to find the non-cloned txs with the blocked account error
+        - Create a cloned tx from the first found tx
+        - Save other non-cloned txs for the second send
+        - Keep sent txs in the state map for future rechecks"""
+
         tx_state_list = self._tx_state_list_dict.get(SolTxSendState.Status.BlockedAccountError, None)
         if not tx_state_list:
             return
 
         for tx_state in tx_state_list:
-            tx = tx_state.tx
-            # Make a clone to save sent tx in the state map for the next rechecking
-            if not tx.is_cloned():
-                self._tx_list.append(tx.clone())
-                return
-
-    def _clear_rescheduled_error_list(self) -> None:
-        """Clear rescheduled errors to prevent raising of errors on check status."""
-        for status in self._rescheduled_tx_status_list:
-            tx_state_list = self._tx_state_list_dict.get(status, None)
-            if not tx_state_list:
+            if tx_state.tx.is_cloned():
                 continue
 
+            if not len(self._tx_list):
+                self._tx_list.append(tx_state.tx.clone())
+            else:
+                self._rescheduled_tx_list.append(tx_state.tx)
+
+    def _clear_errors(self) -> None:
+        """Clear rescheduled errors to prevent raising of errors on check status."""
+        for tx_state_list in self._tx_state_list_dict.values():
             for tx_state in tx_state_list:
-                LOG.debug(f'Clear error for {tx_state.sig} with the rescheduled status: {status.name}')
-                tx_state.clear_error()
+                if tx_state.error:
+                    LOG.debug(f'Clear error for {tx_state.sig} with the status: {tx_state.status.name}')
+                    tx_state.clear_error()
 
     def _send(self) -> bool:
         try:
@@ -226,6 +220,7 @@ class SolTxListSender:
             # at this point the Sender has all receipts from the network,
             #  some txs (blockhash errors for example) can require the resending
             self._get_tx_list_for_send()
+            self._get_rescheduled_tx_list_for_send()
 
         if len(self._tx_list) > 0:
             raise NoMoreRetriesError()
@@ -373,14 +368,18 @@ class SolTxListSender:
         # Resend txs with the resubmitted status
         for tx_status in self._resubmitted_tx_status_list:
             tx_state_list = self._tx_state_list_dict.pop(tx_status, None)
-            if tx_state_list:
-                self._tx_list.extend([tx_state.tx for tx_state in tx_state_list])
+            if not tx_state_list:
+                continue
 
-        # On rechecking there was the clearing of errors,
-        # If we here, the account are blocked, and we can send next transactions
-        tx_state_list = self._tx_state_list_dict.get(SolTxSendState.Status.BlockedAccountError, None)
-        if tx_state_list:
-            self._tx_list.extend([tx_state.tx.clone() for tx_state in tx_state_list if not tx_state.tx.is_cloned()])
+            self._tx_list.extend([tx_state.tx for tx_state in tx_state_list])
+
+    def _get_rescheduled_tx_list_for_send(self) -> None:
+        """If we are here, the accounts are blocked, and we can send the bulk of txs"""
+        if not len(self._rescheduled_tx_list):
+            return
+
+        self._tx_list.extend([tx.clone() for tx in self._rescheduled_tx_list])
+        self._rescheduled_tx_list.clear()
 
     def _wait_for_tx_receipt_list(self) -> None:
         tx_state_list = self._tx_state_list_dict.pop(SolTxSendState.Status.WaitForReceipt, None)
