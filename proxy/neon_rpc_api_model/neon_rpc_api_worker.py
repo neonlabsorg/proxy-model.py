@@ -240,7 +240,7 @@ class NeonRpcApiWorker:
             param['to'] = self._normalize_address(param['to'], 'to-address')
 
         try:
-            calculator = GasEstimate(self._core_api_client, param)
+            calculator = GasEstimate(self._config, self._core_api_client, param)
             calculator.execute(block)
             return hex(calculator.estimate())
 

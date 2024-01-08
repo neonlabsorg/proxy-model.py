@@ -1,4 +1,5 @@
 import logging
+import math
 
 from typing import Dict, Any, List, Optional
 
@@ -11,6 +12,7 @@ from ..common_neon.solana_alt_limit import ALTLimit
 from ..common_neon.solana_tx import SolAccount, SolPubKey, SolAccountMeta, SolBlockHash, SolTxSizeError
 from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_block import SolBlockInfo
+from ..common_neon.config import Config
 
 from ..neon_core_api.neon_core_api_client import NeonCoreApiClient
 
@@ -38,18 +40,21 @@ class _GasTxBuilder:
         self._neon_ix_builder.init_iterative(holder.pubkey())
         self._neon_ix_builder.init_operator_neon(neon_address)
 
-    def build_tx(self, tx: NeonTx, account_list: List[SolAccountMeta]) -> SolLegacyTx:
+    def build_tx(self, config: Config, tx: NeonTx, account_list: List[SolAccountMeta]) -> SolLegacyTx:
         self._neon_ix_builder.init_neon_tx(tx)
         self._neon_ix_builder.init_neon_account_list(account_list)
 
-        tx = SolLegacyTx(
-            name='Estimate',
-            ix_list=[
-                self._neon_ix_builder.make_compute_budget_heap_ix(),
-                self._neon_ix_builder.make_compute_budget_cu_ix(),
-                self._neon_ix_builder.make_tx_step_from_data_ix(ElfParams().neon_evm_steps, 1)
-            ]
-        )
+        ix_list = [
+            self._neon_ix_builder.make_compute_budget_heap_ix(),
+            self._neon_ix_builder.make_compute_budget_cu_ix()
+        ]
+
+        if config.cu_priority_fee > 0:
+            ix_list.append(self._neon_ix_builder.make_compute_budget_cu_fee_ix(config.cu_priority_fee))
+
+        ix_list.append(self._neon_ix_builder.make_tx_step_from_data_ix(ElfParams().neon_evm_steps, 1))
+
+        tx = SolLegacyTx(name='Estimate', ix_list=ix_list)
 
         tx.recent_block_hash = self._block_hash
         tx.sign(self._signer)
@@ -65,7 +70,9 @@ class GasEstimate:
     _tx_builder = _GasTxBuilder()
     _u256_max = int.from_bytes(bytes([0xFF] * 32), "big")
 
-    def __init__(self, core_api_client: NeonCoreApiClient, request: Dict[str, Any]):
+    def __init__(self, config: Config, core_api_client: NeonCoreApiClient, request: Dict[str, Any]):
+        self._config = config
+
         self._sender = request.get('from')
         self._contract = request.get('to')
         self._data = request.get('data')
@@ -109,7 +116,7 @@ class GasEstimate:
 
         self._cached_tx_cost_size = 0
         try:
-            sol_tx = self._tx_builder.build_tx(neon_tx, self._account_list)
+            sol_tx = self._tx_builder.build_tx(self._config, neon_tx, self._account_list)
             sol_tx.serialize()  # <- there will be exception about size
 
             if not self._contract:  # deploy case
@@ -132,15 +139,26 @@ class GasEstimate:
     def _execution_cost(self) -> int:
         return self._emulator_result.used_gas
 
-    @staticmethod
-    def _iterative_overhead_cost() -> int:
+    def _iterative_overhead_cost(self) -> int:
         """
         if the transaction fails on the simple execution in one iteration,
         it is executed in iterative mode to store the Neon receipt on Solana
         """
         last_iteration_cost = 5000
         cancel_cost = 5000
-        return last_iteration_cost + cancel_cost
+        if self._config.cu_priority_fee == 0:
+            return last_iteration_cost + cancel_cost
+
+        # Add priority fee to the estimated gas
+        iter_cnt = (
+            self._emulator_result.resize_iter_cnt + 2 +
+            math.ceil(self._emulator_result.evm_step_cnt / ElfParams().neon_evm_steps)
+        )
+
+        # Each iteration requests 1'400'000 CUs
+        #  Priority fee is calculated in micro-LAMPORTs per 1 CU
+        priority_gas = iter_cnt * math.ceil(self._config.cu_priority_fee * 1_400_000 / 1_000_000)
+        return last_iteration_cost + cancel_cost + priority_gas
 
     def _alt_cost(self) -> int:
         """
@@ -178,7 +196,7 @@ class GasEstimate:
         alt_cost = self._alt_cost()
 
         # Ethereum's wallets don't accept gas limit less than 21000
-        gas = max(execution_cost + tx_size_cost + overhead_cost + alt_cost, 21000)
+        gas = max(execution_cost + tx_size_cost + overhead_cost + alt_cost, 25000)
 
         LOG.debug(
             f'execution_cost: {execution_cost}, '
