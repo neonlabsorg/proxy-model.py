@@ -38,6 +38,9 @@ class NeonTxSendStrategyExecutor:
     def execute(self) -> NeonTxResultInfo:
         self._validate_nonce()
 
+        if not self._ctx.has_emulator_result():
+            self._emulate_neon_tx()
+
         start_idx = self._ctx.strategy_idx
         end_idx = len(self._strategy_list)
         try:

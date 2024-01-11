@@ -69,7 +69,7 @@ class NeonEmulatorResult:
     
     @cached_property
     def external_solana_call(self) -> bool:
-        return self._res_dict.get('external_solana_call', False)
+        return self._res_dict.get('external_solana_calls', False)
 
 
 class NeonTxExecCfg:
