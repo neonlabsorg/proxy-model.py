@@ -13,6 +13,8 @@ from .neon_tx_send_simple_holder_strategy import SimpleHolderNeonTxStrategy, ALT
 from .neon_tx_send_iterative_strategy import IterativeNeonTxStrategy, ALTIterativeNeonTxStrategy
 from .neon_tx_send_nochainid_strategy import NoChainIdNeonTxStrategy, ALTNoChainIdNeonTxStrategy
 from .neon_tx_send_simple_strategy import SimpleNeonTxStrategy, ALTSimpleNeonTxStrategy
+from .neon_tx_send_simple_solana_call_strategy import SimpleNeonTxSolanaCallStrategy, ALTSimpleNeonTxSolanaCallStrategy
+from .neon_tx_send_simple_holder_solana_call_strategy import SimpleHolderNeonTxSolanaCallStrategy, ALTSimpleHolderNeonTxSolanaCallStrategy
 from .neon_tx_sender_ctx import NeonTxSendCtx
 
 
@@ -21,6 +23,8 @@ LOG = logging.getLogger(__name__)
 
 class NeonTxSendStrategyExecutor:
     _strategy_list = [
+        SimpleNeonTxSolanaCallStrategy, ALTSimpleNeonTxSolanaCallStrategy,
+        SimpleHolderNeonTxSolanaCallStrategy, ALTSimpleHolderNeonTxSolanaCallStrategy,
         SimpleNeonTxStrategy, ALTSimpleNeonTxStrategy,
         IterativeNeonTxStrategy, ALTIterativeNeonTxStrategy,
         SimpleHolderNeonTxStrategy, ALTSimpleHolderNeonTxStrategy,
