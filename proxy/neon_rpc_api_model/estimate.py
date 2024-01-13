@@ -1,5 +1,5 @@
 import logging
-import math
+# import math
 
 from typing import Dict, Any, List, Optional
 
@@ -131,7 +131,8 @@ class GasEstimate:
         self._cached_tx_cost_size = self._holder_tx_cost(self._tx_builder.len_neon_tx)
         return self._cached_tx_cost_size
 
-    def _holder_tx_cost(self, neon_tx_len: int) -> int:
+    @staticmethod
+    def _holder_tx_cost(neon_tx_len: int) -> int:
         # TODO: should be moved to neon-core-api
         holder_msg_size = 950
         return ((neon_tx_len // holder_msg_size) + 1) * 5000
@@ -139,26 +140,27 @@ class GasEstimate:
     def _execution_cost(self) -> int:
         return self._emulator_result.used_gas
 
-    def _iterative_overhead_cost(self) -> int:
+    @staticmethod
+    def _iterative_overhead_cost() -> int:
         """
         if the transaction fails on the simple execution in one iteration,
         it is executed in iterative mode to store the Neon receipt on Solana
         """
         last_iteration_cost = 5000
         cancel_cost = 5000
-        if self._config.cu_priority_fee == 0:
-            return last_iteration_cost + cancel_cost
+        # if self._config.cu_priority_fee == 0:
+        return last_iteration_cost + cancel_cost
 
-        # Add priority fee to the estimated gas
-        iter_cnt = (
-            self._emulator_result.resize_iter_cnt + 2 +
-            math.ceil(self._emulator_result.evm_step_cnt / ElfParams().neon_evm_steps)
-        )
-
-        # Each iteration requests 1'400'000 CUs
-        #  Priority fee is calculated in micro-LAMPORTs per 1 CU
-        priority_gas = iter_cnt * math.ceil(self._config.cu_priority_fee * 1_400_000 / 1_000_000)
-        return last_iteration_cost + cancel_cost + priority_gas
+        # # Add priority fee to the estimated gas
+        # iter_cnt = (
+        #     self._emulator_result.resize_iter_cnt + 2 +
+        #     math.ceil(self._emulator_result.evm_step_cnt / ElfParams().neon_evm_steps)
+        # )
+        #
+        # # Each iteration requests 1'400'000 CUs
+        # #  Priority fee is calculated in micro-LAMPORTs per 1 CU
+        # priority_gas = iter_cnt * math.ceil(self._config.cu_priority_fee * 1_400_000 / 1_000_000)
+        # return last_iteration_cost + cancel_cost + priority_gas
 
     def _alt_cost(self) -> int:
         """
