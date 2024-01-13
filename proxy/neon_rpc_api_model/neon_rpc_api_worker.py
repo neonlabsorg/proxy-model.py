@@ -795,9 +795,11 @@ class NeonRpcApiWorker:
         if contract:
             contract = contract.checksum_address
 
+        from_addr = NeonAddress.from_raw(tx.neon_tx.addr)
+        from_addr = from_addr.checksum_address if from_addr else '0x' + '0' * 40
+
         to_addr = NeonAddress.from_raw(tx.neon_tx.to_addr)
-        if to_addr:
-            to_addr = to_addr.checksum_address
+        to_addr = to_addr.checksum_address if to_addr else None
 
         res = tx.neon_tx_res
 
@@ -807,7 +809,7 @@ class NeonRpcApiWorker:
             "type": hex(tx.neon_tx.tx_type),
             "blockHash": res.block_hash,
             "blockNumber": hex(res.block_slot),
-            "from": NeonAddress.from_raw(tx.neon_tx.addr).checksum_address,
+            "from": from_addr,
             "to": to_addr,
             "gasUsed": hex(res.gas_used),
             "cumulativeGasUsed": hex(res.sum_gas_used),
