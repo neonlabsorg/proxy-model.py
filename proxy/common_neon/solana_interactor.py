@@ -18,7 +18,8 @@ from .solana_tx import SolTx, SolBlockHash, SolPubKey, SolCommit
 from .solana_tx_error_parser import SolTxErrorParser
 from .utils.utils import get_from_dict, cached_property
 from .solana_block import SolBlockInfo
-from .layouts import AccountInfo, ALTAccountInfo
+from .layouts import AccountInfo, ALTAccountInfo, NeonAccountInfo
+from .constants import EVM_PROGRAM_ID
 
 
 LOG = logging.getLogger(__name__)
@@ -298,7 +299,7 @@ class SolInteractor:
 
         return self._decode_account_info(pubkey, raw_account)
 
-    def get_account_info_list(self, src_account_list: List[SolPubKey], length: Optional[int] = None,
+    def get_account_info_list(self, src_pubkey_list: List[SolPubKey], length: Optional[int] = None,
                               commitment=SolCommit.Confirmed) -> List[Optional[AccountInfo]]:
         opts = {
             'encoding': 'base64',
@@ -311,18 +312,28 @@ class SolInteractor:
                 'length': length
             }
 
-        account_info_list: List[Optional[AccountInfo]] = list()
-        while len(src_account_list) > 0:
-            account_list = [str(a) for a in src_account_list[:50]]
-            src_account_list = src_account_list[50:]
-            result = self._send_rpc_request('getMultipleAccounts', account_list, opts)
+        acct_info_list: List[Optional[AccountInfo]] = list()
+        while len(src_pubkey_list) > 0:
+            pubkey_list, src_pubkey_list = [str(a) for a in src_pubkey_list[:75]], src_pubkey_list[75:]
+            result = self._send_rpc_request('getMultipleAccounts', pubkey_list, opts)
 
-            for pubkey, info in zip(account_list, get_from_dict(result, ('result', 'value'), None)):
+            for pubkey, info in zip(pubkey_list, get_from_dict(result, ('result', 'value'), None)):
                 if info is None:
-                    account_info_list.append(None)
+                    acct_info_list.append(None)
                 else:
-                    account_info_list.append(self._decode_account_info(pubkey, info))
-        return account_info_list
+                    acct_info_list.append(self._decode_account_info(pubkey, info))
+        return acct_info_list
+
+    def get_neon_account_list(self, src_pubkey_list: List[SolPubKey],
+                              commitment=SolCommit.Confirmed) -> List[NeonAccountInfo]:
+        # TODO: move to neon-core-api, when it is implemented
+        min_len = NeonAccountInfo.min_size()
+        sol_acct_info_list = self.get_account_info_list(src_pubkey_list, min_len, commitment)
+        return [
+            NeonAccountInfo.from_account_info(sol_acct_info)
+            for sol_acct_info in sol_acct_info_list
+            if sol_acct_info and (sol_acct_info.owner == EVM_PROGRAM_ID)
+        ]
 
     def get_sol_balance(self, account: Union[str, SolPubKey], commitment=SolCommit.Confirmed) -> int:
         opts = {
