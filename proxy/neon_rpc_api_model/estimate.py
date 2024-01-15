@@ -102,6 +102,9 @@ class GasEstimate:
         value = int((self._value or '0x0')[2:], 16)
         gas = int(self._gas[2:], 16) if self._gas else None
 
+        if (not value) and (not len(data)):
+            value = 1
+
         neon_tx = NeonTx(
             nonce=self._u256_max,
             gasPrice=self._u256_max,
