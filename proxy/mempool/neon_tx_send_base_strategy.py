@@ -5,11 +5,12 @@ from typing import Optional, List, Generator, cast
 
 from ..common_neon.evm_config import EVMConfig
 from ..common_neon.solana_neon_tx_receipt import SolNeonTxReceiptInfo, SolNeonIxReceiptInfo
-from ..common_neon.solana_tx import SolTx, SolTxIx
+from ..common_neon.solana_tx import SolTx, SolTxIx, SolCommit
 from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_tx_list_sender import SolTxListSender, SolTxSendState
 from ..common_neon.neon_tx_result_info import NeonTxResultInfo
 from ..common_neon.utils import cached_property
+from ..common_neon.errors import BlockedAccountError
 
 from ..mempool.neon_tx_sender_ctx import NeonTxSendCtx
 
@@ -137,6 +138,18 @@ class BaseNeonTxStrategy(abc.ABC):
                 tx_list.extend(new_tx_list)
 
         yield from tx_list_list
+
+    def _raise_if_blocked_account(self) -> None:
+        neon_acct_list = self._ctx.solana.get_neon_account_list(self._ctx.sol_pubkey_list, SolCommit.Processed)
+        blocked_addr_list = [
+            f'{str(a.pda_address)}({a.neon_address.checksum_address})' if a.neon_address else str(a.pda_address)
+            for a in neon_acct_list if a and a.is_rw_blocked
+        ]
+        if not len(blocked_addr_list):
+            return
+
+        LOG.debug(f'Found blocked accounts: {", ".join(blocked_addr_list)}')
+        raise BlockedAccountError()
 
     def _recheck_tx_list(self, tx_name_list: List[str]) -> bool:
         tx_list = self._ctx.pop_sol_tx_list(tx_name_list)

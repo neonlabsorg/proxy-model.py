@@ -156,13 +156,12 @@ def get_log_list(receipt: SolTxReceipt) -> List[str]:
 
 
 class SolTxErrorParser:
-    _neon_evm_ix_idx = 2
-    _simulation_failed_hdr = f'Transaction simulation failed: Error processing Instruction {_neon_evm_ix_idx}: '
+    _simulation_failed_hdr = 'Transaction simulation failed: Error processing Instruction '
 
     _computation_budget_exceeded_type = 'ComputationalBudgetExceeded'
 
-    _invalid_ix_data_msg = _simulation_failed_hdr + 'invalid instruction data'
-    _program_failed_msg = _simulation_failed_hdr + 'Program failed to complete'
+    _invalid_ix_data_msg = ': invalid instruction data'
+    _program_failed_msg = ': Program failed to complete'
     _alt_invalid_idx_msg = 'invalid transaction: Transaction address table lookup uses an invalid index'
     _already_process_msg = 'AlreadyProcessed'
 
@@ -300,7 +299,11 @@ class SolTxErrorParser:
 
     @cached_method
     def check_if_invalid_ix_data(self) -> bool:
-        return self._get_error_code_msg() == (-32002, self._invalid_ix_data_msg)
+        if not self.check_if_preprocessed_error():
+            return False
+
+        err_code, msg = self._get_error_code_msg()
+        return (err_code == -32002) and msg.endswith(self._invalid_ix_data_msg)
 
     @cached_method
     def check_if_budget_exceeded(self) -> bool:
@@ -329,8 +332,10 @@ class SolTxErrorParser:
 
     @cached_method
     def check_if_require_resize_iter(self) -> bool:
-        if self._get_error_code_msg() != (-32002, self._program_failed_msg):
-            return False
+        if self.check_if_preprocessed_error():
+            err_code, msg = self._get_error_code_msg()
+            if (err_code != -32002) or (not msg.endswith(self._program_failed_msg)):
+                return False
 
         log_list = self._get_evm_log_list()
         for log_rec in reversed(log_list):
@@ -394,6 +399,13 @@ class SolTxErrorParser:
     @cached_method
     def check_if_already_processed(self) -> bool:
         return self._get_value(('data', 'err')) == self._already_process_msg
+
+    @cached_method
+    def check_if_preprocessed_error(self) -> bool:
+        error_code_msg = self._get_error_code_msg()
+        if error_code_msg is None:
+            return False
+        return error_code_msg[1].startswith(self._simulation_failed_hdr)
 
     @cached_method
     def get_slots_behind(self) -> Optional[int]:

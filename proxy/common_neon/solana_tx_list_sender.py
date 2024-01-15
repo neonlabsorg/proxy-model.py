@@ -39,6 +39,7 @@ class SolTxSendState:
         # Rescheduling errors
         NodeBehindError = enum.auto()
         BlockedAccountError = enum.auto()
+        BlockedAccountErrorPrep = enum.auto()
         AltInvalidIndexError = enum.auto()
         AltAlreadyExistError = enum.auto()
 
@@ -87,12 +88,14 @@ class SolTxListSender:
         SolTxSendState.Status.NoReceiptError,
         SolTxSendState.Status.BlockHashNotFoundError,
         SolTxSendState.Status.NodeBehindError,
+        SolTxSendState.Status.BlockedAccountErrorPrep
     )
 
     def __init__(self, config: Config, solana: SolInteractor, signer: SolAccount):
         self._config = config
         self._solana = solana
         self._signer = signer
+        self._skip_preflight = False
         self._block_hash: Optional[SolBlockHash] = None
         self._bad_block_hash_set: Set[SolBlockHash] = set()
         self._tx_list: List[SolTx] = list()
@@ -319,7 +322,7 @@ class SolTxListSender:
         # <- Fuzz testing
 
         LOG.debug(f'send transactions: {self._fmt_tx_name_stat()}')
-        send_result_list = self._solana.send_tx_list(self._tx_list, skip_preflight=False)
+        send_result_list = self._solana.send_tx_list(self._tx_list, skip_preflight=self._skip_preflight)
 
         no_receipt_status = SolTxSendState.Status.WaitForReceipt
         for tx, send_result in zip(self._tx_list, send_result_list):
@@ -364,6 +367,10 @@ class SolTxListSender:
             error = tx_status_list[0].error
             if error:
                 raise error
+
+        # Blocked accounts are checked in the accounts, see BaseNeonTxStrategy::_raise_if_blocked_account
+        if SolTxSendState.Status.BlockedAccountErrorPrep in self._tx_state_list_dict:
+            self._skip_preflight = True
 
         # Resend txs with the resubmitted status
         for tx_status in self._resubmitted_tx_status_list:
@@ -433,6 +440,8 @@ class SolTxListSender:
             # no exception: receipt exists - the goal is reached
             return self._DecodeResult(status.AlreadyFinalizedError, None)
         elif tx_error_parser.check_if_accounts_blocked():
+            if tx_error_parser.check_if_preprocessed_error():
+                return self._DecodeResult(status.BlockedAccountErrorPrep, None)
             return self._DecodeResult(status.BlockedAccountError, BlockedAccountError())
         elif tx_error_parser.check_if_account_already_exists():
             # no exception: account exists - the goal is reached
