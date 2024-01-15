@@ -11,7 +11,7 @@ from construct import Struct
 
 from .constants import (
     ACTIVE_HOLDER_TAG, FINALIZED_HOLDER_TAG, HOLDER_TAG,
-    LOOKUP_ACCOUNT_TAG, ADDRESS_LOOKUP_TABLE_ID
+    LOOKUP_ACCOUNT_TAG, ADDRESS_LOOKUP_TABLE_ID, NEON_ACCOUNT_TAG
 )
 
 from .solana_tx import SolPubKey
@@ -47,9 +47,9 @@ FINALIZED_HOLDER_ACCOUNT_INFO_LAYOUT = Struct(
     "neon_tx_sig" / Bytes(32)
 )
 
-ACCOUNT_INFO_LAYOUT = Struct(
+NEON_ACCOUNT_LAYOUT = Struct(
     "type" / Int8ul,
-    "ether" / Bytes(20),
+    "neon_address" / Bytes(20),
     "nonce" / Int8ul,
     "tx_count" / Bytes(8),
     "balance" / Bytes(32),
@@ -87,6 +87,44 @@ class HolderMetaAccountInfo:
     pubkey: SolPubKey
     is_writable: bool
     is_exists: bool
+
+
+@dataclass
+class NeonAccountInfo:
+    pda_address: SolPubKey
+    neon_address: Optional[str]
+    is_rw_blocked: bool
+
+    @staticmethod
+    def from_account_info(info: AccountInfo) -> Optional[NeonAccountInfo]:
+        if info.tag == NEON_ACCOUNT_TAG:
+            return NeonAccountInfo._from_legacy_account_info(info)
+        return None
+
+    @staticmethod
+    def _from_legacy_account_info(info: AccountInfo) -> NeonAccountInfo:
+        assert info.tag == NEON_ACCOUNT_TAG
+
+        cont = NeonAccountInfo._extract_cont(NEON_ACCOUNT_LAYOUT, info)
+        return NeonAccountInfo(
+            pda_address=info.address,
+            neon_address=cont.neon_address,
+            is_rw_blocked=(cont.is_rw_blocked != 0),
+        )
+
+    @staticmethod
+    def _extract_cont(layout: Struct, info: AccountInfo):
+        min_size = layout.sizeof()
+        if len(info.data) < min_size:
+            raise RuntimeError(
+                f'Wrong data length for account data {str(info.address)}({info.tag}): '
+                f'{len(info.data)} < {min_size}'
+            )
+        return layout.parse(info.data)
+
+    @staticmethod
+    def min_size() -> int:
+        return NEON_ACCOUNT_LAYOUT.sizeof()
 
 
 @dataclass

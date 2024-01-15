@@ -17,6 +17,7 @@ class NeonAddress:
     def __init__(self, data: Union[str, bytes], private: neon_keys.PrivateKey = None):
         if isinstance(data, str):
             data = bytes(bytearray.fromhex(data[2:]))
+        assert len(data) == 20
         self.data = data
         self.private = private
 

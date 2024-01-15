@@ -82,8 +82,14 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
             for acct in holder_info.account_list
         ]
 
+        LOG.debug(
+            f'HOLDER metas ({len(holder_info.account_list)}): ' +
+            ', '.join([f'{str(m.pubkey), m.is_writable}' for m in holder_info.account_list])
+        )
+
         emulator_result = NeonEmulatorResult(dict(
             steps_executed=1,
+            predefined_account_order=True,
             solana_accounts=acct_list
         ))
         self._ctx.set_emulator_result(emulator_result)

@@ -18,7 +18,8 @@ from .solana_tx import SolTx, SolBlockHash, SolPubKey, SolCommit
 from .solana_tx_error_parser import SolTxErrorParser
 from .utils.utils import get_from_dict, cached_property
 from .solana_block import SolBlockInfo
-from .layouts import HolderAccountInfo, AccountInfo, ALTAccountInfo
+from .layouts import HolderAccountInfo, AccountInfo, ALTAccountInfo, NeonAccountInfo
+from .constants import EVM_PROGRAM_ID
 
 
 LOG = logging.getLogger(__name__)
@@ -313,8 +314,8 @@ class SolInteractor:
 
         account_info_list: List[Optional[AccountInfo]] = list()
         while len(src_account_list) > 0:
-            account_list = [str(a) for a in src_account_list[:50]]
-            src_account_list = src_account_list[50:]
+            account_list = [str(a) for a in src_account_list[:75]]
+            src_account_list = src_account_list[75:]
             result = self._send_rpc_request('getMultipleAccounts', account_list, opts)
 
             for pubkey, info in zip(account_list, get_from_dict(result, ('result', 'value'), None)):
@@ -323,6 +324,16 @@ class SolInteractor:
                 else:
                     account_info_list.append(self._decode_account_info(pubkey, info))
         return account_info_list
+
+    def get_neon_account_list(self, src_pubkey_list: List[SolPubKey],
+                              commitment=SolCommit.Confirmed) -> List[NeonAccountInfo]:
+        min_len = NeonAccountInfo.min_size()
+        sol_acct_info_list = self.get_account_info_list(src_pubkey_list, min_len, commitment)
+        return [
+            NeonAccountInfo.from_account_info(sol_acct_info)
+            for sol_acct_info in sol_acct_info_list
+            if sol_acct_info and (sol_acct_info.owner == EVM_PROGRAM_ID)
+        ]
 
     def get_sol_balance(self, account: Union[str, SolPubKey], commitment=SolCommit.Confirmed) -> int:
         opts = {
