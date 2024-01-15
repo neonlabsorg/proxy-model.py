@@ -90,7 +90,7 @@ class Config(DBConfig):
         )
         self._mempool_reschedule_time_sec = self._env_num(
             'MEMPOOL_RESCHEDULE_TIME_SEC',
-            ONE_BLOCK_SEC * 3,
+            ONE_BLOCK_SEC,
             ONE_BLOCK_SEC / 4,
             ONE_BLOCK_SEC * 1000
         )
