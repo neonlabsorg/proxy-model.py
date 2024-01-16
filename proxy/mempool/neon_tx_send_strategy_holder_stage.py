@@ -80,6 +80,7 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
 
         emulator_result = NeonEmulatorResult(dict(
             steps_executed=1,
+            predefined_account_order=True,
             solana_accounts=acct_list
         ))
         self._ctx.set_emulator_result(emulator_result)

@@ -65,6 +65,9 @@ class NeonTxSendCtx:
             for acct_desc in self._neon_tx_exec_cfg.emulator_result.solana_account_list
         ]
 
+        if not self._neon_tx_exec_cfg.emulator_result.predefined_account_order:
+            self._neon_meta_list.sort(key=lambda m: str(m.pubkey))
+
         LOG.debug(
             f'metas ({len(self._neon_meta_list)}): ' +
             ', '.join([f'{str(m.pubkey), m.is_signer, m.is_writable}' for m in self._neon_meta_list])
