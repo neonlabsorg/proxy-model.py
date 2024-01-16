@@ -43,6 +43,7 @@ env:
   IMAGE_NAME: ${{vars.IMAGE_NAME}}
   NEON_TEST_INVOKE_PROGRAM_IMAGE: ${{vars.NEON_TEST_INVOKE_PROGRAM_IMAGE}}
   NEON_TEST_RUN_LINK: ${{vars.NEON_TEST_RUN_LINK}}
+  NEON_TESTS_ENDPOINT: ${{vars.NEON_TESTS_ENDPOINT}}
   TFSTATE_BUCKET: ${{vars.TFSTATE_BUCKET}}
   TFSTATE_KEY_PREFIX: ${{vars.TFSTATE_KEY_PREFIX}}
   TFSTATE_REGION: ${{vars.TFSTATE_REGION}}
@@ -60,6 +61,7 @@ jobs:
       proxy_tag: ${{ steps.tags.outputs.proxy }}
       neon_evm_tag: ${{ steps.tags.outputs.neon_evm }}
       is_version_proxy_branch: ${{ steps.is_version_proxy_branch.outputs.value }}
+      tag_creation_base_branch: ${{ steps.tag_creation.outputs.base_branch }}
       test_set: ${{ steps.test_set.outputs.value }}
       neon_test_tag: ${{ steps.neon_test_final_tag.outputs.value }}
     steps:
@@ -80,7 +82,13 @@ jobs:
             echo "value=false"
             echo "value=false" >> $GITHUB_OUTPUT
           fi
-
+      - name: Define base branch if the action is tag creation
+        id: tag_creation
+        if:  startsWith(github.ref , 'refs/tags/')
+        run: |
+          base_branch=`echo ${{ github.ref_name }} | sed 's/\.[0-9]*$/\.x/'`
+          echo "base_branch=$base_branch" >> $GITHUB_OUTPUT
+          echo "base_branch=$base_branch"
       - name: Define images tags
         id: tags
         run: |
@@ -118,8 +126,8 @@ jobs:
           if ${{ steps.is_version_proxy_branch.outputs.value }}; then
             tag=${GITHUB_REF/refs\/heads\//}
 
-          elif [[ $github_ref == *"refs/tags/"* ]]; then
-            tag=${GITHUB_REF/refs\/tags\//}
+          elif [[ "${{ steps.tag_creation.outputs.base_branch }}" != "" ]]; then
+            tag=${{ steps.tag_creation.outputs.base_branch }}
 
           elif [[ "${{ github.base_ref }}" =~ "refs/heads/"[vt][0-9]+\.[0-9]+\.x ]]; then # pr to version branch
             tag=${GITHUB_BASE_REF/refs\/heads\//}
@@ -242,7 +250,7 @@ jobs:
       SOLANA_IP: ${{ needs.prepare-infrastructure.outputs.solana_ip }}
       PROXY_IP: ${{ needs.prepare-infrastructure.outputs.proxy_ip }}
       CONTAINER: oz-${{ github.run_id }}
-      NETWORK_NAME: aws_custom
+      NETWORK: terraform
     steps:
       - name: Pull docker image
         run: docker pull ${{ env.NEON_TEST_IMAGE }}:${{ needs.build-image.outputs.neon_test_tag }}
@@ -250,17 +258,15 @@ jobs:
         run: |
           docker run -i -e PROXY_IP=${{env.PROXY_IP}} \
           -e SOLANA_IP=${{env.SOLANA_IP}} \
-          -e DUMP_ENVS=true \
-          -e NETWORK_ID=111 \
-          -e FAUCET_URL="http://${{env.PROXY_IP}}:3333/request_neon" \
-          -e SOLANA_URL="http://${{env.SOLANA_IP}}:8899" \
-          -e PROXY_URL="http://${{env.PROXY_IP}}:9090/solana" \
-          -e NETWORK_NAME=${{env.NETWORK_NAME}} \
-          -d --name=${{ env.CONTAINER }} ${{ env.NEON_TEST_IMAGE }} /bin/bash
+          -e NETWORK=${{env.NETWORK}} \
+          -d --name=${{ env.CONTAINER }} ${{ env.NEON_TEST_IMAGE }}:${{ needs.build-image.outputs.neon_test_tag }} /bin/bash
       - name: Run OpenZeppelin tests
         run: |
-          docker exec -i ${{ env.CONTAINER }} python3 ./clickfile.py run oz \
-            --network ${{ env.NETWORK_NAME }} \
+          docker exec -i -e PROXY_IP=${{env.PROXY_IP}} \
+              -e SOLANA_IP=${{env.SOLANA_IP}} \
+              -e NETWORK=${{env.NETWORK}} \
+              ${{ env.CONTAINER }} python3 ./clickfile.py run oz \
+            --network ${{ env.NETWORK }} \
             --jobs 8 \
             --users 10
       - name: Print OpenZeppelin report
@@ -305,7 +311,8 @@ jobs:
       - name: Update contracts in the container
         run: |
           docker exec -i ${{ env.CONTAINER }} \
-            python3 ./clickfile.py update-contracts --branch ${{ github.head_ref || github.ref_name }}
+            python3 ./clickfile.py update-contracts \
+          --branch ${{ needs.build-image.outputs.tag_creation_base_branch || github.head_ref || github.ref_name }}
       - name: Run basic tests
         run: |
           docker exec -i ${{ env.CONTAINER }} \
@@ -346,7 +353,7 @@ jobs:
       SOLANA_IP: ${{ needs.prepare-infrastructure.outputs.solana_ip }}
       PROXY_IP: ${{ needs.prepare-infrastructure.outputs.proxy_ip }}
       CONTAINER: economy-${{ github.run_id }}
-      NETWORK: aws
+      NETWORK: terraform
     steps:
       - name: Run docker container
         run: |
