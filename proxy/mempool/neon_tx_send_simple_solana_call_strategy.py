@@ -10,8 +10,8 @@ class SimpleNeonTxSolanaCallStrategy(SimpleNeonTxStrategy):
 
     def _validate(self) -> bool:
         return (
-            self._validate_stuck_tx and
-            self._validate_tx_has_chainid and 
+            self._validate_stuck_tx() and
+            self._validate_tx_has_chainid() and 
             self._ctx.has_external_solana_call()
         )
 
