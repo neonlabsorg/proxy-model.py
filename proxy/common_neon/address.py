@@ -25,6 +25,7 @@ class NeonAddress:
             address = hex_to_bytes(data)
         else:
             assert isinstance(data, bytes)
+            assert len(data) == 20
             address = data
 
         self._chain_id = chain_id or 0

@@ -9,8 +9,12 @@ from typing import Optional, List
 from construct import Bytes, Int8ul, Int16ul, Int32ul, Int64ul
 from construct import Struct
 
-from .constants import LOOKUP_ACCOUNT_TAG, ADDRESS_LOOKUP_TABLE_ID
+from .constants import (
+    LOOKUP_ACCOUNT_TAG, ADDRESS_LOOKUP_TABLE_ID,
+    NEON_LEGACY_ACCOUNT_TAG, NEON_BALANCE_TAG, NEON_CONTRACT_TAG, NEON_STORAGE_CELL_TAG
+)
 
+from .address import NeonAddress
 from .solana_tx import SolPubKey
 
 
@@ -44,9 +48,9 @@ FINALIZED_HOLDER_ACCOUNT_INFO_LAYOUT = Struct(
     "neon_tx_sig" / Bytes(32)
 )
 
-ACCOUNT_INFO_LAYOUT = Struct(
+NEON_LEGACY_ACCOUNT_LAYOUT = Struct(
     "type" / Int8ul,
-    "ether" / Bytes(20),
+    "neon_address" / Bytes(20),
     "nonce" / Int8ul,
     "tx_count" / Bytes(8),
     "balance" / Bytes(32),
@@ -55,6 +59,17 @@ ACCOUNT_INFO_LAYOUT = Struct(
     "is_rw_blocked" / Int8ul,
 )
 
+NEON_ACCOUNT_LAYOUT = Struct(
+    "type" / Int8ul,
+    "is_rw_blocked" / Int8ul,
+    "neon_address" / Bytes(20),
+    "chain_id" / Int64ul
+)
+
+NEON_STORAGE_CELL_LAYOUT = Struct(
+    "type" / Int8ul,
+    "is_rw_blocked" / Int8ul,
+)
 
 ACCOUNT_LOOKUP_TABLE_LAYOUT = Struct(
     "type" / Int32ul,
@@ -74,6 +89,71 @@ class AccountInfo:
     lamports: int
     owner: SolPubKey
     data: bytes
+
+
+@dataclass
+class NeonAccountInfo:
+    pda_address: SolPubKey
+    neon_address: Optional[NeonAddress]
+    is_rw_blocked: bool
+
+    @staticmethod
+    def from_account_info(info: AccountInfo) -> Optional[NeonAccountInfo]:
+        if info.tag == NEON_LEGACY_ACCOUNT_TAG:
+            return NeonAccountInfo._from_legacy_account_info(info)
+        elif info.tag in (NEON_BALANCE_TAG, NEON_CONTRACT_TAG):
+            return NeonAccountInfo._from_account_info(info)
+        elif info.tag == NEON_STORAGE_CELL_TAG:
+            return NeonAccountInfo._from_storage_cell_info(info)
+        return None
+
+    @staticmethod
+    def _from_legacy_account_info(info: AccountInfo) -> NeonAccountInfo:
+        assert info.tag == NEON_LEGACY_ACCOUNT_TAG
+        cont = NeonAccountInfo._extract_cont(NEON_LEGACY_ACCOUNT_LAYOUT, info)
+        return NeonAccountInfo(
+            pda_address=info.address,
+            neon_address=NeonAddress(cont.neon_address, None),
+            is_rw_blocked=(cont.is_rw_blocked != 0),
+        )
+
+    @staticmethod
+    def _from_account_info(info: AccountInfo) -> NeonAccountInfo:
+        assert info.tag in (NEON_BALANCE_TAG, NEON_CONTRACT_TAG)
+        cont = NeonAccountInfo._extract_cont(NEON_ACCOUNT_LAYOUT, info)
+        return NeonAccountInfo(
+            pda_address=info.address,
+            neon_address=NeonAddress(cont.neon_address, cont.chain_id),
+            is_rw_blocked=(cont.is_rw_blocked == 1),
+        )
+
+    @staticmethod
+    def _from_storage_cell_info(info: AccountInfo) -> NeonAccountInfo:
+        assert info.tag == NEON_STORAGE_CELL_TAG
+        cont = NeonAccountInfo._extract_cont(NEON_STORAGE_CELL_LAYOUT, info)
+        return NeonAccountInfo(
+            pda_address=info.address,
+            neon_address=None,
+            is_rw_blocked=(cont.is_rw_blocked == 1),
+        )
+
+    @staticmethod
+    def _extract_cont(layout: Struct, info: AccountInfo):
+        min_size = layout.sizeof()
+        if len(info.data) < min_size:
+            raise RuntimeError(
+                f'Wrong data length for account data {str(info.address)}({info.tag}): '
+                f'{len(info.data)} < {min_size}'
+            )
+        return layout.parse(info.data)
+
+    @staticmethod
+    def min_size() -> int:
+        return max(
+            NEON_LEGACY_ACCOUNT_LAYOUT.sizeof(),
+            NEON_ACCOUNT_LAYOUT.sizeof(),
+            NEON_STORAGE_CELL_LAYOUT.sizeof()
+        )
 
 
 @dataclass

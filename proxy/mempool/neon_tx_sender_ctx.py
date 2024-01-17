@@ -43,6 +43,7 @@ class NeonTxSendCtx:
             self._ix_builder.init_neon_tx_sig(mp_tx_req.sig)
 
         self._neon_meta_list: List[SolAccountMeta] = list()
+        self._sol_pubkey_list: List[SolPubKey] = list()
         if not mp_tx_req.is_stuck_tx():
             self._build_account_list()
 
@@ -59,6 +60,13 @@ class NeonTxSendCtx:
             )
             for acct_desc in self._neon_tx_exec_cfg.emulator_result.solana_account_list
         ]
+        self._sol_pubkey_list = [
+            SolPubKey.from_string(acct_desc['pubkey'])
+            for acct_desc in self._neon_tx_exec_cfg.emulator_result.solana_account_list
+        ]
+
+        if not self._neon_tx_exec_cfg.emulator_result.predefined_account_order:
+            self._neon_meta_list.sort(key=lambda m: str(m.pubkey))
 
         LOG.debug(
             f'metas ({len(self._neon_meta_list)}): ' +
@@ -74,6 +82,10 @@ class NeonTxSendCtx:
     @property
     def len_account_list(self) -> int:
         return len(self._neon_meta_list)
+
+    @property
+    def sol_pubkey_list(self) -> List[SolPubKey]:
+        return self._sol_pubkey_list
 
     def has_emulator_result(self) -> bool:
         return not self._neon_tx_exec_cfg.emulator_result.is_empty()

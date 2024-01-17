@@ -7,7 +7,7 @@ from ..common_neon.solana_tx_list_sender import SolTxSendState
 from ..common_neon.neon_tx_result_info import NeonTxResultInfo
 from ..common_neon.solana_tx_error_parser import SolTxError
 from ..common_neon.neon_instruction import EvmIxCode, EvmIxCodeName
-from ..common_neon.errors import WrongStrategyError
+from ..common_neon.errors import WrongStrategyError, OutOfGasError
 
 from .neon_tx_sender_ctx import NeonTxSendCtx
 from .neon_tx_send_base_strategy import BaseNeonTxStrategy
@@ -28,11 +28,16 @@ class SimpleNeonTxStrategy(BaseNeonTxStrategy):
     def execute(self) -> NeonTxResultInfo:
         assert self.is_valid()
 
+        self._sol_tx_list_sender.clear()
+
+        if not self._ctx.has_sol_tx(self.name):
+            self._raise_if_blocked_account()
+
         try:
             if not self._recheck_tx_list([self.name]):
                 self._send_tx_list(self._build_tx_list())
 
-        except SolTxError as err:
+        except (SolTxError, OutOfGasError) as err:
             LOG.debug(f'Got error {str(err)}, use another strategy for execution')
             raise WrongStrategyError()
 

@@ -34,36 +34,40 @@ class NeonEmulatorResult:
     def is_empty(self) -> bool:
         return self._is_empty
 
-    @cached_property
+    @property
     def evm_step_cnt(self) -> int:
         return self._res_dict.get('steps_executed', 0)
 
-    @cached_property
+    @property
     def solana_account_list(self) -> List[Dict[str, Any]]:
         return self._res_dict.get('solana_accounts', list())
 
-    @cached_property
+    @property
+    def predefined_account_order(self) -> bool:
+        return self._res_dict.get('predefined_account_order', False)
+
+    @property
     def iter_cnt(self) -> int:
         return self._res_dict.get('iterations', 1)
 
-    @cached_property
+    @property
     def used_gas(self) -> int:
         return self._res_dict.get('used_gas', 0)
 
-    @cached_property
+    @property
     def exit_status(self) -> NeonEmulatorExitStatus.Type:
         value = self._res_dict.get('exit_status', '<unknown>')
         return NeonEmulatorExitStatus.to_type(value)
 
-    @cached_property
+    @property
     def revert_data(self) -> str:
         return self._res_dict.get('result', '')
 
-    @cached_property
+    @property
     def result(self) -> str:
         return self._res_dict.get('result', '')
 
-    @cached_property
+    @property
     def exit_reason(self) -> Optional[str]:
         return self._res_dict.get('exit_reason', None)
     

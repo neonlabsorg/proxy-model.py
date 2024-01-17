@@ -111,6 +111,9 @@ class GasEstimate:
         value = int(self._value, 16)
         gas = int(self._gas, 16)
 
+        if (not value) and (not len(data)):
+            value = 1
+
         neon_tx = NeonTx(
             nonce=self._u256_max,
             gasPrice=self._u256_max,
@@ -150,14 +153,16 @@ class GasEstimate:
     def _iterative_overhead_cost(self) -> int:
         if self._config.cu_priority_fee == 0:
             return 0
+        return 0
 
-        # Add priority fee to the estimated gas
-        iter_cnt = self._emulator_result.iter_cnt
-
-        # Each iteration requests 1'400'000 CUs
-        # Priority fee is calculated in micro-LAMPORTs per 1 CU
-        priority_cost = iter_cnt * math.ceil(self._config.cu_priority_fee * 1_400_000 / 1_000_000)
-        return priority_cost
+        # Can be uncommented when Neon EVM will be ready
+        # # Add priority fee to the estimated gas
+        # iter_cnt = self._emulator_result.iter_cnt
+        #
+        # # Each iteration requests 1'400'000 CUs
+        # # Priority fee is calculated in micro-LAMPORTs per 1 CU
+        # priority_cost = iter_cnt * math.ceil(self._config.cu_priority_fee * 1_400_000 / 1_000_000)
+        # return priority_cost
 
     def _alt_cost(self) -> int:
         """Costs to create->extend->deactivate->close an Address Lookup Table
