@@ -202,7 +202,8 @@ class NeonRpcApiWorker:
             sol_price_usd=hex(gas_price_info.sol_price_usd),
             neon_price_usd=hex(gas_price_info.neon_price_usd),
             operator_fee=hex(gas_price_info.operator_fee),
-            gas_price_slippage=hex(gas_price_info.gas_price_slippage)
+            gas_price_slippage=hex(gas_price_info.gas_price_slippage),
+            cu_priority_usd=hex(gas_price_info.cu_priority_fee)
         )
 
     @staticmethod

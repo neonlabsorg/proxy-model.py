@@ -3,7 +3,6 @@ import logging
 
 from typing import Optional, List, Generator, cast
 
-from ..common_neon.elf_params import ElfParams
 from ..common_neon.solana_neon_tx_receipt import SolNeonTxReceiptInfo, SolNeonIxReceiptInfo
 from ..common_neon.solana_tx import SolTx, SolTxIx, SolCommit
 from ..common_neon.solana_tx_legacy import SolLegacyTx
@@ -46,7 +45,7 @@ class BaseNeonTxStrategy(abc.ABC):
         self._validation_error_msg: Optional[str] = None
         self._prep_stage_list: List[BaseNeonTxPrepStage] = list()
         self._ctx = ctx
-        self._evm_step_cnt = ElfParams().neon_evm_steps
+        self._cu_priority_fee = 0
 
     @property
     def ctx(self) -> NeonTxSendCtx:
@@ -193,11 +192,11 @@ class BaseNeonTxStrategy(abc.ABC):
 
         ix_list = [
             self._ctx.ix_builder.make_compute_budget_heap_ix(),
-            self._ctx.ix_builder.make_compute_budget_cu_ix()
+            self._ctx.ix_builder.make_compute_budget_cu_ix(),
         ]
 
-        if self._ctx.config.cu_priority_fee > 0:
-            ix_list.append(self._ctx.ix_builder.make_compute_budget_cu_fee_ix(self._ctx.config.cu_priority_fee))
+        if self._cu_priority_fee > 0:
+            ix_list.append(self._ctx.ix_builder.make_compute_budget_cu_fee_ix(self._cu_priority_fee))
 
         ix_list.append(ix)
 

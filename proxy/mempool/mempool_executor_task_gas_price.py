@@ -52,6 +52,7 @@ class MPExecutorGasPriceTask(MPExecutorBaseTask):
             neon_price_usd=math.ceil(gas_price_calc.neon_price_usd * 100000),
             operator_fee=math.ceil(self._config.operator_fee * 100000),
             gas_price_slippage=math.ceil(self._config.gas_price_slippage * 100000),
+            cu_priority_fee=self._config.cu_priority_fee,
 
             suggested_gas_price=gas_price_calc.suggested_gas_price,
             is_const_gas_price=gas_price_calc.is_const_gas_price,

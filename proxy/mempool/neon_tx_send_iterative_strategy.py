@@ -8,6 +8,7 @@ from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_tx_list_sender import SolTxSendState
 from ..common_neon.neon_tx_result_info import NeonTxResultInfo
 from ..common_neon.neon_instruction import EvmIxCodeName, EvmIxCode
+from ..common_neon.elf_params import ElfParams
 
 from .neon_tx_sender_ctx import NeonTxSendCtx
 from .neon_tx_send_base_strategy import BaseNeonTxStrategy
@@ -24,6 +25,10 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
 
     def __init__(self, ctx: NeonTxSendCtx) -> None:
         super().__init__(ctx)
+        # EVM steps is valid only for iterative transactions
+        self._evm_step_cnt = ElfParams().neon_evm_steps
+        # Apply priority fee only in iterative transactions
+        self._cu_priority_fee = ctx.config.cu_priority_fee
         self._prep_stage_list.append(NewAccountNeonTxPrepStage(ctx))
 
     def complete_init(self) -> None:
@@ -59,8 +64,8 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
 
     def _build_execute_tx_list(self) -> Generator[List[SolTx], None, None]:
         LOG.debug(
-            f'Total EVM steps {self._ctx.emulated_evm_step_cnt}, '
-            f'total resize iterations {self._ctx.resize_iter_cnt}'
+            f"Total EVM steps {self._ctx.emulated_evm_step_cnt}, "
+            f"total resize iterations {self._ctx.resize_iter_cnt}"
         )
 
         emulated_step_cnt = max(self._ctx.emulated_evm_step_cnt, self._evm_step_cnt)
@@ -70,10 +75,12 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
         yield from self._build_tx_list_impl(emulated_step_cnt, additional_iter_cnt)
 
     def _build_complete_tx_list(self) -> Generator[List[SolTx], None, None]:
-        LOG.debug('No receipt -> execute additional iteration')
+        LOG.debug("No receipt -> execute additional iteration")
         yield from self._build_tx_list_impl(0, 1)
 
-    def _build_tx_list_impl(self, total_evm_step_cnt: int, add_iter_cnt: int) -> Generator[List[SolTx], None, None]:
+    def _build_tx_list_impl(
+        self, total_evm_step_cnt: int, add_iter_cnt: int
+    ) -> Generator[List[SolTx], None, None]:
         tx_list: List[SolTx] = list()
 
         for _ in range(add_iter_cnt):
@@ -85,26 +92,27 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
             tx_list.append(self._build_tx())
 
         LOG.debug(
-            f'Total iterations: {len(tx_list)}, '
-            f'additional iterations: {add_iter_cnt}, '
-            f'total EVM steps: {total_evm_step_cnt}, '
-            f'EVM steps per iteration: {self._evm_step_cnt}'
+            f"Total iterations: {len(tx_list)}, "
+            f"additional iterations: {add_iter_cnt}, "
+            f"total EVM steps: {total_evm_step_cnt}, "
+            f"EVM steps per iteration: {self._evm_step_cnt}"
         )
         yield tx_list
 
     def _validate(self) -> bool:
-        return (
-            self._validate_stuck_tx() and
-            self._validate_tx_has_chainid()
-        )
+        return self._validate_stuck_tx() and self._validate_tx_has_chainid()
 
     def _build_tx(self) -> SolLegacyTx:
         uniq_idx = self._ctx.sol_tx_cnt
         builder = self._ctx.ix_builder
-        return self._build_cu_tx(builder.make_tx_step_from_data_ix(self._evm_step_cnt, uniq_idx))
+        return self._build_cu_tx(
+            builder.make_tx_step_from_data_ix(self._evm_step_cnt, uniq_idx)
+        )
 
     def _build_cancel_tx(self) -> SolLegacyTx:
-        return self._build_cu_tx(name='CancelWithHash', ix=self._ctx.ix_builder.make_cancel_ix())
+        return self._build_cu_tx(
+            name="CancelWithHash", ix=self._ctx.ix_builder.make_cancel_ix()
+        )
 
     def _decode_neon_tx_result(self) -> NeonTxResultInfo:
         neon_tx_res = NeonTxResultInfo()
@@ -124,19 +132,21 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
             if sol_neon_ix is None:
                 continue
 
-            neon_total_gas_used = max(neon_total_gas_used, sol_neon_ix.neon_total_gas_used)
+            neon_total_gas_used = max(
+                neon_total_gas_used, sol_neon_ix.neon_total_gas_used
+            )
 
             ret = sol_neon_ix.neon_tx_return
             if ret is None:
                 continue
 
             neon_tx_res.set_res(status=ret.status, gas_used=ret.gas_used)
-            LOG.debug(f'Set Neon tx result: {neon_tx_res}')
+            LOG.debug(f"Set Neon tx result: {neon_tx_res}")
             return neon_tx_res
 
         if has_already_finalized:
             neon_tx_res.set_lost_res(neon_total_gas_used)
-            LOG.debug(f'Set lost Neon tx result: {neon_tx_res}')
+            LOG.debug(f"Set lost Neon tx result: {neon_tx_res}")
 
         return neon_tx_res
 
