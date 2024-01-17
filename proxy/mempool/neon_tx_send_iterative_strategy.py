@@ -8,6 +8,7 @@ from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_tx_list_sender import SolTxSendState
 from ..common_neon.neon_tx_result_info import NeonTxResultInfo
 from ..common_neon.neon_instruction import EvmIxCodeName, EvmIxCode
+from ..common_neon.evm_config import EVMConfig
 
 from .neon_tx_sender_ctx import NeonTxSendCtx
 from .neon_tx_send_base_strategy import BaseNeonTxStrategy
@@ -24,6 +25,10 @@ class IterativeNeonTxStrategy(BaseNeonTxStrategy):
 
     def __init__(self, ctx: NeonTxSendCtx) -> None:
         super().__init__(ctx)
+        # EVM steps is valid only for iterative transactions
+        self._evm_step_cnt = EVMConfig().neon_evm_steps
+        # Apply priority fee only in iterative transactions
+        self._cu_priority_fee = ctx.config.cu_priority_fee
         self._prep_stage_list.append(NewAccountNeonTxPrepStage(ctx))
 
     def complete_init(self) -> None:

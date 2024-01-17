@@ -211,6 +211,7 @@ class TestMemPool(unittest.IsolatedAsyncioTestCase):
                 token_price_account=SolPubKey.new_unique(),
                 gas_price_slippage=1,
                 operator_fee=10,
+                cu_priority_fee=0,
                 allow_underpriced_tx_wo_chainid=True,
                 min_wo_chainid_acceptable_gas_price=1
             )]
