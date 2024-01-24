@@ -74,6 +74,11 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
         self._async_task_list: List[Union[asyncio.Task, MPPeriodicTaskLoop]] = list()
         self._free_alt_queue_task_loop: Optional[MPFreeALTQueueTaskLoop] = None
 
+        # Output statistics once every certain period of time
+        self._stat_period_sec: Final[int] = 10
+        self._last_stat_sec = 0
+        self._last_acquire_sec = 0
+
     def start(self) -> None:
         asyncio.get_event_loop().run_until_complete(self._executor_mng.set_executor_cnt(1))
         self._async_task_list.append(MPEVMConfigTaskLoop(self._executor_mng, self))
@@ -227,12 +232,22 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
         return tx
 
     def _acquire_scheduled_tx(self) -> Optional[MPTxExecRequest]:
-        tx_schedule, tx = self._find_tx_schedule()
+        now = int(time.time() / self._stat_period_sec)
+        output_stat = now != self._last_acquire_sec
+        if output_stat:
+            self._last_acquire_sec = now
+
+        tx_schedule, tx = self._find_tx_schedule(output_stat)
         if tx_schedule is None:
+            if output_stat:
+                LOG.debug('No tx for execution')
             return None
 
         tx: Optional[MPTxExecRequest] = self._attach_resource_to_tx(tx)
         if not tx:
+            if output_stat:
+                with logging_context(req_id=tx.req_id):
+                    LOG.debug(f'No resource for execution')
             return None
 
         with logging_context(req_id=tx.req_id):
@@ -241,7 +256,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
 
         return tx
 
-    def _find_tx_schedule(self) -> Tuple[Optional[MPTxSchedule], Optional[MPTxRequest]]:
+    def _find_tx_schedule(self, output_stat: bool) -> Tuple[Optional[MPTxSchedule], Optional[MPTxRequest]]:
         tx_schedule_list: List[MPTxSchedule] = list(self._tx_schedule_dict.values())
 
         for retry in range(len(tx_schedule_list)):
@@ -253,11 +268,16 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
 
             gas_price = self._gas_price_dict.get(tx_schedule.chain_id, None)
             if not gas_price:
+                if output_stat:
+                    LOG.debug(f'No gas price for {tx_schedule.chain_id}')
                 continue
 
             tx = tx_schedule.peek_top_tx()
             if tx and (tx.gas_price >= gas_price.min_executable_gas_price):
                 return tx_schedule, tx
+            elif output_stat:
+                with logging_context(req_id=tx.req_id):
+                    LOG.debug(f'Gas price is small {tx.gas_price} < {gas_price.min_executable_gas_price}')
 
         return None, None
 
@@ -303,6 +323,11 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
         stat.in_reschedule_queue_cnt = len(self._rescheduled_tx_queue)
         stat.in_stuck_queue_cnt = self._stuck_tx_dict.tx_cnt
         stat.in_mempool_cnt = sum([tx_schedule.tx_cnt for tx_schedule in self._tx_schedule_dict.values()])
+
+        now = int(time.time() / self._stat_period_sec)
+        if self._last_stat_sec != now:
+            self._last_stat_sec = now
+            LOG.debug(f'Mempool stat: {str(stat)}')
 
     async def _process_tx_result_loop(self):
         while True:
