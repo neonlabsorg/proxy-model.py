@@ -114,7 +114,7 @@ class NeonLogTxEvent:
 
     @cached_property
     def log_bloom(self) -> int:
-        if self.event_type != NeonLogTxEvent.Type.Log:
+        if self.event_type != NeonLogTxEvent.Type.Log or self.is_hidden:
             return 0
         bloom = BloomFilter.from_iterable((self.address,) + self.topic_list)
         return int(bloom)
