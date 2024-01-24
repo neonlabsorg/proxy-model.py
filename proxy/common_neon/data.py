@@ -70,6 +70,10 @@ class NeonEmulatorResult:
     @property
     def exit_reason(self) -> Optional[str]:
         return self._res_dict.get('exit_reason', None)
+    
+    @cached_property
+    def external_solana_call(self) -> bool:
+        return self._res_dict.get('external_solana_calls', False)
 
 
 class NeonTxExecCfg:
