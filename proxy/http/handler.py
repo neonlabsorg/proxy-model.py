@@ -168,13 +168,14 @@ class HttpProtocolHandler(BaseTcpServerHandler[HttpClientConnection]):
             # Plugins can utilize on_client_data for such cases and
             # apply custom logic to handle request data sent after 1st
             # valid request.
+            self.request.address = self.work.address
             if self.request.state != httpParserStates.COMPLETE:
                 if self._parse_first_request(data):
                     return True
             # HttpProtocolHandlerPlugin.on_client_data
             # Can raise HttpProtocolException to tear down the connection
             elif self.plugin:
-                self.plugin.on_client_data(data)
+                self.plugin.on_client_data(self.request.address, data)
         except HttpProtocolException as e:
             # logger.info('HttpProtocolException: %s' % e)
             response: Optional[memoryview] = e.response(self.request)
