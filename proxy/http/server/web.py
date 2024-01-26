@@ -150,7 +150,7 @@ class HttpWebServerPlugin(HttpProtocolHandlerPlugin):
                 return True
         return False
 
-    def on_client_data(self, raw: memoryview) -> None:
+    def on_client_data(self, address: str, raw: memoryview) -> None:
         if self.switched_protocol == httpProtocolTypes.WEBSOCKET:
             # TODO(abhinavsingh): Do we really tobytes() here?
             # Websocket parser currently doesn't depend on internal
@@ -179,6 +179,7 @@ class HttpWebServerPlugin(HttpProtocolHandlerPlugin):
                 self.pipeline_request = HttpParser(
                     httpParserTypes.REQUEST_PARSER,
                 )
+            self.pipeline_request.address = address
             self.pipeline_request.parse(raw)
             if self.pipeline_request.is_complete:
                 self.route.handle_request(self.pipeline_request)
