@@ -812,6 +812,7 @@ class NeonRpcApiWorker:
             "blockNumber": hex(res.block_slot),
             "from": from_addr,
             "to": to_addr,
+            "effectiveGasPrice": hex(tx.neon_tx.gas_price),
             "gasUsed": hex(res.gas_used),
             "cumulativeGasUsed": hex(res.sum_gas_used),
             "contractAddress": contract,
