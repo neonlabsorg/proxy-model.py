@@ -71,6 +71,7 @@ class HttpParser:
         # Request attributes
         self.host: Optional[bytes] = None
         self.port: Optional[int] = None
+        self.address: str = ''
         self.path: Optional[bytes] = None
         self.method: Optional[bytes] = None
         # Response attributes
