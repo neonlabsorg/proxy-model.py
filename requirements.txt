@@ -1,3 +1,8 @@
+click==8.1.7
+docker==7.0.0
+paramiko==3.4.0
+python-terraform==0.10.1
+scp==0.14.5
 typing-extensions==4.9.0
 ecdsa==0.18.0
 pysha3==1.0.2
