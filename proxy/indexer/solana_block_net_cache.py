@@ -1,4 +1,7 @@
+import multiprocessing
 from typing import List, Generator, Optional
+from multiprocessing.dummy import Pool as ThreadPool
+
 import logging
 
 from ..common_neon.solana_block import SolBlockInfo
@@ -22,6 +25,8 @@ class SolBlockNetCache:
         self._start_slot = -1
         self._stop_slot = -1
         self._block_list: List[SolBlockInfo] = list()
+
+        self._thread_pool = ThreadPool(min(multiprocessing.cpu_count(), self._block_request_len))
 
     def finalize_block(self, sol_block: SolBlockInfo) -> None:
         if sol_block.block_slot > self._stop_slot:
@@ -109,7 +114,10 @@ class SolBlockNetCache:
         if not len(empty_slot_list):
             return
 
-        block_list = self._solana.get_block_info_list(empty_slot_list, ctx.sol_commit, full=True)
+        block_list = self._thread_pool.starmap(
+            self._solana.get_block_info,
+            [(slot, ctx.sol_commit, True) for slot in empty_slot_list],
+        )
         for block in block_list:
             if not block.is_empty():
                 idx = self._calc_idx(block.block_slot)
