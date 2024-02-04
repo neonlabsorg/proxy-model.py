@@ -243,10 +243,11 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
                 LOG.debug('No tx for execution')
             return None
 
+        tx_req_id = tx.req_id
         tx: Optional[MPTxExecRequest] = self._attach_resource_to_tx(tx)
         if not tx:
             if output_stat:
-                with logging_context(req_id=tx.req_id):
+                with logging_context(req_id=tx_req_id):
                     LOG.debug(f'No resource for execution')
             return None
 
@@ -275,7 +276,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
             tx = tx_schedule.peek_top_tx()
             if tx and (tx.gas_price >= gas_price.min_executable_gas_price):
                 return tx_schedule, tx
-            elif output_stat:
+            elif tx and output_stat:
                 with logging_context(req_id=tx.req_id):
                     LOG.debug(f'Gas price is small {tx.gas_price} < {gas_price.min_executable_gas_price}')
 
