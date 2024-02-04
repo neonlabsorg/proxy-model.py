@@ -314,7 +314,7 @@ class Indexer:
             return True
 
         neon_block.check_stuck_objs(self._config)
-        return not neon_block.has_stuck_objs()
+        return neon_block.min_block_slot > self._db.stop_slot
 
     def _process_solana_blocks(self) -> None:
         dctx = SolNeonDecoderCtx(self._config, self._decoder_stat)
