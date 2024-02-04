@@ -51,21 +51,12 @@ cached_property = functools.cached_property
 
 @functools.lru_cache(maxsize=None)
 def str_enum(value: Enum) -> str:
-    value = str(value)
-    idx = value.find('.')
-    if idx != -1:
-        value = value[idx + 1:]
-    return value
+    return value.name
 
 
 def str_fmt_object(obj: Any, skip_underling=True, name='') -> str:
     def _decode_name(value: Any) -> str:
-        result = f'{type(value)}'
-        result = result[result.rfind('.') + 1:-2]
-        class_prefix = '<class '
-        if result.startswith(class_prefix):
-            result = result[len(class_prefix) + 1:]
-        return result
+        return type(value).__name__
 
     def _lookup_dict_as_value(value_type: str, value: Dict[str, Any]) -> Tuple[bool, str]:
         result = _lookup_dict(value)

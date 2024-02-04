@@ -30,6 +30,7 @@ from ..common_neon.solana_block import SolBlockInfo
 from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.neon_instruction import EvmIxCodeName, AltIxCodeName
 from ..common_neon.db.db_connect import DBConnection
+from ..common_neon.utils.evm_log_decoder import NeonLogTxEvent
 
 from ..mempool import (
     MemPoolClient, MP_SERVICE_ADDR,
@@ -482,26 +483,10 @@ class NeonRpcApiWorker:
 
     @staticmethod
     def _decode_event_type(event_type: int) -> Union[str, int]:
-        event_type_dict: Dict[int, str] = {
-            1: 'LOG',
-            101: 'ENTER CALL',
-            102: 'ENTER CALL CODE',
-            103: 'ENTER STATICCALL',
-            104: 'ENTER DELEGATECALL',
-            105: 'ENTER CREATE',
-            106: 'ENTER CREATE2',
-            201: 'EXIT STOP',
-            202: 'EXIT RETURN',
-            203: 'EXIT SELFDESTRUCT',
-            204: 'EXIT REVERT',
-            300: 'RETURN',
-            301: 'CANCEL'
-        }
-
-        value = event_type_dict.get(event_type, None)
-        if value is None:
+        try:
+            return NeonLogTxEvent.Type(event_type).name
+        except (BaseException,):
             return event_type
-        return value
 
     def eth_getLogs(self, obj: Dict[str, Any]) -> List[Dict[str, Any]]:
         log_list = self._get_log_list(obj)
