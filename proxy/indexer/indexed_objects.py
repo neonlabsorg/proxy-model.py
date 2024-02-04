@@ -812,15 +812,6 @@ class NeonIndexedBlockInfo:
         self._check_stuck_txs(config)
         self._check_stuck_alts(config)
 
-    def has_stuck_objs(self) -> bool:
-        assert self._is_stuck_completed
-
-        return (
-            len(self._stuck_neon_tx_list) > 0 or
-            len(self._stuck_neon_holder_list) > 0 or
-            len(self._sol_alt_info_dict) > 0
-        )
-
     def _check_stuck_holders(self, config: Config) -> None:
         # there were the restart with stuck holders
         if self._stuck_block_slot > self._sol_block.block_slot:
@@ -883,6 +874,8 @@ class NeonIndexedBlockInfo:
         for alt_info in self._sol_alt_info_dict.values():
             if stuck_block_slot > alt_info.block_slot:
                 alt_info.mark_stuck()
+            if self._min_block_slot > alt_info.block_slot:
+                self._min_block_slot = alt_info.block_slot
 
 
 class NeonIndexedBlockDict:
