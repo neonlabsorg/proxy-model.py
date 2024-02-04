@@ -19,14 +19,14 @@ class SolBlockNetCache:
     def __init__(self, config: Config, solana: SolInteractor):
         self._solana = solana
 
-        self._slot_request_len = max(config.indexer_poll_block_cnt * 4, 128)
+        self._slot_request_len = config.indexer_poll_block_cnt * 4
         self._block_request_len = config.indexer_poll_block_cnt
 
         self._start_slot = -1
         self._stop_slot = -1
         self._block_list: List[SolBlockInfo] = list()
 
-        self._thread_pool = ThreadPool(min(multiprocessing.cpu_count(), self._block_request_len))
+        self._thread_pool = ThreadPool(self._block_request_len)
 
     def finalize_block(self, sol_block: SolBlockInfo) -> None:
         if sol_block.block_slot > self._stop_slot:
