@@ -166,10 +166,7 @@ class Indexer:
             value_dict['terminate block slot'] = self._term_slot
 
         with logging_context(ident='stat'):
-            self._counted_logger.print(
-                list_value_dict=dict(),
-                latest_value_dict=value_dict
-            )
+            self._counted_logger.print(value_dict)
 
     def _new_neon_block(self, dctx: SolNeonDecoderCtx, sol_block: SolBlockInfo) -> NeonIndexedBlockInfo:
         if not dctx.is_finalized():
