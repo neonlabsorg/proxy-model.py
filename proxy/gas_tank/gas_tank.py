@@ -320,15 +320,13 @@ class GasTank:
         self._save_cached_data()
         self._clear_old_data()
 
-        with logging_context(ident='stat'):
-            self._counted_logger.print(
-                list_value_dict={},
-                latest_value_dict={
+        if self._counted_logger.is_print_time():
+            with logging_context(ident='stat'):
+                self._counted_logger.print({
                     'Latest slot': self._last_block_slot,
                     'Latest processed slot': self._latest_gas_tank_slot,
                     'Solana finalized slot': self._sol_tx_collector.last_block_slot
-                }
-            )
+                })
 
     @staticmethod
     def _check_error(tx: Dict[str, Any]) -> bool:
