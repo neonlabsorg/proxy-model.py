@@ -69,22 +69,10 @@ terraform = Terraform(working_dir=pathlib.Path(
 
 
 def docker_compose(args: str):
-    get_version = f'docker-compose --version'
-
-    click.echo(f"run command: {get_version}")
-    out = subprocess.run(get_version, capture_output=True, shell=True)
-    click.echo("return code: " + str(out.returncode))
-
-    if out.returncode != 0:
-        raise RuntimeError(f"Command {get_version} failed. Err: {out.stderr}")
-
-    version = out.stdout.decode('utf-8').split(' ')[3]
-    command = f'docker-compose {args}' if version < '1.20' else f'docker-compose --compatibility {args}'
-
+    command = f'docker-compose --compatibility {args}'
     click.echo(f"run command: {command}")
     out = subprocess.run(command, shell=True)
     click.echo("return code: " + str(out.returncode))
-
     if out.returncode != 0:
         raise RuntimeError(f"Command {command} failed. Err: {out.stderr}")
 
