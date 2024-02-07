@@ -18,27 +18,57 @@ from ..neon_core_api.neon_core_api_client import NeonCoreApiClient
 class ProxyStatDataPeeker(StatDataPeeker):
     def __init__(self, config: Config, stat_srv: ProxyStatService):
         super().__init__(config, stat_srv)
+        self._config = config
+
         self._stat_service = stat_srv
         self._core_api_client = NeonCoreApiClient(config)
 
         self._sol_account_list: List[str] = list()
         self._neon_account_list: List[str] = list()
 
+        self._last_sol_op_pos = 0
+        self._last_neon_op_pos = 0
+
     def set_op_account_list(self, op_list: NeonOpResListData) -> None:
         self._sol_account_list = list(set(op_list.sol_account_list))
         self._neon_account_list = list(set(op_list.neon_account_list))
 
+        self._sol_account_list.sort()
+        self._neon_account_list.sort()
+
     async def _run(self) -> None:
         await super()._run()
-        self._stat_operator_balance()
+        self._stat_operator_sol_balance()
+        self._stat_operator_neon_balance()
 
-    def _stat_operator_balance(self) -> None:
-        sol_balance_list = self._solana.get_sol_balance_list(self._sol_account_list)
-        for sol_account, balance in zip(self._sol_account_list, sol_balance_list):
+    def _stat_operator_sol_balance(self) -> None:
+        sol_acct_list: List[str] = list()
+        for i in range(2):
+            pos = self._last_sol_op_pos
+            end_pos = pos + self._config.stat_number_operator_balance_at_time
+            sol_acct_list = self._sol_account_list[pos:end_pos]
+            if len(sol_acct_list):
+                break
+
+            self._last_sol_op_pos = 0
+
+        sol_balance_list = self._solana.get_sol_balance_list(sol_acct_list)
+        for sol_account, balance in zip(sol_acct_list, sol_balance_list):
             self._stat_service.commit_op_sol_balance(sol_account, Decimal(balance) / 1_000_000_000)
 
-        neon_layout_list = self._core_api_client.get_neon_account_info_list(self._neon_account_list)
-        for neon_account, neon_layout in zip(self._neon_account_list, neon_layout_list):
+    def _stat_operator_neon_balance(self) -> None:
+        neon_acct_list: List[str] = list()
+        for i in range(2):
+            pos = self._last_neon_op_pos
+            end_pos = pos + self._config.stat_number_operator_balance_at_time
+            neon_acct_list = self._neon_account_list[pos:end_pos]
+            if len(neon_acct_list):
+                break
+
+            self._last_neon_op_pos = 0
+
+        neon_layout_list = self._core_api_client.get_neon_account_info_list(neon_acct_list)
+        for neon_account, neon_layout in zip(neon_acct_list, neon_layout_list):
             if neon_layout is not None:
                 neon_balance = Decimal(neon_layout.balance) / 1_000_000_000 / 1_000_000_000
                 self._stat_service.commit_op_neon_balance(neon_account, neon_balance)

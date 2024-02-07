@@ -77,6 +77,7 @@ class Config(DBConfig):
         self._use_earliest_block_if_0_passed = self._env_bool('USE_EARLIEST_BLOCK_IF_0_PASSED', False)
         self._max_evm_step_cnt_emulate = self._env_num('MAX_EVM_STEP_COUNT_TO_EMULATE', 500_000, 1000, 4_000_000)
         self._gather_statistics = self._env_bool('GATHER_STATISTICS', False)
+        self._stat_num_op_balance_at_time = self._env_num('STAT_NUMBER_OPERATOR_BALANCES_AT_TIME', 10, 1)
         self._neon_core_api_port = self._env_num('NEON_CORE_API_PORT', 9195, 8000, 12000)
 
         # Mempool limits
@@ -368,6 +369,10 @@ class Config(DBConfig):
         return self._gather_statistics
 
     @property
+    def stat_number_operator_balance_at_time(self) -> int:
+        return self._stat_num_op_balance_at_time
+
+    @property
     def neon_core_api_port(self) -> int:
         return self._neon_core_api_port
 
@@ -617,6 +622,7 @@ class Config(DBConfig):
             'USE_EARLIEST_BLOCK_IF_0_PASSED': self.use_earliest_block_if_0_passed,
             'MAX_EVM_STEP_COUNT_TO_EMULATE': self.max_evm_step_cnt_emulate,
             'GATHER_STATISTICS': self.gather_statistics,
+            'STAT_NUMBER_OPERATOR_BALANCES_AT_TIME': self.stat_number_operator_balance_at_time,
             'NEON_CORE_API_PORT': self.neon_core_api_port,
 
             # Mempool settings
