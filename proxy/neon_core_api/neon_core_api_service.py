@@ -38,6 +38,7 @@ class _Service:
             NEON_API_LISTENER_ADDR=self._host,
             COMMITMENT='recent',
             NEON_DB_CLICKHOUSE_URLS=';'.join(self._config.ch_dsn_list),
+            SOLANA_KEY_FOR_CONFIG=str(self._config.solana_key_for_evm_config),
 
             # TODO: remove
             KEYPAIR='',
