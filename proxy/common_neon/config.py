@@ -77,7 +77,13 @@ class Config(DBConfig):
         self._use_earliest_block_if_0_passed = self._env_bool('USE_EARLIEST_BLOCK_IF_0_PASSED', False)
         self._max_evm_step_cnt_emulate = self._env_num('MAX_EVM_STEP_COUNT_TO_EMULATE', 500_000, 1000, 4_000_000)
         self._gather_statistics = self._env_bool('GATHER_STATISTICS', False)
+
+        # Neon Core API settings
         self._neon_core_api_port = self._env_num('NEON_CORE_API_PORT', 9195, 8000, 12000)
+        self._solana_key_for_evm_config = self._validate_sol_acct(
+            'SOLANA_KEY_FOR_EVM_CONFIG',
+            os.environ.get('SOLANA_KEY_FOR_EVM_CONFIG', '')
+        )
 
         # Mempool limits
         self._mempool_capacity = self._env_num('MEMPOOL_CAPACITY', 4096, 10, 4096 * 1024)
@@ -367,9 +373,16 @@ class Config(DBConfig):
     def gather_statistics(self) -> bool:
         return self._gather_statistics
 
+    ########################
+    # Neon Core API settings
+
     @property
     def neon_core_api_port(self) -> int:
         return self._neon_core_api_port
+
+    @property
+    def solana_key_for_evm_config(self) -> Optional[SolPubKey]:
+        return self._solana_key_for_evm_config
 
     #####################
     # Mempool settings
@@ -617,7 +630,10 @@ class Config(DBConfig):
             'USE_EARLIEST_BLOCK_IF_0_PASSED': self.use_earliest_block_if_0_passed,
             'MAX_EVM_STEP_COUNT_TO_EMULATE': self.max_evm_step_cnt_emulate,
             'GATHER_STATISTICS': self.gather_statistics,
+
+            # Neon Core API settings
             'NEON_CORE_API_PORT': self.neon_core_api_port,
+            'SOLANA_KEY_FOR_EVM_CONFIG': str(self.solana_key_for_evm_config),
 
             # Mempool settings
             'MEMPOOL_CAPACITY': self.mempool_capacity,
