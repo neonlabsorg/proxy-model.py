@@ -4,14 +4,13 @@ ARG DOCKERHUB_ORG_NAME
 FROM ${DOCKERHUB_ORG_NAME}/evm_loader:${NEON_EVM_COMMIT} AS spl
 FROM ${DOCKERHUB_ORG_NAME}/neon_test_invoke_program:develop AS neon_test_invoke_program
 
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 WORKDIR /opt
 
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive \
-        apt-get install -y \
-            git \
+RUN apt update && \
+    DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC \
+        apt install -y \
             software-properties-common \
             openssl \
             curl \
@@ -21,15 +20,27 @@ RUN apt-get update && \
             python3-pip \
             python3-venv \
             postgresql-client && \
-    apt-get remove -y git && \
     rm -rf /var/lib/apt/lists/*
+
+ENV SSL_URL=http://security.ubuntu.com/ubuntu/pool/main/o/openssl
+ENV SSL_VER=1.1.1f-1ubuntu2
+
+RUN \
+    curl ${SSL_URL}/libssl1.1_${SSL_VER}_amd64.deb -O && \
+    curl ${SSL_URL}/openssl_${SSL_VER}_amd64.deb -O && \
+    apt install -y --allow-downgrades \
+        ./libssl1.1_${SSL_VER}_amd64.deb \
+        ./openssl_${SSL_VER}_amd64.deb && \
+    rm -f \
+        ./libssl1.1_${SSL_VER}_amd64.deb \
+        ./openssl_${SSL_VER}_amd64.deb
 
 COPY ./requirements.txt /opt
 
 RUN python3 -m venv venv && \
     pip3 install --upgrade pip && \
     /bin/bash -c "source venv/bin/activate" && \
-    pip install -r requirements.txt && \
+    pip3 install -r requirements.txt && \
     pip3 install py-solc-x && \
     python3 -c "import solcx; solcx.install_solc(version='0.7.6')"
 
