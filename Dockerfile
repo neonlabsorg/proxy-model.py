@@ -65,7 +65,7 @@ COPY --from=spl \
     /opt/contracts/
 
 COPY --from=neon_test_programs \
-    /opt/deploy/neon_test_invoke/neon_test_invoke_program-keypair.json \
+    /opt/deploy/test_invoke_program/neon_test_invoke_program-keypair.json \
     /spl/bin/
 
 COPY proxy/operator-keypairs/id.json /root/.config/solana/
