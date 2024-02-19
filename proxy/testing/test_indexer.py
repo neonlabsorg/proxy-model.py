@@ -113,7 +113,7 @@ class CompleteTest(unittest.TestCase):
     @classmethod
     def get_test_program_name(cls) -> SolPubKey:
         pubkey = subprocess.check_output([
-            'solana', 'address', '-k', '/spl/bin/neon_test_invoke_program-keypair.json'
+            'solana', 'address', '-k', '/spl/bin/test_invoke_program-keypair.json'
         ])
         return SolPubKey.from_string(bytes.decode(pubkey, 'utf8').strip())
 
