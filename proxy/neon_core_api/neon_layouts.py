@@ -9,17 +9,17 @@ from ..common_neon.address import NeonAddress
 
 
 class NeonAccountStatus(enum.Enum):
-    Ok = 'Ok'
-    Legacy = 'Legacy'
-    Empty = 'Empty'
+    Ok = "Ok"
+    Legacy = "Legacy"
+    Empty = "Empty"
 
     @staticmethod
     def from_string(value: str) -> NeonAccountStatus:
-        if value == 'Ok':
+        if value == "Ok":
             return NeonAccountStatus.Ok
-        elif value == 'Legacy':
+        elif value == "Legacy":
             return NeonAccountStatus.Legacy
-        elif value == 'Empty':
+        elif value == "Empty":
             return NeonAccountStatus.Empty
 
 
@@ -35,12 +35,14 @@ class NeonAccountInfo:
     @staticmethod
     def from_json(neon_addr: NeonAddress, json_data: Dict[str, Any]) -> NeonAccountInfo:
         return NeonAccountInfo(
-            status=NeonAccountStatus.from_string(json_data.get('status')),
+            status=NeonAccountStatus.from_string(json_data.get("status")),
             neon_address=neon_addr,
-            solana_address=SolPubKey.from_string(json_data.get('solana_address')),
-            contract_solana_address=SolPubKey.from_string(json_data.get('contract_solana_address')),
-            tx_count=json_data.get('trx_count'),
-            balance=int(json_data.get('balance'), 16),
+            solana_address=SolPubKey.from_string(json_data.get("solana_address")),
+            contract_solana_address=SolPubKey.from_string(
+                json_data.get("contract_solana_address")
+            ),
+            tx_count=json_data.get("trx_count"),
+            balance=int(json_data.get("balance"), 16),
         )
 
     @property
@@ -55,12 +57,12 @@ class NeonContractInfo:
     code: Optional[str]
 
     @staticmethod
-    def from_json(neon_addr: NeonAddress, json_data: Dict[str, Any]) -> NeonContractInfo:
-        code = '0x' + (json_data.get('code') or '')
+    def from_json(
+        neon_addr: NeonAddress, json_data: Dict[str, Any]
+    ) -> NeonContractInfo:
+        code = "0x" + (json_data.get("code") or "")
         return NeonContractInfo(
-            neon_addr=neon_addr,
-            chain_id=json_data.get('chain_id'),
-            code=code
+            neon_addr=neon_addr, chain_id=json_data.get("chain_id"), code=code
         )
 
 
@@ -74,13 +76,12 @@ class BPFLoader2ProgramInfo:
         if len(data) != 36:
             return BPFLoader2ProgramInfo(0)
 
-        version = int.from_bytes(data[:4], 'little')
+        version = int.from_bytes(data[:4], "little")
         if version != 2:
             return BPFLoader2ProgramInfo(version)
 
         return BPFLoader2ProgramInfo(
-            version=version,
-            executable_addr=SolPubKey.from_bytes(data[4:])
+            version=version, executable_addr=SolPubKey.from_bytes(data[4:])
         )
 
 
@@ -95,13 +96,12 @@ class BPFLoader2ExecutableInfo:
         if len(data) < BPFLoader2ExecutableInfo.minimum_size:
             return BPFLoader2ExecutableInfo(0)
 
-        version = int.from_bytes(data[:4], 'little')
+        version = int.from_bytes(data[:4], "little")
         if version != 3:
             return BPFLoader2ExecutableInfo(version)
 
         return BPFLoader2ExecutableInfo(
-            version=version,
-            deployed_slot=int.from_bytes(data[4:8], 'little')
+            version=version, deployed_slot=int.from_bytes(data[4:8], "little")
         )
 
 
@@ -120,20 +120,20 @@ class EVMChainInfo:
 
 
 class _EVMConfigConst(enum.Enum):
-    ConfigName = 'CONFIG'
-    ChainsName = 'CHAINS'
-    VersionName = 'VERSION'
-    RevisionName = 'REVISION'
+    ConfigName = "CONFIG"
+    ChainsName = "CHAINS"
+    VersionName = "VERSION"
+    RevisionName = "REVISION"
 
-    NeonTokenName = 'NEON'
-    NeonTokenChainID = 'NEON_CHAIN_ID'
-    NeonTokenMint = 'NEON_TOKEN_MINT'
+    NeonTokenName = "NEON"
+    NeonTokenChainID = "NEON_CHAIN_ID"
+    NeonTokenMint = "NEON_TOKEN_MINT"
 
-    NeonPKGVersionName = 'NEON_PKG_VERSION'
-    NeonPKGRevisionName = 'NEON_REVISION'
+    NeonPKGVersionName = "NEON_PKG_VERSION"
+    NeonPKGRevisionName = "NEON_REVISION"
 
-    NeonNoVersion = '0.0.0-unknown'
-    NeonNoRevision = 'unknown'
+    NeonNoVersion = "0.0.0-unknown"
+    NeonNoRevision = "unknown"
 
 
 @dataclass(frozen=True)
@@ -150,13 +150,15 @@ class EVMConfigInfo:
     chain_id: int
 
     @staticmethod
-    def from_json(last_deployed_slot: int, json_config: Dict[str, Any]) -> EVMConfigInfo:
+    def from_json(
+        last_deployed_slot: int, json_config: Dict[str, Any]
+    ) -> EVMConfigInfo:
         evm_param_dict: Dict[str, str] = dict()
         token_info_list: List[EVMTokenInfo] = list()
         chain_info_list: List[EVMChainInfo] = list()
 
-        version = ''
-        revision = ''
+        version = ""
+        revision = ""
 
         for key, value in json_config.items():
             if key.upper() == _EVMConfigConst.ConfigName.value:
@@ -164,17 +166,15 @@ class EVMConfigInfo:
             elif key.upper() == _EVMConfigConst.ChainsName.value:
                 token_info_list = [
                     EVMTokenInfo(
-                        chain_id=token['id'],
-                        token_mint=SolPubKey.from_string(token['token']),
-                        token_name=token['name'].upper()
+                        chain_id=token["id"],
+                        token_mint=SolPubKey.from_string(token["token"]),
+                        token_name=token["name"].upper(),
                     )
                     for token in value
                 ]
                 chain_info_list = [
                     EVMChainInfo(
-                        id=token['id'],
-                        name=token['name'],
-                        token=token['token']
+                        id=token["id"], name=token["name"], token=token["token"]
                     )
                     for token in value
                 ]
@@ -192,20 +192,24 @@ class EVMConfigInfo:
 
         # the call of neon-cli utility
         if not len(token_info_list):
-            chain_id = int(evm_param_dict.get(_EVMConfigConst.NeonTokenChainID.value, '0'), 10)
+            chain_id = int(
+                evm_param_dict.get(_EVMConfigConst.NeonTokenChainID.value, "0"), 10
+            )
             token_mint = evm_param_dict.get(_EVMConfigConst.NeonTokenMint.value, None)
-            token_mint = SolPubKey.from_string(token_mint) if token_mint else SolPubKey.default()
-            token_info_list = [EVMTokenInfo(chain_id, 'NEON', token_mint)]
+            token_mint = (
+                SolPubKey.from_string(token_mint) if token_mint else SolPubKey.default()
+            )
+            token_info_list = [EVMTokenInfo(chain_id, "NEON", token_mint)]
 
         # the call of neon-cli utility
         if not len(version):
             version = evm_param_dict.get(
                 _EVMConfigConst.NeonPKGVersionName.value,
-                _EVMConfigConst.NeonNoVersion.value
+                _EVMConfigConst.NeonNoVersion.value,
             )
             revision = evm_param_dict.get(
                 _EVMConfigConst.NeonPKGRevisionName.value,
-                _EVMConfigConst.NeonNoRevision.value
+                _EVMConfigConst.NeonNoRevision.value,
             )
 
         return EVMConfigInfo(
@@ -215,7 +219,7 @@ class EVMConfigInfo:
             chain_info_list=chain_info_list,
             version=version,
             revision=revision,
-            chain_id=chain_id
+            chain_id=chain_id,
         )
 
     @staticmethod
@@ -227,7 +231,7 @@ class EVMConfigInfo:
             chain_info_list=list(),
             version=_EVMConfigConst.NeonNoVersion.value,
             revision=_EVMConfigConst.NeonNoRevision.value,
-            chain_id=0
+            chain_id=0,
         )
 
 
@@ -238,21 +242,21 @@ class HolderAccountMetaInfo:
 
 
 class HolderStatus(enum.Enum):
-    Empty = 'Empty'
-    Error = 'Error'
-    Holder = 'Holder'
-    Active = 'Active'
-    Finalized = 'Finalized'
+    Empty = "Empty"
+    Error = "Error"
+    Holder = "Holder"
+    Active = "Active"
+    Finalized = "Finalized"
 
     @staticmethod
     def from_string(value: str) -> HolderStatus:
-        if value == 'Empty':
+        if value == "Empty":
             return HolderStatus.Empty
-        elif value == 'Holder':
+        elif value == "Holder":
             return HolderStatus.Holder
-        elif value == 'Active':
+        elif value == "Active":
             return HolderStatus.Active
-        elif value == 'Finalized':
+        elif value == "Finalized":
             return HolderStatus.Finalized
         return HolderStatus.Error
 
@@ -276,20 +280,29 @@ class HolderAccountInfo:
 
     @staticmethod
     def from_json(addr: SolPubKey, json_data: Dict[str, Any]) -> HolderAccountInfo:
-        owner = json_data.get('owner', None)
+        owner = json_data.get("owner", None)
         owner = SolPubKey.from_string(owner) if owner else SolPubKey.default()
 
-        neon_tx_sig = json_data.get('tx', None)
-        neon_tx_sig = ('0x' + neon_tx_sig) if neon_tx_sig else ''
+        neon_tx_sig = json_data.get("tx", None)
+        neon_tx_sig = ("0x" + neon_tx_sig) if neon_tx_sig else ""
 
-        acct_list = json_data.get('accounts', list())
-        acct_list = [
-            HolderAccountMetaInfo(
-                pubkey=SolPubKey.from_string(json_acct.get('key')),
-                is_writable=json_acct.get('is_writable')
-            )
-            for json_acct in acct_list
-        ]
+        json_acct_list = json_data.get("accounts", list())
+        acct_list: List[HolderAccountMetaInfo] = list()
+        for json_acct in json_acct_list:
+            if isinstance(json_acct, str):
+                acct_list.append(
+                    HolderAccountMetaInfo(
+                        pubkey=SolPubKey.from_string(json_acct),
+                        is_writable=True
+                    )
+                )
+            else:
+                acct_list.append(
+                    HolderAccountMetaInfo(
+                        pubkey=SolPubKey.from_string(json_acct.get('key')),
+                        is_writable=json_acct.get('is_writable')
+                    )
+                )
 
         def _get_int(_name: str) -> Optional[int]:
             value = json_data.get(_name, None)
@@ -297,17 +310,13 @@ class HolderAccountInfo:
 
         return HolderAccountInfo(
             holder_account=addr,
-
-            status=HolderStatus.from_string(json_data.get('status', '')),
-            data_size=json_data.get('len', None) or None,
+            status=HolderStatus.from_string(json_data.get("status", "")),
+            data_size=json_data.get("len", None) or 0,
             owner=owner,
-
             neon_tx_sig=neon_tx_sig,
-            chain_id=json_data.get('chain_id', None),
-
-            gas_price=_get_int('gas_price'),
-            gas_limit=_get_int('gas_limit'),
-            gas_used=_get_int('gas_used'),
-
-            account_list=acct_list
+            chain_id=json_data.get("chain_id", None),
+            gas_price=_get_int("gas_price"),
+            gas_limit=_get_int("gas_limit"),
+            gas_used=_get_int("gas_used"),
+            account_list=acct_list,
         )

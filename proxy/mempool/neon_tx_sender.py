@@ -139,6 +139,9 @@ class NeonTxSendStrategyExecutor:
             raise TxAccountCntTooBig(acct_cnt, self._ctx.config.max_tx_account_cnt)
 
     def _validate_nonce(self) -> None:
+        if self._ctx.is_stuck_tx():
+            return
+
         self._init_state_tx_cnt()
         if self._ctx.state_tx_cnt == self._ctx.neon_tx_info.nonce:
             return
