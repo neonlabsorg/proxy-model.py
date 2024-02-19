@@ -122,14 +122,11 @@ def build_docker_image(neon_evm_tag,  proxy_tag, head_ref_branch, skip_pull):
     neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
     neon_evm_image = f'{DOCKERHUB_ORG_NAME}/evm_loader:{neon_evm_tag}'
     click.echo(f"neon-evm image: {neon_evm_image}")
-   # neon_test_invoke_program_image = f"{DOCKERHUB_ORG_NAME}/neon_test_invoke_program:develop"
     if not skip_pull:
         click.echo('pull docker images...')
         out = docker_client.pull(neon_evm_image, stream=True, decode=True)
         process_output(out)
 
-       # out = docker_client.pull(neon_test_invoke_program_image, stream=True, decode=True)
-      #  process_output(out)
     else:
         click.echo('skip pulling of docker images')
 
