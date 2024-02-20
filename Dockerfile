@@ -2,7 +2,6 @@ ARG NEON_EVM_COMMIT
 ARG DOCKERHUB_ORG_NAME
 
 FROM ${DOCKERHUB_ORG_NAME}/evm_loader:${NEON_EVM_COMMIT} AS spl
-FROM ${DOCKERHUB_ORG_NAME}/neon_test_invoke_program:develop AS neon_test_invoke_program
 
 FROM ubuntu:20.04
 
@@ -53,8 +52,8 @@ COPY --from=spl \
     /opt/solidity/ \
     /opt/contracts/
 
-COPY --from=neon_test_invoke_program \
-    /opt/neon_test_invoke_program-keypair.json \
+COPY --from=spl \
+    /opt/deploy/test_invoke_program/test_invoke_program-keypair.json \
     /spl/bin/
 
 COPY proxy/operator-keypairs/id.json /root/.config/solana/
