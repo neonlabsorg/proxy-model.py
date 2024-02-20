@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import enum
 
+from time import time
 from typing import List, Dict, Set, Optional, Tuple, Union, cast
 
 from ..common_neon.utils.neon_tx_info import NeonTxInfo
@@ -95,6 +96,7 @@ class MPSenderTxPool:
         self._state = self.State.Empty
         self._sender_address = sender_address
         self._gas_price = 0
+        self._heartbeat = int(time())
         self._state_tx_cnt = 0
         self._processing_tx: Optional[MPTxRequest] = None
         self._tx_nonce_queue = SortedQueue[MPTxRequest, int, str](
@@ -150,6 +152,7 @@ class MPSenderTxPool:
     def add_tx(self, tx: MPTxRequest) -> None:
         assert self._state_tx_cnt <= tx.nonce, f'Tx {tx.sig} has nonce {tx.nonce} less than {self._state_tx_cnt}'
         self._tx_nonce_queue.add(tx)
+        self._heartbeat = int(time())
 
     @property
     def top_tx(self) -> Optional[MPTxRequest]:
@@ -191,6 +194,10 @@ class MPSenderTxPool:
 
     def set_state_tx_cnt(self, value: int) -> None:
         self._state_tx_cnt = value
+
+    @property
+    def heartbeat(self) -> int:
+        return self._heartbeat
 
     def _validate_processing_tx(self, tx: MPTxRequest) -> None:
         assert not self.is_empty(), f'no transactions in {self.sender_address} pool'
