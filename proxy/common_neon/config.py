@@ -87,6 +87,7 @@ class Config(DBConfig):
 
         # Mempool limits
         self._mempool_capacity = self._env_num('MEMPOOL_CAPACITY', 4096, 10, 4096 * 1024)
+        self._mempool_eviction_timeout_sec = self._env_num('MEMPOOL_EVICTION_TIMEOUT_SEC', 60 * 60 * 3, 10, None)
         self._mempool_executor_limit_cnt = self._env_num('MEMPOOL_EXECUTOR_LIMIT_COUNT', 128, 4, 1024)
         self._mempool_cache_life_sec = self._env_num(
             'MEMPOOL_CACHE_LIFE_SEC',
@@ -392,6 +393,10 @@ class Config(DBConfig):
         return self._mempool_capacity
 
     @property
+    def mempool_eviction_timeout_sec(self) -> int:
+        return self._mempool_eviction_timeout_sec
+
+    @property
     def mempool_executor_limit_cnt(self) -> int:
         return self._mempool_executor_limit_cnt
 
@@ -637,6 +642,7 @@ class Config(DBConfig):
 
             # Mempool settings
             'MEMPOOL_CAPACITY': self.mempool_capacity,
+            'MEMPOOL_EVICTION_TIMEOUT_SEC': self.mempool_eviction_timeout_sec,
             'MEMPOOL_EXECUTOR_LIMIT_CNT': self.mempool_executor_limit_cnt,
             'MEMPOOL_CACHE_LIFE_SEC': self.mempool_cache_life_sec,
             'MEMPOOL_RESCHEDULE_TIME_SEC': self.mempool_reschedule_time_sec,
