@@ -303,6 +303,35 @@ class MPTxSchedule:
         sender_pool.drop_tx(tx)
         self._tx_dict.pop_tx(tx)
 
+    def drop_expired_sender_pools(self, eviction_timeout_sec: int) -> None:
+        threshold = int(time()) - eviction_timeout_sec
+        LOG.debug(f'Try to drop sender pools with heartbeat below {threshold}')
+
+        while True:
+            sender_pool =  self.peek_lowest_sender_pool_heartbeat()
+
+            if any([
+                sender_pool is None,
+                threshold < sender_pool.heartbeat,
+                sender_pool.is_processing()
+            ]):
+                break
+
+            LOG.debug('Droping sender pool {} with heartbeat {}'.format(
+                sender_pool.sender_address,
+                sender_pool.heartbeat
+            ))
+
+            while not sender_pool.is_empty():
+                tx = sender_pool.top_tx
+
+                if tx is None:
+                    break
+
+                self._drop_tx_from_sender_pool(sender_pool, tx)
+
+            self._sync_sender_state(sender_pool, True)
+            
     def _find_sender_pool(self, sender_address: str) -> Optional[MPSenderTxPool]:
         return self._sender_pool_dict.get(sender_address, None)
 
@@ -336,8 +365,11 @@ class MPTxSchedule:
 
         sender_pool.set_state_tx_cnt(state_tx_cnt)
 
-    def _sync_sender_state(self, sender_pool: MPSenderTxPool) -> None:
-        if sender_pool.has_valid_state():
+    def _sync_sender_state(
+            self,
+            sender_pool: MPSenderTxPool,
+            skip_validation: bool=False) -> None:
+        if not skip_validation and sender_pool.has_valid_state():
             return
 
         old_state = sender_pool.state
