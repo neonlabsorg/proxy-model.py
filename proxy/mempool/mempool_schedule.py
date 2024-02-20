@@ -262,6 +262,10 @@ class MPTxSchedule:
         self._chain_id = chain_id
 
         self._sender_pool_dict: Dict[str, MPSenderTxPool] = dict()
+        self._sender_pool_heartbeat_queue = SortedQueue[MPSenderTxPool, int, str](
+            lt_key_func=lambda a: a.heartbeat,
+            eq_key_func=lambda a: a.sender_address
+        )
         self._sender_pool_queue = SortedQueue[MPSenderTxPool, int, str](
             lt_key_func=lambda a: a.gas_price,
             eq_key_func=lambda a: a.sender_address
@@ -291,6 +295,8 @@ class MPTxSchedule:
         # the first tx in the sender pool
         if sender_pool.len_tx_nonce_queue == 1:
             self._sender_pool_dict[sender_pool.sender_address] = sender_pool
+
+        self._sender_pool_heartbeat_queue.try_add(sender_pool)
 
     def _drop_tx_from_sender_pool(self, sender_pool: MPSenderTxPool, tx: MPTxRequest) -> None:
         LOG.debug(f'Drop tx {tx.sig} from pool {sender_pool.sender_address}')
@@ -343,6 +349,7 @@ class MPTxSchedule:
         new_state = sender_pool.sync_state()
         if new_state == sender_pool.State.Empty:
             self._sender_pool_dict.pop(sender_pool.sender_address)
+            self._sender_pool_heartbeat_queue.try_pop(sender_pool)
             LOG.debug(f'Done sender {self._chain_id, sender_pool.sender_address}')
         elif new_state == sender_pool.State.Suspended:
             self._suspended_sender_set.add(NeonAddress.from_raw(sender_pool.sender_address, self._chain_id))
@@ -447,6 +454,11 @@ class MPTxSchedule:
         if len(self._sender_pool_queue) == 0:
             return None
         return self._sender_pool_queue[self._top_index].top_tx
+
+    def peek_lowest_sender_pool_heartbeat(self) -> Optional[MPSenderTxPool]:
+        if len(self._sender_pool_heartbeat_queue) == 0:
+            return None
+        return self._sender_pool_heartbeat_queue[0]
 
     def acquire_tx(self, tx: MPTxRequest) -> Optional[MPTxRequest]:
         sender_pool = self._get_sender_pool(tx.sender_address)
