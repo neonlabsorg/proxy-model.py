@@ -75,6 +75,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
         self._free_alt_queue_task_loop: Optional[MPFreeALTQueueTaskLoop] = None
 
     def start(self) -> None:
+        asyncio.get_event_loop().create_task(self._process_eviction_loop()),
         asyncio.get_event_loop().run_until_complete(self._executor_mng.set_executor_cnt(1))
         self._async_task_list.append(MPEVMConfigTaskLoop(self._executor_mng, self))
 
@@ -522,6 +523,13 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
 
     def _create_kick_tx_schedule_task(self) -> None:
         asyncio.get_event_loop().create_task(self._kick_tx_schedule())
+    
+    async def _process_eviction_loop(self) -> None:
+        while True:
+            for tx_schedule in self._tx_schedule_dict.values():
+                tx_schedule.drop_expired_sender_pools(self._config.mempool_eviction_timeout_sec)
+
+            await asyncio.sleep(self._config.mempool_eviction_timeout_sec / 10)
 
     async def _process_tx_dict_clear_loop(self) -> None:
         while True:
