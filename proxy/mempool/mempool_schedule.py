@@ -263,7 +263,7 @@ class MPTxSchedule:
 
         self._sender_pool_dict: Dict[str, MPSenderTxPool] = dict()
         self._sender_pool_heartbeat_queue = SortedQueue[MPSenderTxPool, int, str](
-            lt_key_func=lambda a: a.heartbeat,
+            lt_key_func=lambda a: -a.heartbeat,
             eq_key_func=lambda a: a.sender_address
         )
         self._sender_pool_queue = SortedQueue[MPSenderTxPool, int, str](
@@ -307,8 +307,8 @@ class MPTxSchedule:
         threshold = int(time.time()) - eviction_timeout_sec
         LOG.debug(f'Try to drop sender pools with heartbeat below {threshold}')
 
-        while True:
-            sender_pool =  self.peek_lowest_sender_pool_heartbeat()
+        while not self._sender_pool_heartbeat_queue.is_empty():
+            sender_pool = self._sender_pool_heartbeat_queue[self._top_index]
 
             if any([
                 sender_pool is None,
@@ -486,11 +486,6 @@ class MPTxSchedule:
         if len(self._sender_pool_queue) == 0:
             return None
         return self._sender_pool_queue[self._top_index].top_tx
-
-    def peek_lowest_sender_pool_heartbeat(self) -> Optional[MPSenderTxPool]:
-        if len(self._sender_pool_heartbeat_queue) == 0:
-            return None
-        return self._sender_pool_heartbeat_queue[0]
 
     def acquire_tx(self, tx: MPTxRequest) -> Optional[MPTxRequest]:
         sender_pool = self._get_sender_pool(tx.sender_address)
