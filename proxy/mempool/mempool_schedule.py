@@ -295,8 +295,8 @@ class MPTxSchedule:
         # the first tx in the sender pool
         if sender_pool.len_tx_nonce_queue == 1:
             self._sender_pool_dict[sender_pool.sender_address] = sender_pool
-
-        self._sender_pool_heartbeat_queue.try_add(sender_pool)
+        
+        self._sender_pool_heartbeat_queue.add(sender_pool)
 
     def _drop_tx_from_sender_pool(self, sender_pool: MPSenderTxPool, tx: MPTxRequest) -> None:
         LOG.debug(f'Drop tx {tx.sig} from pool {sender_pool.sender_address}')
@@ -381,7 +381,7 @@ class MPTxSchedule:
         new_state = sender_pool.sync_state()
         if new_state == sender_pool.State.Empty:
             self._sender_pool_dict.pop(sender_pool.sender_address)
-            self._sender_pool_heartbeat_queue.try_pop(sender_pool)
+            self._sender_pool_heartbeat_queue.pop(sender_pool)
             LOG.debug(f'Done sender {self._chain_id, sender_pool.sender_address}')
         elif new_state == sender_pool.State.Suspended:
             self._suspended_sender_set.add(NeonAddress.from_raw(sender_pool.sender_address, self._chain_id))
