@@ -310,11 +310,7 @@ class MPTxSchedule:
         while not self._sender_pool_heartbeat_queue.is_empty():
             sender_pool = self._sender_pool_heartbeat_queue[self._top_index]
 
-            if any([
-                sender_pool is None,
-                threshold < sender_pool.heartbeat,
-                sender_pool.is_processing()
-            ]):
+            if threshold < sender_pool.heartbeat or sender_pool.is_processing():
                 break
 
             LOG.debug('Droping sender pool {} with heartbeat {}'.format(
@@ -324,10 +320,6 @@ class MPTxSchedule:
 
             while not sender_pool.is_empty():
                 tx = sender_pool.top_tx
-
-                if tx is None:
-                    break
-
                 self._drop_tx_from_sender_pool(sender_pool, tx)
 
             self._sync_sender_state(sender_pool, True)
