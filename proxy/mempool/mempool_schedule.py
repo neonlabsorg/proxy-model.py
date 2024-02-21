@@ -322,7 +322,7 @@ class MPTxSchedule:
                 tx = sender_pool.top_tx
                 self._drop_tx_from_sender_pool(sender_pool, tx)
 
-            self._sync_sender_state(sender_pool, True)
+            self._sync_sender_state(sender_pool)
             
     def _find_sender_pool(self, sender_address: str) -> Optional[MPSenderTxPool]:
         return self._sender_pool_dict.get(sender_address, None)
@@ -357,11 +357,8 @@ class MPTxSchedule:
 
         sender_pool.set_state_tx_cnt(state_tx_cnt)
 
-    def _sync_sender_state(
-            self,
-            sender_pool: MPSenderTxPool,
-            skip_validation: bool=False) -> None:
-        if not skip_validation and sender_pool.has_valid_state():
+    def _sync_sender_state(self, sender_pool: MPSenderTxPool) -> None:
+        if sender_pool.has_valid_state():
             return
 
         old_state = sender_pool.state
