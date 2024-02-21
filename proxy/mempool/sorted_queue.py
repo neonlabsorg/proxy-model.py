@@ -52,10 +52,6 @@ class SortedQueue(Generic[SortedQueueItem, SortedQueueLtKey, SortedQueueEqKey]):
         assert self.find_from_pos(pos, item) is None, 'item is already in the queue'
         self._impl.queue.insert(pos, item)
 
-    def try_add(self, item: SortedQueueItem) -> None:
-        if self.find(item) is None:
-            self.add(item)
-
     def find(self, item: SortedQueueItem) -> Optional[int]:
         start_pos = self._impl.bisect_left(item)
         return self.find_from_pos(start_pos, item)
@@ -75,14 +71,6 @@ class SortedQueue(Generic[SortedQueueItem, SortedQueueLtKey, SortedQueueEqKey]):
         assert index is not None, 'item is absent in the queue'
 
         return self._impl.queue.pop(index)
-
-    def try_pop(self, item: SortedQueueItem) -> Optional[SortedQueueItem]:
-        index = self.find(item)
-
-        if index is None:
-            return None
-
-        return self.pop(index)
 
     def clear(self) -> None:
         self._impl.queue.clear()
