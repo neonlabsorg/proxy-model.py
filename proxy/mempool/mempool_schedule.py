@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 import enum
+import time
 
-from time import time
 from typing import List, Dict, Set, Optional, Tuple, Union, cast
 
 from ..common_neon.utils.neon_tx_info import NeonTxInfo
@@ -96,7 +96,7 @@ class MPSenderTxPool:
         self._state = self.State.Empty
         self._sender_address = sender_address
         self._gas_price = 0
-        self._heartbeat = int(time())
+        self._heartbeat = int(time.time())
         self._state_tx_cnt = 0
         self._processing_tx: Optional[MPTxRequest] = None
         self._tx_nonce_queue = SortedQueue[MPTxRequest, int, str](
@@ -152,7 +152,7 @@ class MPSenderTxPool:
     def add_tx(self, tx: MPTxRequest) -> None:
         assert self._state_tx_cnt <= tx.nonce, f'Tx {tx.sig} has nonce {tx.nonce} less than {self._state_tx_cnt}'
         self._tx_nonce_queue.add(tx)
-        self._heartbeat = int(time())
+        self._heartbeat = int(time.time())
 
     @property
     def top_tx(self) -> Optional[MPTxRequest]:
@@ -304,7 +304,7 @@ class MPTxSchedule:
         self._tx_dict.pop_tx(tx)
 
     def drop_expired_sender_pools(self, eviction_timeout_sec: int) -> None:
-        threshold = int(time()) - eviction_timeout_sec
+        threshold = int(time.time()) - eviction_timeout_sec
         LOG.debug(f'Try to drop sender pools with heartbeat below {threshold}')
 
         while True:
