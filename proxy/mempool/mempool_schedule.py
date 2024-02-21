@@ -289,6 +289,9 @@ class MPTxSchedule:
     def _add_tx_to_sender_pool(self, sender_pool: MPSenderTxPool, tx: MPTxRequest) -> None:
         LOG.debug(f'Add tx {tx.sig} to mempool with {self.tx_cnt} txs')
 
+        if self._sender_pool_heartbeat_queue.find(sender_pool) is not None:
+            self._sender_pool_heartbeat_queue.pop(sender_pool)
+        
         sender_pool.add_tx(tx)
         self._tx_dict.add_tx(tx)
 
