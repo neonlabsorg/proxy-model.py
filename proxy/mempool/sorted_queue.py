@@ -74,3 +74,6 @@ class SortedQueue(Generic[SortedQueueItem, SortedQueueLtKey, SortedQueueEqKey]):
 
     def clear(self) -> None:
         self._impl.queue.clear()
+
+    def is_empty(self) -> bool:
+        return not len(self._impl.queue)
