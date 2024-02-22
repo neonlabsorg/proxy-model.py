@@ -84,6 +84,7 @@ class Config(DBConfig):
             'SOLANA_KEY_FOR_EVM_CONFIG',
             os.environ.get('SOLANA_KEY_FOR_EVM_CONFIG', '')
         )
+        self._debug_core_api = self._env_bool('DEBUG_CORE_API', False)
 
         # Mempool limits
         self._mempool_capacity = self._env_num('MEMPOOL_CAPACITY', 4096, 10, 4096 * 1024)
@@ -384,6 +385,10 @@ class Config(DBConfig):
     def solana_key_for_evm_config(self) -> Optional[SolPubKey]:
         return self._solana_key_for_evm_config
 
+    @property
+    def debug_core_api(self) -> bool:
+        return self._debug_core_api
+
     #####################
     # Mempool settings
 
@@ -634,6 +639,7 @@ class Config(DBConfig):
             # Neon Core API settings
             'NEON_CORE_API_PORT': self.neon_core_api_port,
             'SOLANA_KEY_FOR_EVM_CONFIG': str(self.solana_key_for_evm_config),
+            'DEBUG_CORE_API': self.debug_core_api,
 
             # Mempool settings
             'MEMPOOL_CAPACITY': self.mempool_capacity,
