@@ -289,16 +289,17 @@ class MPTxSchedule:
     def _add_tx_to_sender_pool(self, sender_pool: MPSenderTxPool, tx: MPTxRequest) -> None:
         LOG.debug(f'Add tx {tx.sig} to mempool with {self.tx_cnt} txs')
 
-        if self._sender_pool_heartbeat_queue.find(sender_pool) is not None:
+        is_new_pool = sender_pool.state == sender_pool.State.Empty
+        if not is_new_pool:
             self._sender_pool_heartbeat_queue.pop(sender_pool)
-        
+
         sender_pool.add_tx(tx)
         self._tx_dict.add_tx(tx)
 
         # the first tx in the sender pool
-        if sender_pool.len_tx_nonce_queue == 1:
+        if is_new_pool:
             self._sender_pool_dict[sender_pool.sender_address] = sender_pool
-        
+
         self._sender_pool_heartbeat_queue.add(sender_pool)
 
     def _drop_tx_from_sender_pool(self, sender_pool: MPSenderTxPool, tx: MPTxRequest) -> None:
@@ -326,7 +327,7 @@ class MPTxSchedule:
                 self._drop_tx_from_sender_pool(sender_pool, tx)
 
             self._sync_sender_state(sender_pool)
-            
+
     def _find_sender_pool(self, sender_address: str) -> Optional[MPSenderTxPool]:
         return self._sender_pool_dict.get(sender_address, None)
 
