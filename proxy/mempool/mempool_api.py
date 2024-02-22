@@ -340,6 +340,7 @@ class MPTxSendResultCode(IntEnum):
     NonceTooLow = 1
     Underprice = 2
     AlreadyKnown = 3
+    NonceTooHigh = 4
     Unspecified = 255
 
 
