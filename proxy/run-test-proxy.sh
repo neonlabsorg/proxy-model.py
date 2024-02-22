@@ -10,16 +10,9 @@ fi
 solana config set -u $SOLANA_URL
 ln -s /opt/proxy/operator-keypairs/id?*.json /root/.config/solana/
 
-export NUM_ACCOUNTS=30
-/spl/bin/create-test-accounts.sh $NUM_ACCOUNTS
+/spl/bin/create-test-accounts.sh 1
 
-for i in $(seq 1 $NUM_ACCOUNTS); do
-  ID_FILE="$HOME/.config/solana/id"
-  if [ "$i" -gt "1" ]; then
-    ID_FILE="${ID_FILE}${i}.json"
-  else
-    ID_FILE="${ID_FILE}.json"
-  fi
-done
+export NUM_ACCOUNTS=30
+/spl/bin/create-test-accounts.sh $NUM_ACCOUNTS &
 
 proxy/run-proxy.sh
