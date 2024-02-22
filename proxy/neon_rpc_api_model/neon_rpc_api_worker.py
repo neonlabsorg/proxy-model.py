@@ -21,7 +21,7 @@ from ..common_neon.config import Config
 from ..common_neon.constants import EVM_PROGRAM_ID_STR
 from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.db.db_connect import DBConnection
-from ..common_neon.errors import EthereumError, InvalidParamError, NonceTooLowError
+from ..common_neon.errors import EthereumError, InvalidParamError, NonceTooHighError, NonceTooLowError
 from ..common_neon.eth_commit import EthCommit
 from ..common_neon.evm_config import EVMConfig
 from ..common_neon.keys_storage import KeyStorage
@@ -1067,6 +1067,8 @@ class NeonRpcApiWorker:
                 raise EthereumError(message='replacement transaction underpriced')
             elif result.code == MPTxSendResultCode.NonceTooLow:
                 NonceTooLowError.raise_error(neon_tx.hex_sender, neon_tx.nonce, result.state_tx_cnt)
+            elif result.code == MPTxSendResultCode.NonceTooHigh:
+                raise NonceTooHighError(result.state_tx_cnt)
             else:
                 raise EthereumError(message='unknown error')
         except BaseException as exc:
