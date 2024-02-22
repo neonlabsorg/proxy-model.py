@@ -2,6 +2,7 @@ import os
 import subprocess
 import logging
 import time
+import re
 
 from typing import Dict, Any, List
 from multiprocessing import Process
@@ -20,6 +21,24 @@ class _Service:
         port = config.neon_core_api_port + idx
         self._host = f'127.0.0.1:{port}'
         self._solana_url = solana_url
+
+        # 7-bit C1 ANSI sequences
+        self._ansi_escape = re.compile(
+            r"""
+            \x1B  # ESC
+            (?:   # 7-bit C1 Fe (except CSI)
+                [@-Z\\-_]
+            |     # or [ for CSI, followed by a control sequence
+                \[
+                [0-?]*  # Parameter bytes
+                [ -/]*  # Intermediate bytes
+                [@-~]   # Final byte
+            )
+        """,
+            re.VERBOSE,
+        )
+
+        self._skip_len = len('2024-02-20T21:59:26.318980Z ')
 
     def start(self) -> None:
         process = Process(target=self._run)
@@ -68,9 +87,11 @@ class _Service:
             while True:
                 line = process.stdout.readline()
                 if line:
-                    pass
-                    # TODO: wait for implementation in neon-core-api
-                    # LOG.debug(line)
+                    if not self._config.debug_core_api:
+                        line = self._ansi_escape.sub('', line).replace('"', "'")
+                        pos = line.find(' ', self._skip_len) + 1
+                        line = line[pos:-1]
+                        LOG.debug(line)
                 elif process.poll() is not None:
                     break
 
