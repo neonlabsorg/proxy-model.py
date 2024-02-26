@@ -256,8 +256,9 @@ class MPSenderTxPool:
 class MPTxSchedule:
     _top_index = -1
 
-    def __init__(self, capacity: int, chain_id: int) -> None:
+    def __init__(self, capacity: int, capacity_high_watermark: float, chain_id: int) -> None:
         self._capacity = capacity
+        self.set_capacity_high_watermark(capacity_high_watermark)
         self._tx_dict = MPTxRequestDict()
         self._chain_id = chain_id
 
@@ -272,9 +273,14 @@ class MPTxSchedule:
         )
         self._suspended_sender_set: Set[NeonAddress] = set()
 
+
+    def set_capacity_high_watermark(self, value: float) -> None:
+        '''Sets the mempool capacity high watermark as a multiplier of the capacity'''
+        self._capacity_high_watermark = int(self._capacity * value)
+    
     @property
     def min_gas_price(self) -> int:
-        if self.tx_cnt < int(self._capacity * 0.9):  # if there are more than 90%
+        if self.tx_cnt < self._capacity_high_watermark:
             return 0
 
         lower_tx = self._tx_dict.peek_lower_tx()
@@ -407,6 +413,11 @@ class MPTxSchedule:
 
         sender_pool = self._get_or_create_sender_pool(tx.sender_address)
         LOG.debug(f'Got sender pool {tx.chain_id, tx.sender_address} with {sender_pool.len_tx_nonce_queue} txs')
+
+        if self.tx_cnt >= self._capacity_high_watermark:
+            pending_nonce = 1 if sender_pool.is_empty() else sender_pool.pending_nonce
+            if (pending_nonce is not None) and (pending_nonce < tx.nonce):
+                return MPTxSendResult(code=MPTxSendResultCode.NonceTooHigh, state_tx_cnt=pending_nonce)
 
         if sender_pool.state == sender_pool.State.Processing:
             top_tx = sender_pool.top_tx
