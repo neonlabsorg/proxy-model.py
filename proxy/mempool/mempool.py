@@ -475,10 +475,12 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
         self._create_kick_tx_schedule_task()
 
     def on_evm_config(self, evm_config: EVMConfig) -> None:
-        capacity = self._config.mempool_capacity
         for token_info in evm_config.token_info_list:
             if token_info.chain_id not in self._tx_schedule_dict:
-                self._tx_schedule_dict[token_info.chain_id] = MPTxSchedule(capacity, token_info.chain_id)
+                self._tx_schedule_dict[token_info.chain_id] = MPTxSchedule(
+                    self._config.mempool_capacity,
+                    self._config.mempool_capacity_high_watermark,
+                    token_info.chain_id)
                 LOG.info(f'Start transaction scheduler for the token {token_info.chain_id, token_info.token_name}')
 
         chain_id_set = set(evm_config.chain_id_list)

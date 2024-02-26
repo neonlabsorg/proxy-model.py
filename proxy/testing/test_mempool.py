@@ -487,7 +487,9 @@ class TestMPSchedule(unittest.TestCase):
 
     def test_capacity_oversized_simple(self):
         """Checks if mp_schedule gets oversized in simple way"""
-        schedule = MPTxSchedule(5, DEF_CHAIN_ID)
+        mp_capacity = 5
+        mp_capacity_high_watermark = 1
+        schedule = MPTxSchedule(mp_capacity, mp_capacity_high_watermark, DEF_CHAIN_ID)
         acct_list = [NeonAccount.create() for _ in range(3)]
         req_data_list = [
             dict(req_id='000', nonce=1, gas_price=6000, gas=10, value=1, from_acct=acct_list[0], to_acct=acct_list[1]),
@@ -521,7 +523,8 @@ class TestMPSchedule(unittest.TestCase):
         from_acc_count = 10
         nonce_count = 1000
         mp_schedule_capacity = 4000
-        schedule = MPTxSchedule(mp_schedule_capacity, DEF_CHAIN_ID)
+        mp_schedule_capacity_high_watermark = 1
+        schedule = MPTxSchedule(mp_schedule_capacity, mp_schedule_capacity_high_watermark, DEF_CHAIN_ID)
         acct_list = [NeonAccount.create() for _ in range(acc_count_max)]
         req_list: List[MPTxExecRequest] = list()
         for acc_idx in range(0, from_acc_count):
@@ -565,7 +568,9 @@ class TestMPSchedule(unittest.TestCase):
             self.assertEqual(len(schedule._tx_dict._tx_sender_nonce_dict), 1)
             self.assertEqual(len(schedule._tx_dict._tx_gas_price_queue), 0)
 
-        schedule = MPTxSchedule(100, DEF_CHAIN_ID)
+        mp_capacity = 100
+        mp_capacity_high_watermark = 1
+        schedule = MPTxSchedule(mp_capacity, mp_capacity_high_watermark, DEF_CHAIN_ID)
         acct_list = [NeonAccount.create() for _ in range(2)]
         req = create_transfer_mp_request(
             req_id='000', nonce=0, gas_price=600, gas=10, value=1, from_acct=acct_list[0], to_acct=acct_list[1]
@@ -608,7 +613,8 @@ class TestMPSchedule(unittest.TestCase):
             return dst_req, schedule.add_tx(dst_req)
 
         mp_capacity = 10
-        schedule = MPTxSchedule(mp_capacity, DEF_CHAIN_ID)
+        mp_capacity_high_watermark = 1
+        schedule = MPTxSchedule(mp_capacity, mp_capacity_high_watermark, DEF_CHAIN_ID)
         acct1, acct2 = NeonAccount.create(), NeonAccount.create()
 
         req_data = dict(gas_price=1000, gas=11, value=1, from_acct=acct2, to_acct=acct1)
