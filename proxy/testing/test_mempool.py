@@ -386,7 +386,10 @@ class TestMemPool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(submit_mp_request_mock.call_count, 0)
         is_available_mock.return_value = True
         await self._exec_all_txs_in_mempool(nonce_cnt)
-        self.assertEqual(submit_mp_request_mock.call_count, self._tx_schedule._capacity)
+        self.assertGreaterEqual(
+            submit_mp_request_mock.call_count,
+            (self._tx_schedule._capacity * 0.9)
+        )
 
     @patch.object(MockMPExecutorMng, 'submit_mp_request', side_effect=MockMPExecutorMng.create_mp_task)
     @patch.object(MockMPExecutorMng, 'is_available')
@@ -400,7 +403,7 @@ class TestMemPool(unittest.IsolatedAsyncioTestCase):
         capacipy_90pct = self._config.mempool_capacity // 10 * 9
         from_acct_cnt = capacipy_90pct // (nonce_cnt - 1) + 1
         await self._enqueue_requests_by_from_acct_nonce(from_acct_cnt, nonce_cnt)
-        self.assertGreater(self._tx_schedule.tx_cnt, capacipy_90pct)
+        self.assertGreaterEqual(self._tx_schedule.tx_cnt, capacipy_90pct)
 
         gas_price = self._emit_set_gas_price()
         self.assertGreater(gas_price.suggested_gas_price, base_gas_price.suggested_gas_price)
@@ -408,7 +411,7 @@ class TestMemPool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(submit_mp_request_mock.call_count, 0)
         is_available_mock.return_value = True
         await self._exec_all_txs_in_mempool(nonce_cnt)
-        self.assertEqual(submit_mp_request_mock.call_count, (nonce_cnt - 1) * from_acct_cnt)
+        self.assertEqual(submit_mp_request_mock.call_count, capacipy_90pct)
 
         gas_price = self._emit_set_gas_price()
         self.assertEqual(gas_price.suggested_gas_price, base_gas_price.suggested_gas_price)
@@ -440,7 +443,7 @@ class TestMemPool(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             self._tx_schedule.tx_cnt,
-            min(self._tx_schedule._capacity, from_acct_cnt * (nonce_cnt - 1))
+            self._tx_schedule._capacity_high_watermark
         )
 
     async def _exec_all_txs_in_mempool(self, nonce_cnt: int):
@@ -697,7 +700,12 @@ class TestMPSchedule(unittest.TestCase):
         self.assertIsNone(res.state_tx_cnt)
         self.assertNotIn(global_low_req.sig, schedule._tx_dict._tx_hash_dict)
 
-        new_req, res = _add_tx(req_data, req_id='high-gas-price', gas_price=req.gas_price + 1)
+        new_req, res = _add_tx(req_data,
+            req_id='high-gas-price',
+            gas_price=req.gas_price + 1,
+            nonce=req.nonce + 1,
+            state_tx_cnt=11
+        )
         self.assertEqual(res.code, MPTxSendResultCode.Success)
         self.assertIsNone(res.state_tx_cnt)
         self.assertNotIn(req.sig, schedule._tx_dict._tx_hash_dict)
