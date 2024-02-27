@@ -541,6 +541,59 @@ class TestMPSchedule(unittest.TestCase):
             schedule.add_tx(req)
         self.assertEqual(mp_schedule_capacity, schedule.tx_cnt)
 
+    def test_capacity_oversized_with_nonce_rejection(self):
+        """Checks if mp_schedule rejects nonce gap transactions when oversized"""
+        acc_count_max = 20
+        from_acc_count = 10
+        reqs_per_acc = 1000
+        mp_schedule_capacity = 4000
+        mp_schedule_capacity_high_watermark = 0.5
+        mp_schedule_capacity_limit = mp_schedule_capacity *  mp_schedule_capacity_high_watermark
+        schedule = MPTxSchedule(mp_schedule_capacity, mp_schedule_capacity_high_watermark, DEF_CHAIN_ID)
+        acct_list = [NeonAccount.create() for _ in range(acc_count_max)]
+        req_list: List[MPTxExecRequest] = list()
+        account_nonces: List[int] = list()
+        expected_nonce_gap_error_count = 0
+
+        for acc_idx in range(0, from_acc_count):
+            account_nonces.append(0)
+
+            for _ in range(0, reqs_per_acc):
+                if random.choice([True, False]): # 50% chance of having a nonce gap
+                    nonce = account_nonces[acc_idx] + randint(2, 100)
+
+                    if len(req_list) > mp_schedule_capacity_limit:
+                        expected_nonce_gap_error_count += 1
+                else:
+                    nonce = account_nonces[acc_idx]
+                    account_nonces[acc_idx] += 1
+
+                req = create_transfer_mp_request(
+                    from_acct=acct_list[acc_idx], to_acct=acct_list[randint(0, acc_count_max - 1)],
+                    req_id=str(acc_idx) + '-' + str(nonce), nonce=nonce,
+                    gas_price=randint(50000, 100000), gas=randint(4000, 10000)
+                )
+                req_list.append(req)
+
+        nonce_too_high_error_count = 0
+        underprice_error_count = 0
+
+        for req in req_list:
+            result = schedule.add_tx(req)
+
+            if result.code == MPTxSendResultCode.NonceTooHigh:
+                nonce_too_high_error_count += 1
+            elif result.code == MPTxSendResultCode.Underprice:
+                underprice_error_count += 1
+            elif result.code != MPTxSendResultCode.Success:
+                self.fail(f'Unexpected result code: {result.code}')
+
+        self.assertGreater(nonce_too_high_error_count, 0)
+        self.assertGreater(underprice_error_count, 0)
+        self.assertGreater(expected_nonce_gap_error_count, 0)
+        self.assertGreater(nonce_too_high_error_count + underprice_error_count, expected_nonce_gap_error_count)    
+        self.assertEqual(mp_schedule_capacity, schedule.tx_cnt)
+
     def test_tx_lifecycle(self):
         def _tx_is_been_scheduled():
             self.assertEqual(len(schedule._sender_pool_dict), 1)
