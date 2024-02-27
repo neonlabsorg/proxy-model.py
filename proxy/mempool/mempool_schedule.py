@@ -414,9 +414,11 @@ class MPTxSchedule:
         sender_pool = self._get_or_create_sender_pool(tx.sender_address)
         LOG.debug(f'Got sender pool {tx.chain_id, tx.sender_address} with {sender_pool.len_tx_nonce_queue} txs')
 
+        # this condition checks the processing tx too
+        state_tx_cnt = max(tx.neon_tx_exec_cfg.state_tx_cnt, sender_pool.state_tx_cnt)
         if self.tx_cnt >= self._capacity_high_watermark:
-            pending_nonce = 1 if sender_pool.is_empty() else sender_pool.pending_nonce
-            if (pending_nonce is not None) and (pending_nonce < tx.nonce):
+            pending_nonce = sender_pool.pending_nonce or state_tx_cnt
+            if pending_nonce < tx.nonce:
                 return MPTxSendResult(code=MPTxSendResultCode.NonceTooHigh, state_tx_cnt=pending_nonce)
 
         if sender_pool.state == sender_pool.State.Processing:
@@ -425,8 +427,6 @@ class MPTxSchedule:
                 LOG.debug(f'Old tx {top_tx.sig} (gas price {top_tx.gas_price}) is processing')
                 return MPTxSendResult(code=MPTxSendResultCode.NonceTooLow, state_tx_cnt=top_tx.nonce + 1)
 
-        # this condition checks the processing tx too
-        state_tx_cnt = max(tx.neon_tx_exec_cfg.state_tx_cnt, sender_pool.state_tx_cnt)
         if state_tx_cnt > tx.nonce:
             LOG.debug(f'Sender {tx.sender_address} has higher tx counter {state_tx_cnt} > {tx.nonce}')
             return MPTxSendResult(code=MPTxSendResultCode.NonceTooLow, state_tx_cnt=state_tx_cnt)
