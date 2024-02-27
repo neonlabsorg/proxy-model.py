@@ -58,7 +58,8 @@ class MockOpResInfo:
 def create_transfer_mp_request(*, req_id: str, nonce: int, gas: int, gas_price: int,
                                from_acct: Union[NeonLocalAccount, None] = None,
                                to_acct: Union[NeonLocalAccount, None] = None,
-                               value: int = 0, data: bytes = b'') -> MPTxExecRequest:
+                               value: int = 0, data: bytes = b'',
+                               state_tx_cnt: int = 0) -> MPTxExecRequest:
     if from_acct is None:
         from_acct = NeonAccount.create()
 
@@ -71,7 +72,7 @@ def create_transfer_mp_request(*, req_id: str, nonce: int, gas: int, gas_price: 
     )
     neon_tx = NeonTx.from_string(bytearray(signed_tx_data.rawTransaction))
     neon_tx_exec_cfg = NeonTxExecCfg()
-    neon_tx_exec_cfg.set_state_tx_cnt(0)
+    neon_tx_exec_cfg.set_state_tx_cnt(state_tx_cnt)
     res_info = MockOpResInfo().get()
 
     mp_tx_req = MPTxExecRequest.from_tx_req(
