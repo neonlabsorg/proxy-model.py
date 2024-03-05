@@ -308,21 +308,21 @@ class NeonRpcApiWorker:
             gas_price = token_gas_price_info.suggested_gas_price
 
         return dict(
-            gas_price=hex(gas_price),
-            suggested_gas_price=hex(token_gas_price_info.suggested_gas_price),
-            is_const_gas_price=token_gas_price_info.is_const_gas_price,
-            min_acceptable_gas_price=hex(token_gas_price_info.min_acceptable_gas_price),
-            min_executable_gas_price=hex(token_gas_price_info.min_executable_gas_price),
-            min_wo_chainid_acceptable_gas_price=hex(token_gas_price_info.min_wo_chainid_acceptable_gas_price),
-            allow_underpriced_tx_wo_chainid=token_gas_price_info.allow_underpriced_tx_wo_chainid,
-            sol_price_usd=hex(global_gas_price_info.sol_price_usd),
-            neon_price_usd=hex(neon_gas_price_info.token_price_usd),
-            chain_id=hex(token_gas_price_info.chain_id),
-            token_name=token_gas_price_info.token_name,
-            token_price_usd=hex(token_gas_price_info.token_price_usd),
-            operator_fee=hex(token_gas_price_info.operator_fee),
-            gas_price_slippage=hex(token_gas_price_info.gas_price_slippage),
-            cu_priority_fee=hex(token_gas_price_info.cu_priority_fee)
+            gasPrice=hex(gas_price),
+            suggestedGasPrice=hex(token_gas_price_info.suggested_gas_price),
+            isConstGasPrice=token_gas_price_info.is_const_gas_price,
+            minAcceptableGasPrice=hex(token_gas_price_info.min_acceptable_gas_price),
+            minExecutableGasPrice=hex(token_gas_price_info.min_executable_gas_price),
+            minWoChainIDAcceptableGasPrice=hex(token_gas_price_info.min_wo_chainid_acceptable_gas_price),
+            allowUnderpricedTxWoChainID=token_gas_price_info.allow_underpriced_tx_wo_chainid,
+            solPriceUsd=hex(global_gas_price_info.sol_price_usd),
+            neonPriceUsd=hex(neon_gas_price_info.token_price_usd),
+            chainID=hex(token_gas_price_info.chain_id),
+            tokenName=token_gas_price_info.token_name,
+            tokenPriceUsd=hex(token_gas_price_info.token_price_usd),
+            operatorFee=hex(token_gas_price_info.operator_fee),
+            gasPriceSlippage=hex(token_gas_price_info.gas_price_slippage),
+            solanaCUPriorityFee=hex(token_gas_price_info.cu_priority_fee)
         )
 
     @staticmethod
@@ -983,6 +983,10 @@ class NeonRpcApiWorker:
         else:
             from_addr = '0x' + '0' * 40
 
+        chain_id = t.chain_id
+        if chain_id is not None:
+            chain_id = hex(chain_id)
+
         result = {
             "blockHash": r.block_hash,
             "blockNumber": hex_block_number,
@@ -996,6 +1000,7 @@ class NeonRpcApiWorker:
             "to": to_addr,
             "value": hex(t.value),
             "input": t.calldata,
+            "chainID": chain_id,
             "v": hex(t.v),
             "r": hex(t.r),
             "s": hex(t.s),
@@ -1379,9 +1384,9 @@ class NeonRpcApiWorker:
     def neon_getNativeTokenList(self) -> List[Dict[str, str]]:
         return list(
             dict(
-                token_name=token.token_name,
-                token_mint=str(token.token_mint),
-                token_chain_id=hex(token.chain_id)
+                tokenName=token.token_name,
+                tokenMint=str(token.token_mint),
+                tokenChainId=hex(token.chain_id)
             )
             for token in self._evm_config.token_info_list
         )
