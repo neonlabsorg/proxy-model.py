@@ -30,6 +30,10 @@ class MPTxRequestDict:
             lt_key_func=lambda a: -a.gas_price,
             eq_key_func=lambda a: a.sig
         )
+        self._tx_gapped_gas_price_queue = SortedQueue[MPTxRequest, int, str](
+            lt_key_func=lambda a: -a.gas_price,
+            eq_key_func=lambda a: a.sig
+        )
 
     def __len__(self) -> int:
         return len(self._tx_hash_dict)
@@ -42,29 +46,61 @@ class MPTxRequestDict:
             sender_addr, tx_nonce = tx
         return f'{sender_addr}:{tx_nonce}'
 
-    def add_tx(self, tx: MPTxRequest) -> None:
+    def add_tx(self, tx: MPTxRequest, is_gapped: bool) -> None:
         sender_nonce = self._sender_nonce(tx)
         assert tx.sig not in self._tx_hash_dict, f'Tx {tx.sig} is already in dictionary'
         assert sender_nonce not in self._tx_sender_nonce_dict, f'Tx {sender_nonce} is already in dictionary'
+        assert tx not in self._tx_gas_price_queue, f'Tx {tx.sig} is already in gas price queue'
+        assert tx not in self._tx_gapped_gas_price_queue, f'Tx {tx.sig} is already in gapped gas price queue'
 
         self._tx_hash_dict[tx.sig] = tx
         self._tx_sender_nonce_dict[sender_nonce] = tx
-        self._tx_gas_price_queue.add(tx)
+        self._add_to_gas_price_queues(tx, is_gapped)
         assert len(self._tx_hash_dict) == len(self._tx_sender_nonce_dict) >= len(self._tx_gas_price_queue)
 
-    def pop_tx(self, tx: MPTxRequest) -> MPTxRequest:
+    def _add_to_gas_price_queues(self, tx: MPTxRequest, is_gapped: bool) -> None:
+        if is_gapped:
+            self._tx_gapped_gas_price_queue.add(tx)
+        else:
+            self._tx_gas_price_queue.add(tx)
+            next_nonce = tx.nonce + 1
+            while gapped_tx := self._tx_sender_nonce_dict.get(self._sender_nonce((tx.sender_address, next_nonce)), None):
+                pos = self._tx_gapped_gas_price_queue.find(gapped_tx)
+                if pos is not None:
+                    r = self._tx_gapped_gas_price_queue.pop(pos)
+                    self._tx_gas_price_queue.add(gapped_tx)
+                    next_nonce += 1
+                else:
+                    break
+
+    def pop_tx(self, tx: MPTxRequest, is_gapped: bool) -> MPTxRequest:
         assert tx.sig in self._tx_hash_dict, f'Tx {tx.sig} is absent in dictionary'
 
         sender_nonce = self._sender_nonce(tx)
         assert sender_nonce in self._tx_sender_nonce_dict, f'Tx {sender_nonce} is absent in dictionary'
 
-        pos = self._tx_gas_price_queue.find(tx)
-        # tx was removed from the gas price queue on processing
-        if pos is not None:
-            self._tx_gas_price_queue.pop(pos)
-
+        self._pop_from_gas_price_queues(tx, is_gapped)
         self._tx_sender_nonce_dict.pop(sender_nonce)
         return self._tx_hash_dict.pop(tx.sig, None)
+
+    def _pop_from_gas_price_queues(self, tx: MPTxRequest, is_gapped: bool) -> None:    
+        if is_gapped:
+            pos = self._tx_gapped_gas_price_queue.find(tx)
+            if pos is not None:
+                self._tx_gapped_gas_price_queue.pop(pos)
+        else:
+            pos = self._tx_gas_price_queue.find(tx)
+            if pos is not None:
+                self._tx_gas_price_queue.pop(pos)
+                next_nonce = tx.nonce + 1
+                while gapped_tx := self._tx_sender_nonce_dict.get(self._sender_nonce((tx.sender_address, next_nonce)), None):
+                    pos = self._tx_gas_price_queue.find(gapped_tx)
+                    if pos is not None:
+                        self._tx_gas_price_queue.pop(pos)
+                        self._tx_gapped_gas_price_queue.add(gapped_tx)
+                        next_nonce += 1
+                    else:
+                        break
 
     def get_tx_by_hash(self, neon_sig: str) -> Optional[MPTxRequest]:
         return self._tx_hash_dict.get(neon_sig, None)
@@ -72,11 +108,11 @@ class MPTxRequestDict:
     def get_tx_by_sender_nonce(self, sender_addr: str, tx_nonce: int) -> Optional[MPTxRequest]:
         return self._tx_sender_nonce_dict.get(self._sender_nonce((sender_addr, tx_nonce)), None)
 
-    def acquire_tx(self, tx: MPTxRequest) -> None:
-        self._tx_gas_price_queue.pop(tx)
+    def acquire_tx(self, tx: MPTxRequest, is_gapped: bool) -> None:
+        self._pop_from_gas_price_queues(tx, is_gapped)
 
-    def cancel_process_tx(self, tx: MPTxRequest) -> None:
-        self._tx_gas_price_queue.add(tx)
+    def cancel_process_tx(self, tx: MPTxRequest, is_gapped: bool) -> None:
+        self._add_to_gas_price_queues(tx, is_gapped)
 
     def peek_lower_tx(self) -> Optional[MPTxRequest]:
         return self._tx_gas_price_queue[self._top_index] if len(self._tx_gas_price_queue) > 0 else None
@@ -300,7 +336,7 @@ class MPTxSchedule:
             self._sender_pool_heartbeat_queue.pop(sender_pool)
 
         sender_pool.add_tx(tx)
-        self._tx_dict.add_tx(tx)
+        self._tx_dict.add_tx(tx, (sender_pool.pending_nonce or 0) < (tx.nonce + 1))
 
         # the first tx in the sender pool
         if is_new_pool:
@@ -311,7 +347,7 @@ class MPTxSchedule:
     def _drop_tx_from_sender_pool(self, sender_pool: MPSenderTxPool, tx: MPTxRequest) -> None:
         LOG.debug(f'Drop tx {tx.sig} from pool {sender_pool.sender_address}')
         sender_pool.drop_tx(tx)
-        self._tx_dict.pop_tx(tx)
+        self._tx_dict.pop_tx(tx, (sender_pool.pending_nonce or 0) < (tx.nonce + 1))
 
     def drop_expired_sender_pools(self, eviction_timeout_sec: int) -> None:
         threshold = int(time.time()) - eviction_timeout_sec
@@ -497,7 +533,7 @@ class MPTxSchedule:
 
         self._sender_pool_queue.pop(sender_pool)
         sender_pool.acquire_tx(tx)
-        self._tx_dict.acquire_tx(tx)
+        self._tx_dict.acquire_tx(tx, (sender_pool.pending_nonce or 0) < (tx.nonce + 1))
         return tx
 
     def get_pending_tx_nonce(self, sender_address: str) -> Optional[int]:
@@ -521,7 +557,7 @@ class MPTxSchedule:
 
         sender_pool = self._get_sender_pool(tx.sender_address)
         sender_pool.done_tx(tx)
-        self._tx_dict.pop_tx(tx)
+        self._tx_dict.pop_tx(tx, (sender_pool.pending_nonce or 0) < (tx.nonce + 1))
         self._schedule_sender_pool(sender_pool, tx.neon_tx_exec_cfg.state_tx_cnt)
 
     def done_tx(self, tx: MPTxRequest) -> None:
@@ -533,7 +569,7 @@ class MPTxSchedule:
     def cancel_tx(self, tx: MPTxRequest) -> bool:
         sender_pool = self._get_sender_pool(tx.sender_address)
         sender_pool.cancel_process_tx(tx)
-        self._tx_dict.cancel_process_tx(tx)
+        self._tx_dict.cancel_process_tx(tx, (sender_pool.pending_nonce or 0) < (tx.nonce + 1))
         self._schedule_sender_pool(sender_pool, tx.neon_tx_exec_cfg.state_tx_cnt)
         return True
 

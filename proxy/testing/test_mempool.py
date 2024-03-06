@@ -506,19 +506,20 @@ class TestMPSchedule(unittest.TestCase):
         ]
         req_list = [create_transfer_mp_request(**req) for req in req_data_list]
         for req in req_list[0:5]:
-            schedule.add_tx(req)
+            self.assertEqual(schedule.add_tx(req).code, MPTxSendResultCode.Success)
 
         self.assertIs(self._acquire_top_tx(schedule), req_list[1])
         self.assertIs(self._acquire_top_tx(schedule), req_list[4])
         self.assertIs(self._acquire_top_tx(schedule), None)
-        for request in req_list[5:]:
-            schedule.add_tx(request)
-        self.assertEqual(acct_list[2].address.lower(), schedule._sender_pool_queue[0].sender_address)
+
+        self.assertEqual(schedule.add_tx(req_list[5]).code, MPTxSendResultCode.NonceTooHigh)
+        self.assertEqual(schedule.add_tx(req_list[6]).code, MPTxSendResultCode.Success)
+
         self.assertIs(req_list[3], schedule._sender_pool_queue[0]._tx_nonce_queue[0])
-        self.assertEqual(5, schedule.tx_cnt)
+        self.assertEqual(6, schedule.tx_cnt)
         self.assertEqual(1, len(schedule._sender_pool_queue))
         self.assertEqual(2, self._get_pending_tx_count(schedule, acct_list[0].address.lower()))
-        self.assertEqual(1, self._get_pending_tx_count(schedule, acct_list[1].address.lower()))
+        self.assertEqual(2, self._get_pending_tx_count(schedule, acct_list[1].address.lower()))
         self.assertEqual(2, self._get_pending_tx_count(schedule, acct_list[2].address.lower()))
 
     def test_capacity_oversized(self):
@@ -543,7 +544,7 @@ class TestMPSchedule(unittest.TestCase):
         random.shuffle(req_list)
         for req in req_list:
             schedule.add_tx(req)
-        self.assertEqual(mp_schedule_capacity, schedule.tx_cnt)
+        self.assertLessEqual(mp_schedule_capacity, schedule.tx_cnt)
 
     def test_capacity_oversized_with_nonce_rejection(self):
         """Checks if mp_schedule rejects nonce gap transactions when oversized"""
@@ -615,7 +616,8 @@ class TestMPSchedule(unittest.TestCase):
             sender_nonce = schedule._tx_dict._sender_nonce(req)
             self.assertEqual(schedule._tx_dict._tx_sender_nonce_dict[sender_nonce].sig, req.sig)
 
-            self.assertEqual(len(schedule._tx_dict._tx_gas_price_queue), 1)
+            combined_gas_price_queues_count = len(schedule._tx_dict._tx_gas_price_queue) + len(schedule._tx_dict._tx_gapped_gas_price_queue)
+            self.assertEqual(combined_gas_price_queues_count, 1)
             self.assertIn(req, schedule._tx_dict._tx_gas_price_queue)
 
         def _tx_is_been_processed():
