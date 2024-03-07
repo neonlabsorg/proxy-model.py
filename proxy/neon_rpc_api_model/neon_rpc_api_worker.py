@@ -50,7 +50,7 @@ from ..neon_core_api.neon_core_api_client import NeonCoreApiClient
 from ..neon_core_api.neon_layouts import NeonAccountInfo
 
 
-NEON_PROXY_PKG_VERSION = '1.11.0'
+NEON_PROXY_PKG_VERSION = '1.11.1'
 NEON_PROXY_REVISION = 'NEON_PROXY_REVISION_TO_BE_REPLACED'
 LOG = logging.getLogger(__name__)
 
