@@ -193,7 +193,7 @@ jobs:
       - name: Dump docker logs
         if: always()
         run: python3 ./.github/workflows/deploy.py dump_apps_logs --proxy_tag=${{ needs.build-image.outputs.proxy_tag }}
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Docker logs
@@ -284,7 +284,7 @@ jobs:
         run: |
           docker exec -i ${{ env.CONTAINER }} tar -czvf ./allure-results.tar.gz /opt/neon-tests/allure-results
           docker cp ${{ env.CONTAINER }}:/opt/neon-tests/allure-results.tar.gz ./
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: FTS allure report
@@ -396,12 +396,12 @@ jobs:
       - name: Get container logs
         if: always()
         run: python3 ./.github/workflows/deploy.py get_container_logs
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: FTS docker logs
           path: ./logs/*
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: Terraform infrastructure logs
