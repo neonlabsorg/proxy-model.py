@@ -275,10 +275,10 @@ jobs:
             --users 10
       - name: Print OpenZeppelin report
         run: |
-          docker exec -i ${{ env.CONTAINER }} python3 ./clickfile.py ozreport
+          docker exec -i ${{ env.CONTAINER }} python3 ./clickfile.py oz report
       - name: Analyze tests results
         run: |
-          docker exec -i ${{ env.CONTAINER }} python3  ./clickfile.py analyze-openzeppelin-results
+          docker exec -i ${{ env.CONTAINER }} python3  ./clickfile.py oz analyze
       - name: "Archive report"
         if: always()
         run: |
