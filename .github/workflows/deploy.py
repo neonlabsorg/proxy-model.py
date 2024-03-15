@@ -469,7 +469,7 @@ def run_uniswap_test(project_name):
 @click.option("--proxy_ip", help="proxy ip")
 @click.option('--pr_url_for_report', default="", help="Url to send the report as comment for PR")
 @click.option('--token', help="github token")
-@click.option('--full_test_suite', help="fullTestSuite or extendedFullTestSuite")
+@click.option('--full_test_suite', help="set in true to run all dapps tests")
 def trigger_dapps_tests(solana_ip, proxy_ip, pr_url_for_report, token, full_test_suite):
     github = GithubClient(token)
 

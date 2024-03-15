@@ -202,7 +202,9 @@ jobs:
       - name: Stop containers
         if: always()
         run: python3 ./.github/workflows/deploy.py stop_containers --proxy_tag=${{ needs.build-image.outputs.proxy_tag }}
-
+      - name: canceling the build if job failed
+        if: "failure()"
+        uses: "andymckay/cancel-action@0.4"
   prepare-infrastructure:
     needs:
       - build-image
@@ -286,7 +288,9 @@ jobs:
       - name: Remove docker container
         if: always()
         run: docker rm -f ${{ env.CONTAINER }}
-
+      - name: canceling the build if job failed
+        if: "failure()"
+        uses: "andymckay/cancel-action@0.4"
   basic-tests:
     needs:
       - prepare-infrastructure
@@ -317,7 +321,9 @@ jobs:
       - name: Remove docker container
         if: always()
         run: docker rm -f ${{ env.CONTAINER }}
-
+      - name: canceling the build if job failed
+        if: "failure()"
+        uses: "andymckay/cancel-action@0.4"
   dapps-tests:
     needs:
       - prepare-infrastructure
@@ -336,7 +342,9 @@ jobs:
           --pr_url_for_report=${{github.event.inputs.initial_pr}} \
           --token=${{secrets.GHTOKEN}} \
           --full_test_suite=${{needs.build-image.outputs.full_test_suite }}
-
+      - name: canceling the build if job failed
+        if: "failure()"
+        uses: "andymckay/cancel-action@0.4"
 #  will be fixed by NDEV-2766
 #  economy-tests:
 #    if: needs.build-image.outputs.full_test_suite=='true'
