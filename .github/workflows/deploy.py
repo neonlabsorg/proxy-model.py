@@ -469,8 +469,8 @@ def run_uniswap_test(project_name):
 @click.option("--proxy_ip", help="proxy ip")
 @click.option('--pr_url_for_report', default="", help="Url to send the report as comment for PR")
 @click.option('--token', help="github token")
-@click.option('--test_set', help="fullTestSuite or extendedFullTestSuite")
-def trigger_dapps_tests(solana_ip, proxy_ip, pr_url_for_report, token, test_set):
+@click.option('--full_test_suite', help="fullTestSuite or extendedFullTestSuite")
+def trigger_dapps_tests(solana_ip, proxy_ip, pr_url_for_report, token, full_test_suite):
     github = GithubClient(token)
 
     runs_before = github.get_dapps_runs_list()
@@ -479,7 +479,7 @@ def trigger_dapps_tests(solana_ip, proxy_ip, pr_url_for_report, token, test_set)
     solana_url = f"http://{solana_ip}:8899/"
     faucet_url = f"http://{proxy_ip}:3333/"
 
-    github.run_dapps_dispatches(proxy_url, solana_url, faucet_url, pr_url_for_report, test_set)
+    github.run_dapps_dispatches(proxy_url, solana_url, faucet_url, pr_url_for_report, full_test_suite)
     wait_condition(lambda: github.get_dapps_runs_count() > runs_count_before, timeout_sec=180)
 
     runs_after = github.get_dapps_runs_list()

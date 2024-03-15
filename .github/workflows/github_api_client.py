@@ -24,9 +24,9 @@ class GithubClient():
             f"{NEON_TESTS_ENDPOINT}/actions/workflows/dapps.yml/runs?branch={branch}", headers=self.headers)
         return int(response.json()["total_count"])
 
-    def run_dapps_dispatches(self, proxy_url, solana_url, faucet_url, pr_url_for_report, test_set, network_id='111',
+    def run_dapps_dispatches(self, proxy_url, solana_url, faucet_url, pr_url_for_report, full_test_suite, network_id='111',
                              branch='develop'):
-        dapps = "" if test_set=='extendedFullTestSuite' else "aave,saddle,uniswap-v3"
+        dapps = "" if full_test_suite else "aave,saddle,uniswap-v3"
         data = {"ref": branch,
                 "inputs": {"proxy_url": proxy_url,
                            "solana_url": solana_url,
