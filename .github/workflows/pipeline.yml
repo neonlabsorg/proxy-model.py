@@ -5,12 +5,16 @@ on:
       full_test_suite:
         default: "false"
         required: true
+        description: "Run full test suite"
       neon_evm_commit:
         required: false
+        description: "Neon EVM commit"
       neon_evm_branch:
         required: false
+        description: "Neon EVM branch"
       initial_pr:
         required: false
+        description: "Initial PR"
   pull_request:
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review]
   push:
@@ -136,7 +140,10 @@ jobs:
           elif [[ "${{ github.head_ref }}" != "" ]]; then # pr to feature branch
             tag=${{ github.head_ref }}
 
-          elif [[ "${{ github.ref }}" =~ "refs/heads".+ ]] ; then # triggered by neon evm workflow
+          elif [[ "{{github.event.inputs.neon_evm_branch}}" != "" && "{{github.event.inputs.neon_evm_branch}}" != "refs/heads/develop" ]]; then # triggered by neon evm workflow
+            tag=${{ github.event.inputs.neon_evm_branch }}
+
+          elif [[ "${{ github.ref }}" =~ "refs/heads".+ ]] ; then # triggered by pr to develop
             tag=${GITHUB_REF/refs\/heads\//}
 
           else
@@ -437,8 +444,7 @@ jobs:
       - name: Tag published image
         if: ${{ (github.event.inputs.neon_evm_commit == ''  &&
             needs.build-image.outputs.is_version_proxy_branch == 'false') ||
-            github.event.inputs.neon_evm_branch == 'refs/heads/develop' ||
-            github.event.inputs.neon_evm_branch == 'refs/heads/master'  }}
+            github.event.inputs.neon_evm_branch == 'refs/heads/develop' }}
         run: |
           python3 ./.github/workflows/deploy.py finalize_image \
           --head_ref_branch=${{ github.head_ref }} \
