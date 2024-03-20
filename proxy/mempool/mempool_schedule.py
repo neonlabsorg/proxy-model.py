@@ -11,8 +11,12 @@ from ..common_neon.utils.json_logger import logging_context
 from ..common_neon.address import NeonAddress
 
 from .mempool_api import (
-    MPTxRequest, MPTxSendResult, MPTxSendResultCode, MPSenderTxCntData,
-    MPTxRequestList, MPTxPoolContentResult
+    MPTxRequest,
+    MPTxSendResult,
+    MPTxSendResultCode,
+    MPSenderTxCntData,
+    MPTxRequestList,
+    MPTxPoolContentResult,
 )
 from .sorted_queue import SortedQueue
 
@@ -27,12 +31,10 @@ class MPTxRequestDict:
         self._tx_hash_dict: Dict[str, MPTxRequest] = {}
         self._tx_sender_nonce_dict: Dict[str, MPTxRequest] = {}
         self._tx_gas_price_queue = SortedQueue[MPTxRequest, int, str](
-            lt_key_func=lambda a: -a.gas_price,
-            eq_key_func=lambda a: a.sig
+            lt_key_func=lambda a: -a.gas_price, eq_key_func=lambda a: a.sig
         )
         self._tx_gapped_gas_price_queue = SortedQueue[MPTxRequest, int, str](
-            lt_key_func=lambda a: -a.gas_price,
-            eq_key_func=lambda a: a.sig
+            lt_key_func=lambda a: -a.gas_price, eq_key_func=lambda a: a.sig
         )
 
     def __len__(self) -> int:
@@ -48,14 +50,14 @@ class MPTxRequestDict:
             sender_addr, tx_nonce = tx.sender_address, tx.nonce
         else:
             sender_addr, tx_nonce = tx
-        return f'{sender_addr}:{tx_nonce}'
+        return f"{sender_addr}:{tx_nonce}"
 
     def add_tx(self, tx: MPTxRequest, is_gapped_tx: bool) -> None:
         sender_nonce = self._sender_nonce(tx)
-        assert tx.sig not in self._tx_hash_dict, f'Tx {tx.sig} is already in dictionary'
-        assert sender_nonce not in self._tx_sender_nonce_dict, f'Tx {sender_nonce} is already in dictionary'
-        assert tx not in self._tx_gas_price_queue, f'Tx {tx.sig} is already in gas price queue'
-        assert tx not in self._tx_gapped_gas_price_queue, f'Tx {tx.sig} is already in gapped gas price queue'
+        assert tx.sig not in self._tx_hash_dict, f"Tx {tx.sig} is already in dictionary"
+        assert sender_nonce not in self._tx_sender_nonce_dict, f"Tx {sender_nonce} is already in dictionary"
+        assert tx not in self._tx_gas_price_queue, f"Tx {tx.sig} is already in gas price queue"
+        assert tx not in self._tx_gapped_gas_price_queue, f"Tx {tx.sig} is already in gapped gas price queue"
 
         self._tx_hash_dict[tx.sig] = tx
         self._tx_sender_nonce_dict[sender_nonce] = tx
@@ -66,14 +68,17 @@ class MPTxRequestDict:
             self._tx_gas_price_queue.add(tx)
             self.queue_tx(tx.sender_address, tx.nonce + 1)
 
-        assert len(self._tx_hash_dict) == len(self._tx_sender_nonce_dict) >= (
-            len(self._tx_gas_price_queue) + len(self._tx_gapped_gas_price_queue))
+        assert (
+            len(self._tx_hash_dict)
+            == len(self._tx_sender_nonce_dict)
+            >= (len(self._tx_gas_price_queue) + len(self._tx_gapped_gas_price_queue))
+        )
 
     def pop_tx(self, tx: MPTxRequest) -> MPTxRequest:
-        assert tx.sig in self._tx_hash_dict, f'Tx {tx.sig} is absent in dictionary'
+        assert tx.sig in self._tx_hash_dict, f"Tx {tx.sig} is absent in dictionary"
 
         sender_nonce = self._sender_nonce(tx)
-        assert sender_nonce in self._tx_sender_nonce_dict, f'Tx {sender_nonce} is absent in dictionary'
+        assert sender_nonce in self._tx_sender_nonce_dict, f"Tx {sender_nonce} is absent in dictionary"
 
         # tx may be removed from the gas price queue on processing
         if (pos := self._tx_gapped_gas_price_queue.find(tx)) is not None:
@@ -86,11 +91,11 @@ class MPTxRequestDict:
         return self._tx_hash_dict.pop(tx.sig)
 
     def done_tx(self, tx: MPTxRequest, is_suspended: bool) -> MPTxRequest:
-        """Tx was in the processing, """
-        assert tx.sig in self._tx_hash_dict, f'Tx {tx.sig} is absent in dictionary'
+        """Tx was in the processing,"""
+        assert tx.sig in self._tx_hash_dict, f"Tx {tx.sig} is absent in dictionary"
 
         sender_nonce = self._sender_nonce(tx)
-        assert sender_nonce in self._tx_sender_nonce_dict, f'Tx {sender_nonce} is absent in dictionary'
+        assert sender_nonce in self._tx_sender_nonce_dict, f"Tx {sender_nonce} is absent in dictionary"
         assert tx not in self._tx_gas_price_queue
         assert tx not in self._tx_gapped_gas_price_queue
 
@@ -105,7 +110,7 @@ class MPTxRequestDict:
         src: SortedQueue[MPTxRequest, int, str],
         dst: SortedQueue[MPTxRequest, int, str],
         sender_address: str,
-        nonce: int
+        nonce: int,
     ) -> None:
         while True:
             sender_nonce = self._sender_nonce((sender_address, nonce))
@@ -132,18 +137,12 @@ class MPTxRequestDict:
 
     def queue_tx(self, sender_address: str, start_nonce: int) -> None:
         self._move_between_gas_price_queues(
-            self._tx_gapped_gas_price_queue,
-            self._tx_gas_price_queue,
-            sender_address,
-            start_nonce
+            self._tx_gapped_gas_price_queue, self._tx_gas_price_queue, sender_address, start_nonce
         )
 
     def dequeue_tx(self, sender_address: str, start_nonce: int) -> None:
         self._move_between_gas_price_queues(
-            self._tx_gas_price_queue,
-            self._tx_gapped_gas_price_queue,
-            sender_address,
-            start_nonce
+            self._tx_gas_price_queue, self._tx_gapped_gas_price_queue, sender_address, start_nonce
         )
 
     def peek_gapped_lower_tx(self) -> Optional[MPTxRequest]:
@@ -174,8 +173,7 @@ class MPSenderTxPool:
         self._state_tx_cnt = 0
         self._processing_tx: Optional[MPTxRequest] = None
         self._tx_nonce_queue = SortedQueue[MPTxRequest, int, str](
-            lt_key_func=lambda a: -a.nonce,
-            eq_key_func=lambda a: a.sig
+            lt_key_func=lambda a: -a.nonce, eq_key_func=lambda a: a.sig
         )
 
     @property
@@ -224,7 +222,7 @@ class MPSenderTxPool:
         return len(self._tx_nonce_queue)
 
     def add_tx(self, tx: MPTxRequest) -> None:
-        assert self._state_tx_cnt <= tx.nonce, f'Tx {tx.sig} has nonce {tx.nonce} less than {self._state_tx_cnt}'
+        assert self._state_tx_cnt <= tx.nonce, f"Tx {tx.sig} has nonce {tx.nonce} less than {self._state_tx_cnt}"
         self._tx_nonce_queue.add(tx)
         self._heartbeat = int(time.time())
 
@@ -243,14 +241,14 @@ class MPSenderTxPool:
     @property
     def pending_nonce(self) -> Optional[int]:
         if self.state in {self.State.Suspended, self.State.Empty}:
-            LOG.debug(f'state = {self.state}')
+            LOG.debug(f"state = {self.state}")
             return None
 
         pending_nonce = self._state_tx_cnt
-        LOG.debug(f'state_tx_cnt = {self._state_tx_cnt}, pending_tx_cnt = {len(self._tx_nonce_queue)}')
+        LOG.debug(f"state_tx_cnt = {self._state_tx_cnt}, pending_tx_cnt = {len(self._tx_nonce_queue)}")
         for tx in reversed(self._tx_nonce_queue):
             if tx.nonce != pending_nonce:
-                LOG.debug(f'tx.nonce ({tx.nonce}) != pending_nonce {pending_nonce}, state_tx_cnt {self._state_tx_cnt}')
+                LOG.debug(f"tx.nonce ({tx.nonce}) != pending_nonce {pending_nonce}, state_tx_cnt {self._state_tx_cnt}")
                 break
             pending_nonce += 1
         return pending_nonce
@@ -274,25 +272,25 @@ class MPSenderTxPool:
         return self._heartbeat
 
     def _validate_processing_tx(self, tx: MPTxRequest) -> None:
-        assert not self.is_empty(), f'no transactions in {self.sender_address} pool'
-        assert self.is_processing(), f'{self.sender_address} pool does not process tx {tx.sig}'
+        assert not self.is_empty(), f"no transactions in {self.sender_address} pool"
+        assert self.is_processing(), f"{self.sender_address} pool does not process tx {tx.sig}"
 
         t_tx, p_tx = self.top_tx, self._processing_tx
-        assert tx.sig == p_tx.sig, f'tx {tx.sig} is not equal to processing tx {p_tx.sig}'
-        assert t_tx is p_tx, f'top tx {t_tx.sig} is not equal to processing tx {p_tx.sig}'
+        assert tx.sig == p_tx.sig, f"tx {tx.sig} is not equal to processing tx {p_tx.sig}"
+        assert t_tx is p_tx, f"top tx {t_tx.sig} is not equal to processing tx {p_tx.sig}"
 
     def done_tx(self, tx: MPTxRequest) -> None:
         self._validate_processing_tx(tx)
 
         self._tx_nonce_queue.pop(self._top_index)
         self._processing_tx = None
-        LOG.debug(f'Done tx {tx.sig}. There are {self.len_tx_nonce_queue} txs left in {self.sender_address} pool')
+        LOG.debug(f"Done tx {tx.sig}. There are {self.len_tx_nonce_queue} txs left in {self.sender_address} pool")
 
     def drop_tx(self, tx: MPTxRequest) -> None:
-        assert not self.is_processing() or tx.sig != self._processing_tx.sig, f'cannot drop processing tx {tx.sig}'
+        assert not self.is_processing() or tx.sig != self._processing_tx.sig, f"cannot drop processing tx {tx.sig}"
 
         self._tx_nonce_queue.pop(tx)
-        LOG.debug(f'Drop tx {tx.sig}. There are {self.len_tx_nonce_queue} txs left in {self.sender_address} pool')
+        LOG.debug(f"Drop tx {tx.sig}. There are {self.len_tx_nonce_queue} txs left in {self.sender_address} pool")
 
     def cancel_process_tx(self, tx: MPTxRequest) -> None:
         self._validate_processing_tx(tx)
@@ -303,8 +301,8 @@ class MPSenderTxPool:
     def take_out_tx_list(self) -> MPTxRequestList:
         is_processing = self.is_processing()
         LOG.debug(
-            f'Take out txs from sender pool: {self.sender_address}, count: {self.len_tx_nonce_queue}, '
-            f'processing: {is_processing}'
+            f"Take out txs from sender pool: {self.sender_address}, count: {self.len_tx_nonce_queue}, "
+            f"processing: {is_processing}"
         )
         _from = 1 if is_processing else 0
         taken_out_tx_list = self._tx_nonce_queue.extract_list_from(_from)
@@ -338,12 +336,10 @@ class MPTxSchedule:
 
         self._sender_pool_dict: Dict[str, MPSenderTxPool] = dict()
         self._sender_pool_heartbeat_queue = SortedQueue[MPSenderTxPool, int, str](
-            lt_key_func=lambda a: -a.heartbeat,
-            eq_key_func=lambda a: a.sender_address
+            lt_key_func=lambda a: -a.heartbeat, eq_key_func=lambda a: a.sender_address
         )
         self._sender_pool_queue = SortedQueue[MPSenderTxPool, int, str](
-            lt_key_func=lambda a: a.gas_price,
-            eq_key_func=lambda a: a.sender_address
+            lt_key_func=lambda a: a.gas_price, eq_key_func=lambda a: a.sender_address
         )
         self._suspended_sender_set: Set[NeonAddress] = set()
         self.set_capacity_high_watermark(capacity_high_watermark)
@@ -367,7 +363,7 @@ class MPTxSchedule:
         return self._chain_id
 
     def _add_tx_to_sender_pool(self, sender_pool: MPSenderTxPool, tx: MPTxRequest, is_gapped_tx: bool) -> None:
-        LOG.debug(f'Add tx {tx.sig} to mempool with {self.tx_cnt} txs')
+        LOG.debug(f"Add tx {tx.sig} to mempool with {self.tx_cnt} txs")
 
         is_new_pool = sender_pool.state == sender_pool.State.Empty
         if not is_new_pool:
@@ -383,13 +379,13 @@ class MPTxSchedule:
         self._sender_pool_heartbeat_queue.add(sender_pool)
 
     def _drop_tx_from_sender_pool(self, sender_pool: MPSenderTxPool, tx: MPTxRequest) -> None:
-        LOG.debug(f'Drop tx {tx.sig} from pool {sender_pool.sender_address}')
+        LOG.debug(f"Drop tx {tx.sig} from pool {sender_pool.sender_address}")
         sender_pool.drop_tx(tx)
         self._tx_dict.pop_tx(tx)
 
     def drop_expired_sender_pools(self, eviction_timeout_sec: int) -> None:
         threshold = int(time.time()) - eviction_timeout_sec
-        LOG.debug(f'Try to drop sender pools with heartbeat below {threshold}')
+        LOG.debug(f"Try to drop sender pools with heartbeat below {threshold}")
 
         while not self._sender_pool_heartbeat_queue.is_empty():
             sender_pool = self._sender_pool_heartbeat_queue[self._top_index]
@@ -397,10 +393,9 @@ class MPTxSchedule:
             if threshold < sender_pool.heartbeat or sender_pool.is_processing():
                 break
 
-            LOG.debug('Dropping sender pool {} with heartbeat {}'.format(
-                sender_pool.sender_address,
-                sender_pool.heartbeat
-            ))
+            LOG.debug(
+                "Dropping sender pool {} with heartbeat {}".format(sender_pool.sender_address, sender_pool.heartbeat)
+            )
 
             while not sender_pool.is_empty():
                 tx = sender_pool.top_tx
@@ -419,7 +414,7 @@ class MPTxSchedule:
 
     def _get_sender_pool(self, sender_address: str) -> MPSenderTxPool:
         sender_pool = self._find_sender_pool(sender_address)
-        assert sender_pool is not None, f'Failed to get sender tx pool by sender address {sender_address}'
+        assert sender_pool is not None, f"Failed to get sender tx pool by sender address {sender_address}"
         return cast(MPSenderTxPool, sender_pool)
 
     def _schedule_sender_pool(self, sender_pool: MPSenderTxPool, state_tx_cnt: int) -> None:
@@ -455,32 +450,32 @@ class MPTxSchedule:
         if new_state == sender_pool.State.Empty:
             self._sender_pool_dict.pop(sender_pool.sender_address)
             self._sender_pool_heartbeat_queue.pop(sender_pool)
-            LOG.debug(f'Done sender {self._chain_id, sender_pool.sender_address}')
+            LOG.debug(f"Done sender {self._chain_id, sender_pool.sender_address}")
         elif new_state == sender_pool.State.Suspended:
             self._suspended_sender_set.add(NeonAddress.from_raw(sender_pool.sender_address, self._chain_id))
-            LOG.debug(f'Suspend sender {self._chain_id, sender_pool.sender_address}')
+            LOG.debug(f"Suspend sender {self._chain_id, sender_pool.sender_address}")
         elif new_state == sender_pool.State.Queued:
             self._sender_pool_queue.add(sender_pool)
-            LOG.debug(f'Include sender {self._chain_id, sender_pool.sender_address} into execution queue')
+            LOG.debug(f"Include sender {self._chain_id, sender_pool.sender_address} into execution queue")
 
     def add_tx(self, tx: MPTxRequest) -> MPTxSendResult:
         LOG.debug(
-            f'Try to add tx {tx.sig} (gas price {tx.gas_price}, nonce {tx.nonce}) '
-            f'to mempool {self.chain_id} with {self.tx_cnt} txs'
+            f"Try to add tx {tx.sig} (gas price {tx.gas_price}, nonce {tx.nonce}) "
+            f"to mempool {self.chain_id} with {self.tx_cnt} txs"
         )
 
         old_tx = self._tx_dict.get_tx_by_hash(tx.sig)
         if old_tx is not None:
-            LOG.debug(f'Tx {tx.sig} is already in mempool')
+            LOG.debug(f"Tx {tx.sig} is already in mempool")
             return MPTxSendResult(code=MPTxSendResultCode.AlreadyKnown, state_tx_cnt=None)
 
         old_tx = self._tx_dict.get_tx_by_sender_nonce(tx.sender_address, tx.nonce)
         if (old_tx is not None) and (old_tx.gas_price >= tx.gas_price):
-            LOG.debug(f'Old tx {old_tx.sig} has higher gas price {old_tx.gas_price} > {tx.gas_price}')
+            LOG.debug(f"Old tx {old_tx.sig} has higher gas price {old_tx.gas_price} > {tx.gas_price}")
             return MPTxSendResult(code=MPTxSendResultCode.Underprice, state_tx_cnt=None)
 
         sender_pool = self._get_or_create_sender_pool(tx.sender_address)
-        LOG.debug(f'Got sender pool {tx.chain_id, tx.sender_address} with {sender_pool.len_tx_nonce_queue} txs')
+        LOG.debug(f"Got sender pool {tx.chain_id, tx.sender_address} with {sender_pool.len_tx_nonce_queue} txs")
 
         # this condition checks the processing tx too
         state_tx_cnt = max(tx.neon_tx_exec_cfg.state_tx_cnt, sender_pool.state_tx_cnt)
@@ -491,30 +486,30 @@ class MPTxSchedule:
                 if (lower_tx := self._tx_dict.peek_gapped_lower_tx()) is None:
                     return MPTxSendResult(code=MPTxSendResultCode.NonceTooHigh, state_tx_cnt=state_tx_cnt)
                 elif tx.gas_price < lower_tx.gas_price:
-                    LOG.debug(f'Lowermost tx {lower_tx.sig} has higher gas price {lower_tx.gas_price} > {tx.gas_price}')
+                    LOG.debug(f"Lowermost tx {lower_tx.sig} has higher gas price {lower_tx.gas_price} > {tx.gas_price}")
                     return MPTxSendResult(code=MPTxSendResultCode.Underprice, state_tx_cnt=None)
             elif self.tx_cnt >= self._capacity and self._tx_dict.peek_gapped_lower_tx() is None:
                 lower_tx = self._tx_dict.peek_pending_lower_tx()
                 if (lower_tx is not None) and (tx.gas_price < lower_tx.gas_price):
-                    LOG.debug(f'Lowermost tx {lower_tx.sig} has higher gas price {lower_tx.gas_price} > {tx.gas_price}')
+                    LOG.debug(f"Lowermost tx {lower_tx.sig} has higher gas price {lower_tx.gas_price} > {tx.gas_price}")
                     return MPTxSendResult(code=MPTxSendResultCode.Underprice, state_tx_cnt=None)
 
         if sender_pool.state == sender_pool.State.Processing:
             top_tx = sender_pool.top_tx
             if top_tx.nonce == tx.nonce:
-                LOG.debug(f'Old tx {top_tx.sig} (gas price {top_tx.gas_price}) is processing')
+                LOG.debug(f"Old tx {top_tx.sig} (gas price {top_tx.gas_price}) is processing")
                 return MPTxSendResult(code=MPTxSendResultCode.NonceTooLow, state_tx_cnt=top_tx.nonce + 1)
 
         if state_tx_cnt > tx.nonce:
-            LOG.debug(f'Sender {tx.sender_address} has higher tx counter {state_tx_cnt} > {tx.nonce}')
+            LOG.debug(f"Sender {tx.sender_address} has higher tx counter {state_tx_cnt} > {tx.nonce}")
             return MPTxSendResult(code=MPTxSendResultCode.NonceTooLow, state_tx_cnt=state_tx_cnt)
 
         # Everything is ok, let's add transaction to the pool
         if old_tx is not None:
             with logging_context(req_id=old_tx.req_id):
                 LOG.debug(
-                    f'Replace tx {old_tx.sig} (gas price {old_tx.gas_price}) '
-                    f'with tx {tx.sig} (gas price {tx.gas_price})'
+                    f"Replace tx {old_tx.sig} (gas price {old_tx.gas_price}) "
+                    f"with tx {tx.sig} (gas price {tx.gas_price})"
                 )
                 self._drop_tx_from_sender_pool(sender_pool, old_tx)
 
@@ -549,17 +544,17 @@ class MPTxSchedule:
         if tx_cnt_to_remove <= 0:
             return
 
-        LOG.debug(f'Try to clear {tx_cnt_to_remove} txs by lower gas price')
+        LOG.debug(f"Try to clear {tx_cnt_to_remove} txs by lower gas price")
 
         changed_sender_set: Set[str] = set()
         for i in range(tx_cnt_to_remove):
             tx = self._tx_dict.peek_lower_tx()
             if (tx is None) or (tx.sig == new_tx.sig):
-                LOG.debug(f'Break on tx {tx}')
+                LOG.debug(f"Break on tx {tx}")
                 break
 
             with logging_context(req_id=tx.req_id):
-                LOG.debug(f'Remove tx {tx.sig} from {tx.sender_address} pool by lower gas price {tx.gas_price}')
+                LOG.debug(f"Remove tx {tx.sig} from {tx.sender_address} pool by lower gas price {tx.gas_price}")
                 sender_pool = self._get_sender_pool(tx.sender_address)
                 changed_sender_set.add(tx.sender_address)
                 self._drop_tx_from_sender_pool(sender_pool, tx)
@@ -599,7 +594,7 @@ class MPTxSchedule:
         return None if tx is None else tx.neon_tx_info
 
     def _done_tx(self, tx: MPTxRequest) -> None:
-        LOG.debug(f'Done tx {tx.sig} in pool {tx.sender_address}')
+        LOG.debug(f"Done tx {tx.sig} in pool {tx.sender_address}")
 
         sender_pool = self._get_sender_pool(tx.sender_address)
         sender_pool.done_tx(tx)
@@ -640,7 +635,4 @@ class MPTxSchedule:
             pending_list.extend([tx.neon_tx_info for tx in tx_list[:pending_stop_pos]])
             queued_list.extend([tx.neon_tx_info for tx in tx_list[pending_stop_pos:]])
 
-        return MPTxPoolContentResult(
-            pending_list=pending_list,
-            queued_list=queued_list
-        )
+        return MPTxPoolContentResult(pending_list=pending_list, queued_list=queued_list)
