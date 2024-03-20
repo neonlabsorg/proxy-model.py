@@ -30,9 +30,17 @@ class MPTxRequestDict:
             lt_key_func=lambda a: -a.gas_price,
             eq_key_func=lambda a: a.sig
         )
+        self._tx_gapped_gas_price_queue = SortedQueue[MPTxRequest, int, str](
+            lt_key_func=lambda a: -a.gas_price,
+            eq_key_func=lambda a: a.sig
+        )
 
     def __len__(self) -> int:
         return len(self._tx_hash_dict)
+
+    @property
+    def len_tx_gas_price_queue(self) -> int:
+        return len(self._tx_gas_price_queue)
 
     @staticmethod
     def _sender_nonce(tx: Union[MPTxRequest, Tuple[str, int]]) -> str:
@@ -42,15 +50,24 @@ class MPTxRequestDict:
             sender_addr, tx_nonce = tx
         return f'{sender_addr}:{tx_nonce}'
 
-    def add_tx(self, tx: MPTxRequest) -> None:
+    def add_tx(self, tx: MPTxRequest, is_gapped_tx: bool) -> None:
         sender_nonce = self._sender_nonce(tx)
         assert tx.sig not in self._tx_hash_dict, f'Tx {tx.sig} is already in dictionary'
         assert sender_nonce not in self._tx_sender_nonce_dict, f'Tx {sender_nonce} is already in dictionary'
+        assert tx not in self._tx_gas_price_queue, f'Tx {tx.sig} is already in gas price queue'
+        assert tx not in self._tx_gapped_gas_price_queue, f'Tx {tx.sig} is already in gapped gas price queue'
 
         self._tx_hash_dict[tx.sig] = tx
         self._tx_sender_nonce_dict[sender_nonce] = tx
-        self._tx_gas_price_queue.add(tx)
-        assert len(self._tx_hash_dict) == len(self._tx_sender_nonce_dict) >= len(self._tx_gas_price_queue)
+
+        if is_gapped_tx:
+            self._tx_gapped_gas_price_queue.add(tx)
+        else:
+            self._tx_gas_price_queue.add(tx)
+            self.queue_tx(tx.sender_address, tx.nonce + 1)
+
+        assert len(self._tx_hash_dict) == len(self._tx_sender_nonce_dict) >= (
+            len(self._tx_gas_price_queue) + len(self._tx_gapped_gas_price_queue))
 
     def pop_tx(self, tx: MPTxRequest) -> MPTxRequest:
         assert tx.sig in self._tx_hash_dict, f'Tx {tx.sig} is absent in dictionary'
@@ -58,13 +75,44 @@ class MPTxRequestDict:
         sender_nonce = self._sender_nonce(tx)
         assert sender_nonce in self._tx_sender_nonce_dict, f'Tx {sender_nonce} is absent in dictionary'
 
-        pos = self._tx_gas_price_queue.find(tx)
-        # tx was removed from the gas price queue on processing
-        if pos is not None:
-            self._tx_gas_price_queue.pop(pos)
+        # tx may be removed from the gas price queue on processing
+        if (pos := self._tx_gapped_gas_price_queue.find(tx)) is not None:
+            self._tx_gapped_gas_price_queue.pop(pos)
+        else:
+            self._tx_gas_price_queue.pop(tx)
+            self.dequeue_tx(tx.sender_address, tx.nonce + 1)
 
         self._tx_sender_nonce_dict.pop(sender_nonce)
-        return self._tx_hash_dict.pop(tx.sig, None)
+        return self._tx_hash_dict.pop(tx.sig)
+
+    def done_tx(self, tx: MPTxRequest, is_suspended: bool) -> MPTxRequest:
+        """Tx was in the processing, """
+        assert tx.sig in self._tx_hash_dict, f'Tx {tx.sig} is absent in dictionary'
+
+        sender_nonce = self._sender_nonce(tx)
+        assert sender_nonce in self._tx_sender_nonce_dict, f'Tx {sender_nonce} is absent in dictionary'
+        assert tx not in self._tx_gas_price_queue
+        assert tx not in self._tx_gapped_gas_price_queue
+
+        if is_suspended:
+            self.dequeue_tx(tx.sender_address, tx.nonce + 1)
+
+        self._tx_sender_nonce_dict.pop(sender_nonce)
+        return self._tx_hash_dict.pop(tx.sig)
+
+    def _move_between_gas_price_queues(
+        self,
+        src: SortedQueue[MPTxRequest, int, str],
+        dst: SortedQueue[MPTxRequest, int, str],
+        sender_address: str,
+        nonce: int
+    ) -> None:
+        while True:
+            sender_nonce = self._sender_nonce((sender_address, nonce))
+            if (tx := self._tx_sender_nonce_dict.get(sender_nonce, None)) is None:
+                break
+            dst.add(src.pop(tx))
+            nonce += 1
 
     def get_tx_by_hash(self, neon_sig: str) -> Optional[MPTxRequest]:
         return self._tx_hash_dict.get(neon_sig, None)
@@ -75,11 +123,37 @@ class MPTxRequestDict:
     def acquire_tx(self, tx: MPTxRequest) -> None:
         self._tx_gas_price_queue.pop(tx)
 
-    def cancel_process_tx(self, tx: MPTxRequest) -> None:
-        self._tx_gas_price_queue.add(tx)
+    def cancel_process_tx(self, tx: MPTxRequest, is_suspended: bool) -> None:
+        if is_suspended:
+            self._tx_gapped_gas_price_queue.add(tx)
+            self.dequeue_tx(tx.sender_address, tx.nonce + 1)
+        else:
+            self._tx_gas_price_queue.add(tx)
+
+    def queue_tx(self, sender_address: str, start_nonce: int) -> None:
+        self._move_between_gas_price_queues(
+            self._tx_gapped_gas_price_queue,
+            self._tx_gas_price_queue,
+            sender_address,
+            start_nonce
+        )
+
+    def dequeue_tx(self, sender_address: str, start_nonce: int) -> None:
+        self._move_between_gas_price_queues(
+            self._tx_gas_price_queue,
+            self._tx_gapped_gas_price_queue,
+            sender_address,
+            start_nonce
+        )
+
+    def peek_gapped_lower_tx(self) -> Optional[MPTxRequest]:
+        return self._tx_gapped_gas_price_queue[self._top_index] if len(self._tx_gapped_gas_price_queue) > 0 else None
+
+    def peek_pending_lower_tx(self) -> Optional[MPTxRequest]:
+        return self._tx_gas_price_queue[self._top_index] if len(self._tx_gas_price_queue) > 0 else None
 
     def peek_lower_tx(self) -> Optional[MPTxRequest]:
-        return self._tx_gas_price_queue[self._top_index] if len(self._tx_gas_price_queue) > 0 else None
+        return self.peek_gapped_lower_tx() or self.peek_pending_lower_tx()
 
 
 class MPSenderTxPool:
@@ -258,7 +332,7 @@ class MPTxSchedule:
 
     def __init__(self, capacity: int, capacity_high_watermark: float, chain_id: int) -> None:
         self._capacity = capacity
-        self.set_capacity_high_watermark(capacity_high_watermark)
+        self._capacity_high_watermark = 0
         self._tx_dict = MPTxRequestDict()
         self._chain_id = chain_id
 
@@ -272,18 +346,18 @@ class MPTxSchedule:
             eq_key_func=lambda a: a.sender_address
         )
         self._suspended_sender_set: Set[NeonAddress] = set()
-
+        self.set_capacity_high_watermark(capacity_high_watermark)
 
     def set_capacity_high_watermark(self, value: float) -> None:
-        '''Sets the mempool capacity high watermark as a multiplier of the capacity'''
+        """Sets the mempool capacity high watermark as a multiplier of the capacity"""
         self._capacity_high_watermark = int(self._capacity * value)
-    
+
     @property
     def min_gas_price(self) -> int:
         if self.tx_cnt < self._capacity_high_watermark:
             return 0
 
-        lower_tx = self._tx_dict.peek_lower_tx()
+        lower_tx = self._tx_dict.peek_pending_lower_tx()
         if not lower_tx:
             return 0
         return int(lower_tx.gas_price * 1.3)  # increase gas-price in 30%
@@ -292,7 +366,7 @@ class MPTxSchedule:
     def chain_id(self) -> int:
         return self._chain_id
 
-    def _add_tx_to_sender_pool(self, sender_pool: MPSenderTxPool, tx: MPTxRequest) -> None:
+    def _add_tx_to_sender_pool(self, sender_pool: MPSenderTxPool, tx: MPTxRequest, is_gapped_tx: bool) -> None:
         LOG.debug(f'Add tx {tx.sig} to mempool with {self.tx_cnt} txs')
 
         is_new_pool = sender_pool.state == sender_pool.State.Empty
@@ -300,7 +374,7 @@ class MPTxSchedule:
             self._sender_pool_heartbeat_queue.pop(sender_pool)
 
         sender_pool.add_tx(tx)
-        self._tx_dict.add_tx(tx)
+        self._tx_dict.add_tx(tx, is_gapped_tx)
 
         # the first tx in the sender pool
         if is_new_pool:
@@ -323,7 +397,7 @@ class MPTxSchedule:
             if threshold < sender_pool.heartbeat or sender_pool.is_processing():
                 break
 
-            LOG.debug('Droping sender pool {} with heartbeat {}'.format(
+            LOG.debug('Dropping sender pool {} with heartbeat {}'.format(
                 sender_pool.sender_address,
                 sender_pool.heartbeat
             ))
@@ -405,21 +479,25 @@ class MPTxSchedule:
             LOG.debug(f'Old tx {old_tx.sig} has higher gas price {old_tx.gas_price} > {tx.gas_price}')
             return MPTxSendResult(code=MPTxSendResultCode.Underprice, state_tx_cnt=None)
 
-        if self.tx_cnt >= self._capacity:
-            lower_tx = self._tx_dict.peek_lower_tx()
-            if (lower_tx is not None) and (lower_tx.gas_price > tx.gas_price):
-                LOG.debug(f'Lowermost tx {lower_tx.sig} has higher gas price {lower_tx.gas_price} > {tx.gas_price}')
-                return MPTxSendResult(code=MPTxSendResultCode.Underprice, state_tx_cnt=None)
-
         sender_pool = self._get_or_create_sender_pool(tx.sender_address)
         LOG.debug(f'Got sender pool {tx.chain_id, tx.sender_address} with {sender_pool.len_tx_nonce_queue} txs')
 
         # this condition checks the processing tx too
         state_tx_cnt = max(tx.neon_tx_exec_cfg.state_tx_cnt, sender_pool.state_tx_cnt)
+        is_gapped_tx = (sender_pool.pending_nonce or state_tx_cnt) < tx.nonce
+
         if self.tx_cnt >= self._capacity_high_watermark:
-            pending_nonce = sender_pool.pending_nonce or state_tx_cnt
-            if pending_nonce < tx.nonce:
-                return MPTxSendResult(code=MPTxSendResultCode.NonceTooHigh, state_tx_cnt=pending_nonce)
+            if is_gapped_tx:
+                if (lower_tx := self._tx_dict.peek_gapped_lower_tx()) is None:
+                    return MPTxSendResult(code=MPTxSendResultCode.NonceTooHigh, state_tx_cnt=state_tx_cnt)
+                elif tx.gas_price < lower_tx.gas_price:
+                    LOG.debug(f'Lowermost tx {lower_tx.sig} has higher gas price {lower_tx.gas_price} > {tx.gas_price}')
+                    return MPTxSendResult(code=MPTxSendResultCode.Underprice, state_tx_cnt=None)
+            elif self.tx_cnt >= self._capacity and self._tx_dict.peek_gapped_lower_tx() is None:
+                lower_tx = self._tx_dict.peek_pending_lower_tx()
+                if (lower_tx is not None) and (tx.gas_price < lower_tx.gas_price):
+                    LOG.debug(f'Lowermost tx {lower_tx.sig} has higher gas price {lower_tx.gas_price} > {tx.gas_price}')
+                    return MPTxSendResult(code=MPTxSendResultCode.Underprice, state_tx_cnt=None)
 
         if sender_pool.state == sender_pool.State.Processing:
             top_tx = sender_pool.top_tx
@@ -440,7 +518,7 @@ class MPTxSchedule:
                 )
                 self._drop_tx_from_sender_pool(sender_pool, old_tx)
 
-        self._add_tx_to_sender_pool(sender_pool, tx)
+        self._add_tx_to_sender_pool(sender_pool, tx, is_gapped_tx)
         self._schedule_sender_pool(sender_pool, state_tx_cnt)
         self._check_oversized_and_reduce(tx)
         return MPTxSendResult(code=MPTxSendResultCode.Success, state_tx_cnt=None)
@@ -461,6 +539,10 @@ class MPTxSchedule:
     @property
     def tx_cnt(self) -> int:
         return len(self._tx_dict)
+
+    @property
+    def pending_tx_cnt(self) -> int:
+        return self._tx_dict.len_tx_gas_price_queue
 
     def _check_oversized_and_reduce(self, new_tx: MPTxRequest) -> None:
         tx_cnt_to_remove = self.tx_cnt - self._capacity
@@ -521,8 +603,8 @@ class MPTxSchedule:
 
         sender_pool = self._get_sender_pool(tx.sender_address)
         sender_pool.done_tx(tx)
-        self._tx_dict.pop_tx(tx)
         self._schedule_sender_pool(sender_pool, tx.neon_tx_exec_cfg.state_tx_cnt)
+        self._tx_dict.done_tx(tx, sender_pool.state == sender_pool.State.Suspended)
 
     def done_tx(self, tx: MPTxRequest) -> None:
         self._done_tx(tx)
@@ -533,8 +615,8 @@ class MPTxSchedule:
     def cancel_tx(self, tx: MPTxRequest) -> bool:
         sender_pool = self._get_sender_pool(tx.sender_address)
         sender_pool.cancel_process_tx(tx)
-        self._tx_dict.cancel_process_tx(tx)
         self._schedule_sender_pool(sender_pool, tx.neon_tx_exec_cfg.state_tx_cnt)
+        self._tx_dict.cancel_process_tx(tx, sender_pool.state == sender_pool.State.Suspended)
         return True
 
     @property
@@ -545,6 +627,8 @@ class MPTxSchedule:
         sender_pool = self._find_sender_pool(sender_tx_cnt.sender.address)
         if sender_pool and sender_pool.state == sender_pool.State.Suspended:
             self._schedule_sender_pool(sender_pool, sender_tx_cnt.state_tx_cnt)
+            if sender_pool.state == sender_pool.State.Queued:
+                self._tx_dict.queue_tx(sender_pool.sender_address, sender_pool.top_tx.nonce)
 
     def get_content(self) -> MPTxPoolContentResult:
         pending_list: List[NeonTxInfo] = list()
