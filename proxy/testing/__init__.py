@@ -11,10 +11,14 @@
 import sys
 import logging
 
+# from proxy.common.logger import Logger
+# Logger.setup()
+
 logging.basicConfig(handlers=[logging.StreamHandler(sys.stdout)], level=logging.WARNING)
 
 from solcx import install_solc
-install_solc(version='0.7.6')
+
+install_solc(version="0.7.6")
 
 from ..common_neon.evm_config import EVMConfig
 from ..common_neon.config import Config
