@@ -11,6 +11,9 @@
 import sys
 import logging
 
+# from proxy.common.logger import Logger
+# Logger.setup()
+
 logging.basicConfig(handlers=[logging.StreamHandler(sys.stdout)], level=logging.WARNING)
 
 from solcx import install_solc
