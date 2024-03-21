@@ -82,7 +82,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
         self._free_alt_queue_task_loop: Optional[MPFreeALTQueueTaskLoop] = None
 
     def start(self) -> None:
-        asyncio.get_event_loop().create_task(self._process_eviction_loop()),
+        self._async_task_list.append(asyncio.get_event_loop().create_task(self._process_eviction_loop()))
         asyncio.get_event_loop().run_until_complete(self._executor_mng.set_executor_cnt(1))
         self._async_task_list.append(MPEVMConfigTaskLoop(self._executor_mng, self))
 
