@@ -9,13 +9,20 @@ from typing import List, Optional, Any, cast, Union, Deque, Dict, Final, Tuple
 from .executor_mng import MPExecutorMng, IMPExecutorMngUser
 
 from .mempool_api import (
-    MPRequestType, MPTask,
-    MPGasPriceResult, MPGasPriceTokenResult,
-    MPTxExecResult, MPTxExecResultCode, MPTxRequest, MPTxExecRequest, MPStuckTxInfo,
-    MPTxSendResult, MPTxSendResultCode,
+    MPRequestType,
+    MPTask,
+    MPGasPriceResult,
+    MPGasPriceTokenResult,
+    MPTxExecResult,
+    MPTxExecResultCode,
+    MPTxRequest,
+    MPTxExecRequest,
+    MPStuckTxInfo,
+    MPTxSendResult,
+    MPTxSendResultCode,
     MPTxPoolContentResult,
     MPNeonTxResult,
-    MPEVMConfigResult
+    MPEVMConfigResult,
 )
 
 from .mempool_neon_tx_dict import MPTxDict
@@ -48,7 +55,7 @@ LOG = logging.getLogger(__name__)
 
 class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
     def __init__(self, config: Config, stat_client: ProxyStatClient):
-        LOG.info(f'Init mempool schedule with config: {config.as_dict()}')
+        LOG.info(f"Init mempool schedule with config: {config.as_dict()}")
 
         self._config = config
         self._reschedule_time_sec: Final[float] = config.mempool_reschedule_time_sec
@@ -81,9 +88,9 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
 
     def _update_gas_price(self, tx: MPTxRequest) -> Optional[MPTxSendResult]:
         if not tx.has_chain_id():
-            LOG.debug('Increase gas-price for wo-chain-id tx')
+            LOG.debug("Increase gas-price for wo-chain-id tx")
         elif tx.gas_price == 0:
-            LOG.debug('Increase gas-price for gas-less tx')
+            LOG.debug("Increase gas-price for gas-less tx")
         else:
             return None
 
@@ -98,7 +105,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
     async def schedule_mp_tx_request(self, tx: MPTxRequest) -> MPTxSendResult:
         try:
             if self._completed_tx_dict.get_tx_by_hash(tx.sig) is not None:
-                LOG.debug('Tx is already processed')
+                LOG.debug("Tx is already processed")
                 return MPTxSendResult(MPTxSendResultCode.AlreadyKnown, state_tx_cnt=None)
 
             result: Optional[MPTxSendResult] = self._update_gas_price(tx)
@@ -111,11 +118,11 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
             elif result.code == MPTxSendResultCode.Success:
                 self._stat_client.commit_tx_add()
 
-            LOG.debug('Got tx and scheduled request')
+            LOG.debug("Got tx and scheduled request")
             return result
 
         except BaseException as exc:
-            LOG.error('Failed to schedule tx', exc_info=exc)
+            LOG.error("Failed to schedule tx", exc_info=exc)
             return MPTxSendResult(code=MPTxSendResultCode.Unspecified, state_tx_cnt=None)
 
         finally:
@@ -136,8 +143,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
 
     def get_pending_tx_by_sender_nonce(self, sender: NeonAddress, tx_nonce: int) -> MPNeonTxResult:
         neon_tx_info = self._call_tx_schedule(
-            sender.chain_id, MPTxSchedule.get_pending_tx_by_sender_nonce,
-            sender.address, tx_nonce
+            sender.chain_id, MPTxSchedule.get_pending_tx_by_sender_nonce, sender.address, tx_nonce
         )
         if neon_tx_info:
             return neon_tx_info
@@ -175,20 +181,16 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
                 return True
 
             except BaseException as exc:
-                LOG.error('Failed to enqueue to execute', exc_info=exc)
+                LOG.error("Failed to enqueue to execute", exc_info=exc)
                 self._on_reschedule_tx(tx)
                 return False
 
     def _acquire_tx(self) -> Optional[MPTxExecRequest]:
         try:
-            return (
-                self._acquire_stuck_tx() or
-                self._acquire_rescheduled_tx() or
-                self._acquire_scheduled_tx()
-            )
+            return self._acquire_stuck_tx() or self._acquire_rescheduled_tx() or self._acquire_scheduled_tx()
 
         except BaseException as exc:
-            LOG.error('Failed to get tx for execution', exc_info=exc)
+            LOG.error("Failed to get tx for execution", exc_info=exc)
 
         return None
 
@@ -208,7 +210,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
                 return None
 
             with logging_context(req_id=tx.req_id):
-                LOG.debug('Got tx from stuck queue')
+                LOG.debug("Got tx from stuck queue")
             self._stuck_tx_dict.acquire_tx(stuck_tx)
             return tx
 
@@ -222,7 +224,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
             return None
 
         with logging_context(req_id=tx.req_id):
-            LOG.debug('Got tx from rescheduling queue')
+            LOG.debug("Got tx from rescheduling queue")
 
         self._rescheduled_tx_queue.popleft()
         return tx
@@ -237,7 +239,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
             return None
 
         with logging_context(req_id=tx.req_id):
-            LOG.debug('Got tx from schedule')
+            LOG.debug("Got tx from schedule")
             tx_schedule.acquire_tx(tx)
 
         return tx
@@ -292,11 +294,11 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
                     self._stat_client.commit_tx_begin(stat)
 
             except asyncio.exceptions.CancelledError:
-                LOG.debug('Normal exit')
+                LOG.debug("Normal exit")
                 break
 
             except BaseException as exc:
-                LOG.error('Fail on process schedule', exc_info=exc)
+                LOG.error("Fail on process schedule", exc_info=exc)
 
     def _fill_mempool_stat(self, stat: Union[NeonTxBeginData, NeonTxEndData]) -> None:
         stat.processing_stuck_cnt = self._stuck_tx_dict.processing_tx_cnt
@@ -333,34 +335,34 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
                 return NeonTxEndCode.Unfinished
 
             if mp_task.mp_request.type != MPRequestType.SendTransaction:
-                LOG.error(f'Got unexpected request: {mp_task.mp_request}')
+                LOG.error(f"Got unexpected request: {mp_task.mp_request}")
                 return NeonTxEndCode.Unspecified  # skip task
 
         except BaseException as exc:
-            LOG.error('Exception on checking type of request', exc_info=exc)
+            LOG.error("Exception on checking type of request", exc_info=exc)
             return NeonTxEndCode.Unspecified  # skip task
 
         tx = cast(MPTxExecRequest, mp_task.mp_request)
         try:
             exc = mp_task.aio_task.exception()
             if exc is not None:
-                LOG.error('Exception during processing tx on executor', exc_info=exc)
+                LOG.error("Exception during processing tx on executor", exc_info=exc)
                 return self._on_fail_tx(tx, exc)
 
             mp_result = mp_task.aio_task.result()
             return self._process_mp_tx_result(tx, mp_result)
 
         except BaseException as exc:
-            LOG.error('Exception on the result processing of tx', exc_info=exc)
+            LOG.error("Exception on the result processing of tx", exc_info=exc)
         return NeonTxEndCode.Unspecified  # skip task
 
     def _process_mp_tx_result(self, tx: MPTxExecRequest, mp_res: Any) -> NeonTxEndCode:
-        assert isinstance(mp_res, MPTxExecResult), f'Wrong type of tx result processing {tx.sig}: {mp_res}'
+        assert isinstance(mp_res, MPTxExecResult), f"Wrong type of tx result processing {tx.sig}: {mp_res}"
 
         mp_tx_res = cast(MPTxExecResult, mp_res)
         good_code_set = {MPTxExecResultCode.Done, MPTxExecResultCode.Reschedule}
         log_fn = LOG.warning if mp_tx_res.code not in good_code_set else LOG.debug
-        log_fn(f'For tx {tx.sig} got result: {mp_tx_res}, time: {(time.time_ns() - tx.start_time) / (10 ** 6)}')
+        log_fn(f"For tx {tx.sig} got result: {mp_tx_res}, time: {(time.time_ns() - tx.start_time) / (10 ** 6)}")
 
         if isinstance(mp_tx_res.data, NeonTxExecCfg):
             tx.neon_tx_exec_cfg = cast(NeonTxExecCfg, mp_tx_res.data)
@@ -382,7 +384,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
         elif mp_tx_res.code == MPTxExecResultCode.Done:
             return self._on_done_tx(tx)
 
-        assert False, f'Unknown result code {mp_tx_res.code}'
+        assert False, f"Unknown result code {mp_tx_res.code}"
 
     def _on_bad_resource(self, tx: MPTxExecRequest) -> NeonTxEndCode:
         resource = self._release_resource(tx)
@@ -397,7 +399,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
         return NeonTxEndCode.Canceled
 
     def _on_reschedule_tx(self, tx: MPTxExecRequest) -> NeonTxEndCode:
-        LOG.debug('Got reschedule status')
+        LOG.debug("Got reschedule status")
         asyncio.get_event_loop().create_task(self._reschedule_tx(tx))
         cfg = tx.neon_tx_exec_cfg
         if cfg.is_resource_used() or cfg.has_completed_receipt():
@@ -406,7 +408,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
 
     async def _reschedule_tx(self, tx: MPTxExecRequest):
         with logging_context(req_id=tx.req_id):
-            LOG.debug(f'Tx will be rescheduled in {math.ceil(self._reschedule_time_sec * 1000)} msec')
+            LOG.debug(f"Tx will be rescheduled in {math.ceil(self._reschedule_time_sec * 1000)} msec")
 
         await asyncio.sleep(self._reschedule_time_sec)
 
@@ -420,32 +422,32 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
                     self._release_resource(tx)
                     self._call_tx_schedule(tx.chain_id, MPTxSchedule.cancel_tx, tx)
             except BaseException as exc:
-                LOG.error('Exception on the result processing of tx', exc_info=exc)
+                LOG.error("Exception on the result processing of tx", exc_info=exc)
 
         await self._kick_tx_schedule()
 
     def _on_done_stuck_tx(self, tx: MPTxExecRequest) -> NeonTxEndCode:
         self._release_resource(tx)
         self._stuck_tx_dict.done_tx(tx.sig)
-        LOG.debug(f'Stuck request {tx.sig} is done')
+        LOG.debug(f"Stuck request {tx.sig} is done")
         return NeonTxEndCode.StuckDone
 
     def _on_done_tx(self, tx: MPTxExecRequest) -> NeonTxEndCode:
         self._release_resource(tx)
         self._call_tx_schedule(tx.chain_id, MPTxSchedule.done_tx, tx)
         self._completed_tx_dict.done_tx(tx, None)
-        LOG.debug(f'Request {tx.sig} is done')
+        LOG.debug(f"Request {tx.sig} is done")
         return NeonTxEndCode.Done
 
     def _on_fail_tx(self, tx: MPTxExecRequest, exc: Optional[BaseException]) -> NeonTxEndCode:
         self._release_resource(tx)
         if tx.is_stuck_tx():
             self._stuck_tx_dict.done_tx(tx.sig)
-            LOG.debug(f'Stuck request {tx.sig} is failed - dropped away')
+            LOG.debug(f"Stuck request {tx.sig} is failed - dropped away")
         else:
             self._call_tx_schedule(tx.chain_id, MPTxSchedule.fail_tx, tx)
             self._completed_tx_dict.done_tx(tx, exc)
-            LOG.debug(f'Request {tx.sig} is failed - dropped away')
+            LOG.debug(f"Request {tx.sig} is failed - dropped away")
         return NeonTxEndCode.Failed
 
     def _on_stuck_tx(self, tx: MPTxExecRequest, stuck_tx_error: StuckTxError) -> NeonTxEndCode:
@@ -478,15 +480,14 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
         for token_info in evm_config.token_info_list:
             if token_info.chain_id not in self._tx_schedule_dict:
                 self._tx_schedule_dict[token_info.chain_id] = MPTxSchedule(
-                    self._config.mempool_capacity,
-                    self._config.mempool_capacity_high_watermark,
-                    token_info.chain_id)
-                LOG.info(f'Start transaction scheduler for the token {token_info.chain_id, token_info.token_name}')
+                    self._config.mempool_capacity, self._config.mempool_capacity_high_watermark, token_info.chain_id
+                )
+                LOG.info(f"Start transaction scheduler for the token {token_info.chain_id, token_info.token_name}")
 
         chain_id_set = set(evm_config.chain_id_list)
         for chain_id in list(self._tx_schedule_dict.keys()):
             if chain_id not in chain_id_set:
-                LOG.info(f'Stop transaction scheduler for the chainId {chain_id}')
+                LOG.info(f"Stop transaction scheduler for the chainId {chain_id}")
                 self._tx_schedule_dict.pop(chain_id)
 
         if self._has_evm_config:
@@ -509,23 +510,25 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
         elif self._free_alt_queue_task_loop:
             return
 
-        LOG.info(f'Start transaction scheduler tasks')
+        LOG.info(f"Start transaction scheduler tasks")
         self._free_alt_queue_task_loop = MPFreeALTQueueTaskLoop(self._config, self._executor_mng, self._op_res_mng)
 
-        self._async_task_list.extend([
-            self._free_alt_queue_task_loop,
-            MPSenderTxCntTaskLoop(self._executor_mng, self._tx_schedule_dict),
-            MPOpResGetListTaskLoop(self._executor_mng, self._op_res_mng),
-            MPInitOpResTaskLoop(self._executor_mng, self._op_res_mng, self._stuck_tx_dict),
-            MPStuckTxListLoop(self._executor_mng, self._stuck_tx_dict),
-            asyncio.get_event_loop().create_task(self._process_tx_result_loop()),
-            asyncio.get_event_loop().create_task(self._process_tx_schedule_loop()),
-            asyncio.get_event_loop().create_task(self._process_tx_dict_clear_loop())
-        ])
+        self._async_task_list.extend(
+            [
+                self._free_alt_queue_task_loop,
+                MPSenderTxCntTaskLoop(self._executor_mng, self._tx_schedule_dict),
+                MPOpResGetListTaskLoop(self._executor_mng, self._op_res_mng),
+                MPInitOpResTaskLoop(self._executor_mng, self._op_res_mng, self._stuck_tx_dict),
+                MPStuckTxListLoop(self._executor_mng, self._stuck_tx_dict),
+                asyncio.get_event_loop().create_task(self._process_tx_result_loop()),
+                asyncio.get_event_loop().create_task(self._process_tx_schedule_loop()),
+                asyncio.get_event_loop().create_task(self._process_tx_dict_clear_loop()),
+            ]
+        )
 
     def _create_kick_tx_schedule_task(self) -> None:
         asyncio.get_event_loop().create_task(self._kick_tx_schedule())
-    
+
     async def _process_eviction_loop(self) -> None:
         while True:
             for tx_schedule in self._tx_schedule_dict.values():
