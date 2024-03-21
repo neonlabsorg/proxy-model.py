@@ -14,12 +14,16 @@ from spl.token.constants import TOKEN_PROGRAM_ID
 import spl.token.instructions as SplTokenIxs
 
 from proxy.common_neon.metaplex import create_metadata_instruction_data, create_metadata_instruction
+from proxy.common_neon.operator_resource_info import build_test_resource_info
 from proxy.common_neon.solana_tx import SolAccountMeta, SolTxIx, SolAccount, SolPubKey
 from proxy.common_neon.neon_instruction import NeonIxBuilder
 from proxy.common_neon.erc20_wrapper import ERC20Wrapper
 from proxy.common_neon.config import Config
 from proxy.common_neon.constants import EVM_PROGRAM_ID
 from proxy.common_neon.solana_tx_legacy import SolLegacyTx
+
+from proxy.mempool.mempool_executor_task_op_res import OpResInit
+from proxy.neon_core_api.neon_client import NeonClient
 
 from proxy.testing.testing_helpers import Proxy, SolClient, NeonLocalAccount
 
@@ -38,9 +42,11 @@ class FakeConfig(Config):
 class TestGasTankIntegration(TestCase):
     proxy: Proxy
     admin: NeonLocalAccount
+    neon_client: NeonClient
     solana: SolClient
     config: Config
     mint_authority: SolAccount
+    holder_account: SolAccount
     token: SplToken
     erc20_for_spl: ERC20Wrapper
     solana: SolClient
@@ -51,10 +57,20 @@ class TestGasTankIntegration(TestCase):
         cls.admin = cls.proxy.create_signer_account('neonlabsorg/proxy-model.py/issues/344/admin20')
         cls.config = FakeConfig()
         cls.solana = SolClient(cls.config)
+        cls.neon_client = NeonClient(cls.config)
         cls.create_token_mint()
         cls.deploy_erc20_for_spl()
         cls.acc_num = 0
         cls.neon_ix_builder = NeonIxBuilder(cls.mint_authority)
+
+        # Create a test resource to have a holder account in-place.
+        resource = build_test_resource_info(
+            cls.neon_client,
+            private_key=cls.mint_authority.secret(),
+            res_id=1337
+        )
+        OpResInit(cls.config, cls.solana, cls.neon_client).init_resource(resource)
+        cls.holder_account = resource.holder_account
 
     @classmethod
     def create_token_mint(cls):
@@ -207,7 +223,7 @@ class TestGasTankIntegration(TestCase):
                     to_acct=to_neon_acct,
                     amount=transfer_amount,
                     signer_acct=signer_acct,
-                ).make_tx_exec_from_data_ix()
+                ).init_iterative(self.holder_account).make_tx_exec_from_data_ix()
             ]
         )
 
@@ -271,7 +287,7 @@ class TestGasTankIntegration(TestCase):
                     amount=transfer_amount1,
                     signer_acct=signer_acct,
                     nonce=0
-                ).make_tx_exec_from_data_ix(),
+                ).init_iterative(self.holder_account).make_tx_exec_from_data_ix(),
                 self.erc20_for_spl.create_claim_to_ix(
                     owner=from_owner.pubkey(),
                     from_acct=from_spl_token_acct,
@@ -279,7 +295,7 @@ class TestGasTankIntegration(TestCase):
                     amount=transfer_amount2,
                     signer_acct=signer_acct,
                     nonce=1
-                ).make_tx_exec_from_data_ix()
+                ).init_iterative(self.holder_account).make_tx_exec_from_data_ix()
             ]
         )
         self.solana.send_tx(tx, from_owner)
@@ -344,7 +360,7 @@ class TestGasTankIntegration(TestCase):
                     to_acct=to_neon_acct,
                     amount=transfer_amount,
                     signer_acct=signer_acct,
-                ).make_tx_exec_from_data_ix()
+                ).init_iterative(self.holder_account).make_tx_exec_from_data_ix()
             ]
         )
 
@@ -394,7 +410,7 @@ class TestGasTankIntegration(TestCase):
                     to_acct=to_neon_acct,
                     amount=transfer_amount,
                     signer_acct=signer_acct,
-                ).make_tx_exec_from_data_ix()
+                ).init_iterative(self.holder_account).make_tx_exec_from_data_ix()
             ]
         )
         self.solana.send_tx(tx, from_owner, skip_preflight=True)

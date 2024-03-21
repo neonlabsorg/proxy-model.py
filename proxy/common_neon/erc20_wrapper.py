@@ -178,6 +178,7 @@ class ERC20Wrapper:
         neon.init_operator_neon(SolPubKey.from_string(pda_acct))
         neon.init_neon_tx(NeonTx.from_string(neon_tx))
         neon.init_neon_account_list(neon_account_dict)
+        #TODO: init_iterative?
         return neon
 
     def mint_to(self, destination: Union[SolPubKey, str], amount: int) -> RPCResponse:

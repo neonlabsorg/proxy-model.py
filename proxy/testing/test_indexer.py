@@ -171,7 +171,7 @@ class CompleteTest(unittest.TestCase):
                 neon_ix_builder.make_tx_step_from_data_ix(10, 1)
             ]
         )
-        cls.solana.send_tx(tx, signer)
+        cls.solana.send_tx(tx, signer, skip_preflight=True)
 
     @classmethod
     def create_invoked_transaction(cls):
@@ -209,7 +209,7 @@ class CompleteTest(unittest.TestCase):
             ]
         )
 
-        cls.solana.send_tx(tx, signer)
+        cls.solana.send_tx(tx, signer, skip_preflight=True)
 
     @classmethod
     def create_invoked_transaction_combined(cls):
@@ -247,7 +247,7 @@ class CompleteTest(unittest.TestCase):
             ]
         )
 
-        cls.solana.send_tx(tx, signer)
+        cls.solana.send_tx(tx, signer, skip_preflight=True)
 
     @classmethod
     def create_two_calls_in_transaction(cls):
@@ -292,7 +292,7 @@ class CompleteTest(unittest.TestCase):
             ]
         )
 
-        cls.solana.send_tx(tx, signer)
+        cls.solana.send_tx(tx, signer, skip_preflight=True)
 
     # @unittest.skip("a.i.")
     def test_01_completed(self):
