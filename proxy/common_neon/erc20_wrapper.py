@@ -155,7 +155,7 @@ class ERC20Wrapper:
             to_acct.address,
             amount
         ).build_transaction(
-            {'nonce': nonce, 'gasPrice': 0}
+            {'nonce': nonce, 'gasPrice': 0, 'from': signer_acct.address}
         )
         return self._create_builder(claim_tx, owner, signer_acct)
 
