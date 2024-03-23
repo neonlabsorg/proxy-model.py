@@ -380,6 +380,8 @@ class SolInteractor:
         net_block = response.get('result', None)
         if net_block is None:
             error = get_from_dict(response, ('error', 'message'), None)
+            if error:
+                LOG.error(f"Error on slot {slot}: {error}")
             return SolBlockInfo(block_slot=slot, error=error)
 
         return SolBlockInfo(
