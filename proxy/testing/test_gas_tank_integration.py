@@ -50,6 +50,7 @@ class TestGasTankIntegration(TestCase):
     token: SplToken
     erc20_for_spl: ERC20Wrapper
     solana: SolClient
+    res_id: int
 
     @classmethod
     def setUpClass(cls):
@@ -62,15 +63,7 @@ class TestGasTankIntegration(TestCase):
         cls.deploy_erc20_for_spl()
         cls.acc_num = 0
         cls.neon_ix_builder = NeonIxBuilder(cls.mint_authority)
-
-        # Create a test resource to have a holder account in-place.
-        resource = build_test_resource_info(
-            cls.neon_client,
-            private_key=cls.mint_authority.secret(),
-            res_id=1337
-        )
-        OpResInit(cls.config, cls.solana, cls.neon_client).init_resource(resource)
-        cls.holder_account = resource.holder_account
+        cls.res_id = 1337
 
     @classmethod
     def create_token_mint(cls):
@@ -134,11 +127,21 @@ class TestGasTankIntegration(TestCase):
         acct_info = cls.proxy.get_account_info(neon_address)
         return neon_ix_builder.make_create_neon_account_ix(acct_info)
 
-    def create_sol_account(self):
+    def create_signer_account(self):
         account = SolAccount()
         print(f"New solana account created: {account.pubkey()}. Airdropping SOL...")
-        self.solana.request_airdrop(account.pubkey(), 1000_000_000_000)
-        return account
+        self.solana.request_airdrop(account.pubkey(), 20_000_000_000)
+        sleep(0.8)
+
+        # Create a test resource to have a holder account in-place.
+        self.__class__.res_id += 1
+        resource = build_test_resource_info(
+            self.neon_client,
+            private_key=account.secret(),
+            res_id=self.__class__.res_id
+        )
+        OpResInit(self.config, self.solana, self.neon_client).init_resource(resource)
+        return account, resource.holder_account
 
     def create_token_account(self, owner: SolPubKey, mint_amount: int):
         new_token_account = self.erc20_for_spl.create_associated_token_account(owner)
@@ -191,7 +194,7 @@ class TestGasTankIntegration(TestCase):
         return gas_price
 
     def test_success_gas_less_simple_case(self):
-        from_owner = self.create_sol_account()
+        from_owner, holder = self.create_signer_account()
         mint_amount = 1000_000_000_000
         from_spl_token_acc = self.create_token_account(from_owner.pubkey(), mint_amount)
         signer_acct = self.create_neon_account()
@@ -219,11 +222,12 @@ class TestGasTankIntegration(TestCase):
                 )),
                 self.erc20_for_spl.create_claim_to_ix(
                     owner=from_owner.pubkey(),
+                    holder=holder,
                     from_acct=from_spl_token_acc,
                     to_acct=to_neon_acct,
                     amount=transfer_amount,
                     signer_acct=signer_acct,
-                ).init_iterative(self.holder_account).make_tx_exec_from_data_ix()
+                ).make_tx_exec_from_data_ix()
             ]
         )
 
@@ -246,7 +250,7 @@ class TestGasTankIntegration(TestCase):
 
     @unittest.skip('SolTx is too big')
     def test_success_gas_less_complex_case(self):
-        from_owner = self.create_sol_account()
+        from_owner, holder = self.create_signer_account()
         mint_amount = 1000_000_000_000
         from_spl_token_acct = self.create_token_account(from_owner.pubkey(), mint_amount)
         to_neon_acct1 = self.create_neon_account()
@@ -282,20 +286,22 @@ class TestGasTankIntegration(TestCase):
                 )),
                 self.erc20_for_spl.create_claim_to_ix(
                     owner=from_owner.pubkey(),
+                    holder=holder,
                     from_acct=from_spl_token_acct,
                     to_acct=to_neon_acct1,
                     amount=transfer_amount1,
                     signer_acct=signer_acct,
                     nonce=0
-                ).init_iterative(self.holder_account).make_tx_exec_from_data_ix(),
+                ).make_tx_exec_from_data_ix(),
                 self.erc20_for_spl.create_claim_to_ix(
                     owner=from_owner.pubkey(),
+                    holder=holder,
                     from_acct=from_spl_token_acct,
                     to_acct=to_neon_acct2,
                     amount=transfer_amount2,
                     signer_acct=signer_acct,
                     nonce=1
-                ).init_iterative(self.holder_account).make_tx_exec_from_data_ix()
+                ).make_tx_exec_from_data_ix()
             ]
         )
         self.solana.send_tx(tx, from_owner)
@@ -324,7 +330,7 @@ class TestGasTankIntegration(TestCase):
         self.assertEqual(gas_price2, 0)
 
     def test_no_gas_less_tx(self):
-        from_owner = self.create_sol_account()
+        from_owner, holder = self.create_signer_account()
         mint_amount = 1000_000_000_000
         from_spl_token_acc = self.create_token_account(from_owner.pubkey(), mint_amount)
         to_neon_acct = self.create_neon_account()
@@ -356,11 +362,12 @@ class TestGasTankIntegration(TestCase):
                 )),
                 self.erc20_for_spl.create_claim_to_ix(
                     owner=from_owner.pubkey(),
+                    holder=holder,
                     from_acct=from_spl_token_acc,
                     to_acct=to_neon_acct,
                     amount=transfer_amount,
                     signer_acct=signer_acct,
-                ).init_iterative(self.holder_account).make_tx_exec_from_data_ix()
+                ).make_tx_exec_from_data_ix()
             ]
         )
 
@@ -384,7 +391,7 @@ class TestGasTankIntegration(TestCase):
     @unittest.skip('claimTo fails SolTx')
     def test_failed_gas_less_tx(self):
         """Should fail because approve is given to wrong account"""
-        from_owner = self.create_sol_account()
+        from_owner, holder = self.create_signer_account()
         mint_amount = 1000_000_000_000
         from_spl_token_acc = self.create_token_account(from_owner.pubkey(), mint_amount)
         signer_acct = self.create_neon_account()
@@ -406,11 +413,12 @@ class TestGasTankIntegration(TestCase):
                 self.create_account_instruction(signer_acct.address, from_owner.pubkey()),
                 self.erc20_for_spl.create_claim_to_ix(
                     owner=from_owner.pubkey(),
+                    holder=holder,
                     from_acct=from_spl_token_acc,
                     to_acct=to_neon_acct,
                     amount=transfer_amount,
                     signer_acct=signer_acct,
-                ).init_iterative(self.holder_account).make_tx_exec_from_data_ix()
+                ).make_tx_exec_from_data_ix()
             ]
         )
         self.solana.send_tx(tx, from_owner, skip_preflight=True)
