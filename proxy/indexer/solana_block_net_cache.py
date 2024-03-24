@@ -74,10 +74,6 @@ class SolBlockNetCache:
         while slot >= root_slot:
             sol_block = self._get_sol_block(slot)
             if sol_block.is_empty():
-                if not len(block_queue):
-                    slot -= 1
-                    continue
-
                 msg = f'Fail to get block {slot} (for child {child_slot})'
                 if sol_block.has_error():
                     msg = msg + ': ' + sol_block.error

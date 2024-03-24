@@ -179,9 +179,7 @@ class Indexer:
 
         if (holder_slot is not None) and (tx_slot is not None) and (holder_slot != tx_slot):
             LOG.warning(f'Holder stuck block {holder_slot} != tx stuck block {tx_slot}')
-            neon_holder_list.clear()
-            neon_tx_list.clear()
-            alt_info_list.clear()
+            stuck_slot = min(holder_slot, tx_slot)
 
         elif tx_slot is not None:
             stuck_slot = tx_slot
@@ -203,6 +201,10 @@ class Indexer:
         if neon_block:
             pass
         elif dctx.has_neon_block():
+            if dctx.neon_block.block_slot != sol_block.parent_block_slot:
+                raise SolHistoryNotFound(
+                    f"Wrong root block {dctx.neon_block.block_slot} for the slot {sol_block.block_slot}"
+                )
             neon_block = NeonIndexedBlockInfo.from_block(dctx.neon_block, sol_block)
         else:
             neon_block = self._new_neon_block(dctx, sol_block)

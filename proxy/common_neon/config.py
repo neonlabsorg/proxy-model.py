@@ -151,7 +151,7 @@ class Config(DBConfig):
         self._indexer_poll_block_cnt = self._env_num('INDEXER_POLL_BLOCK_COUNT', 32, 3, 1024)
         self._indexer_check_msec = self._env_num('INDEXER_CHECK_MSEC', 200, 50, 10_000)
         self._stuck_obj_blockout = self._env_num('STUCK_OBJECT_BLOCKOUT', 64, 16, 1024)
-        self._stuck_obj_validate_blockout = self._env_num('STUCK_OBJECT_VALIDATE_BLOCKOUT', 32000, 512, 1024 * 1024)
+        self._stuck_obj_validate_blockout = self._env_num('STUCK_OBJECT_VALIDATE_BLOCKOUT', 10000, 512, 1024 * 1024)
         self._alt_freeing_depth = self._env_num('ALT_FREEING_DEPTH', 512 + 16, 512, 1024)
         self._metrics_log_skip_cnt = self._env_num('METRICS_LOG_SKIP_COUNT', 1000, 1, 100_000)
 
