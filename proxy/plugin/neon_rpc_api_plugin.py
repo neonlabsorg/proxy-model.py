@@ -81,7 +81,7 @@ class NeonRpcApiPlugin(HttpWebServerBasePlugin):
         rpc_value = request.get(name, None)
         return self._sanitize_value(rpc_value)
 
-    def _process_request(self, request: Dict[str, Any]) -> Dict[str, Any]:
+    def _process_request(self, client_ip: str, request: Dict[str, Any]) -> Dict[str, Any]:
         response = {
             'jsonrpc': '2.0',
             'id': self._get_request_value(request, 'id')
@@ -116,10 +116,11 @@ class NeonRpcApiPlugin(HttpWebServerBasePlugin):
         resp_time_ms = (time.time() - start_time) * 1000  # convert this into milliseconds
 
         LOG.info(
-            'handle_request >>> %s 0x%0x %s %s resp_time_ms= %s',
+            'handle_request >>> %s 0x%0x %s %s %s resp_time_ms= %s',
             threading.get_ident(),
             id(self._model),
             response,
+            client_ip,
             rpc_method,
             resp_time_ms
         )
@@ -157,6 +158,10 @@ class NeonRpcApiPlugin(HttpWebServerBasePlugin):
                 })))
             return
 
+        client_ip = 'x.x.x.x'
+        if request.has_header(b'X-Forwarded-For'):
+            client_ip = str(request.header(b'X-Forwarded-For').split(b',')[0].strip())
+
         try:
             request = json.loads(request.body)
             LOG.info(
@@ -168,9 +173,9 @@ class NeonRpcApiPlugin(HttpWebServerBasePlugin):
                 if len(request) == 0:
                     raise Exception("Empty batch request")
                 for r in request:
-                    response.append(self._process_request(r))
+                    response.append(self._process_request(client_ip, r))
             elif isinstance(request, dict):
-                response = self._process_request(request)
+                response = self._process_request(client_ip, request)
             else:
                 raise Exception("Invalid request")
         except Exception as err:
