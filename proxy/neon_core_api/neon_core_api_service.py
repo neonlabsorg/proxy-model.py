@@ -88,10 +88,11 @@ class _Service:
                 line = process.stdout.readline()
                 if line:
                     if not self._config.debug_core_api:
-                        line = self._ansi_escape.sub('', line).replace('"', "'")
-                        pos = line.find(' ', self._skip_len) + 1
-                        line = line[pos:-1]
-                        LOG.debug(line)
+                        continue
+                    line = self._ansi_escape.sub('', line).replace('"', "'")
+                    pos = line.find(' ', self._skip_len) + 1
+                    line = line[pos:-1]
+                    LOG.debug(line)
                 elif process.poll() is not None:
                     break
 
