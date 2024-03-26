@@ -165,7 +165,7 @@ class NeonRpcApiPlugin(HttpWebServerBasePlugin):
 
         client_ip = request.address
         if request.has_header(b'X-Forwarded-For'):
-            client_ip = request.header(b'X-Forwarded-For').split(b',')[0].strip()
+            client_ip = request.header(b'X-Forwarded-For').split(b',')[0].strip().decode("utf-8")
 
         try:
             request_path = bytes.decode(request.path or b'/', 'utf8')
