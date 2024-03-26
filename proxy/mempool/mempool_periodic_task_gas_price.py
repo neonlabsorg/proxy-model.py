@@ -1,10 +1,11 @@
 import abc
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from .executor_mng import MPExecutorMng
 from .mempool_api import MPGasPriceTokenRequest, MPGasPriceRequest, MPGasPriceResult
 from .mempool_periodic_task import MPPeriodicTaskLoop
 
+from ..common_neon.config import Config
 from ..common_neon.constants import ONE_BLOCK_SEC
 from ..common_neon.evm_config import EVMConfig
 from ..common_neon.solana_tx import SolPubKey
@@ -18,10 +19,13 @@ class IGasPriceUser(abc.ABC):
 class MPGasPriceTaskLoop(MPPeriodicTaskLoop[MPGasPriceRequest, MPGasPriceResult]):
     _default_sleep_sec = ONE_BLOCK_SEC * 16
 
-    def __init__(self, executor_mng: MPExecutorMng, user: IGasPriceUser) -> None:
+    def __init__(self, config: Config, executor_mng: MPExecutorMng, user: IGasPriceUser) -> None:
         super().__init__(name='gas-price', sleep_sec=self._default_sleep_sec, executor_mng=executor_mng)
         self._user = user
         self._gas_price: Optional[MPGasPriceResult] = None
+        self._min_executable_gas_prices: Dict[str, List[int]] = dict()
+        self._min_executable_gas_prices_count: int = int(
+            60 / self._default_sleep_sec * config.mempool_gas_price_window)
 
     def _submit_request(self) -> None:
         req_id = self._generate_req_id()
@@ -60,5 +64,22 @@ class MPGasPriceTaskLoop(MPPeriodicTaskLoop[MPGasPriceRequest, MPGasPriceResult]
         pass
 
     async def _process_result(self, _: MPGasPriceRequest, mp_res: MPGasPriceResult) -> None:
+        for token_list in mp_res.token_list:
+            chain_id_token_name = f'{token_list.chain_id}:{token_list.token_name}'
+
+            if chain_id_token_name not in self._min_executable_gas_prices:
+                self._min_executable_gas_prices[chain_id_token_name] = list()
+
+            if token_list.min_executable_gas_price > 0:
+                self._min_executable_gas_prices[chain_id_token_name].append(token_list.min_executable_gas_price)
+
+                while self._min_executable_gas_prices_count <= len(self._min_executable_gas_prices[chain_id_token_name]):
+                    self._min_executable_gas_prices[chain_id_token_name].pop(0)
+
+            min_executable_gas_price = min(self._min_executable_gas_prices[chain_id_token_name])
+
+            if min_executable_gas_price > 0:
+               token_list.up_min_executable_gas_price(min_executable_gas_price)
+
         self._gas_price = mp_res
         self._user.on_gas_price(mp_res)

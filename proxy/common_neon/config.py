@@ -91,6 +91,7 @@ class Config(DBConfig):
         self._mempool_capacity_high_watermark = self._env_num('MEMPOOL_CAPACITY_HIGH_WATERMARK', 0.9 , 0, 1)
         self._mempool_eviction_timeout_sec = self._env_num('MEMPOOL_EVICTION_TIMEOUT_SEC', 60 * 60 * 3, 10, None)
         self._mempool_executor_limit_cnt = self._env_num('MEMPOOL_EXECUTOR_LIMIT_COUNT', 128, 4, 1024)
+        self._mempool_gas_price_window = self._env_num('MEMPOOL_GAS_PRICE_WINDOW', 10, 1, None)
         self._mempool_cache_life_sec = self._env_num(
             'MEMPOOL_CACHE_LIFE_SEC',
             30 * 60,  # 30 min
@@ -410,6 +411,10 @@ class Config(DBConfig):
     @property
     def mempool_executor_limit_cnt(self) -> int:
         return self._mempool_executor_limit_cnt
+
+    @property
+    def mempool_gas_price_window(self) -> int:
+        return self._mempool_gas_price_window
 
     @property
     def mempool_cache_life_sec(self) -> int:

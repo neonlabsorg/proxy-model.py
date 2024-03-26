@@ -494,7 +494,7 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
             return
         self._has_evm_config = True
 
-        self._async_task_list.append(MPGasPriceTaskLoop(self._executor_mng, self))
+        self._async_task_list.append(MPGasPriceTaskLoop(self._config, self._executor_mng, self))
 
     def on_gas_price(self, gas_price: MPGasPriceResult) -> None:
         self._gas_price = gas_price

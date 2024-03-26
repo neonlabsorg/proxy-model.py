@@ -372,6 +372,9 @@ class MPGasPriceTokenResult:
 
     is_overloaded: bool = False
 
+    def up_min_executable_gas_price(self, min_executable_gas_price: int) -> None:
+        object.__setattr__(self, 'min_executable_gas_price', min_executable_gas_price)
+
     def up_suggested_gas_price(self, min_gas_price: int) -> None:
         if self.suggested_gas_price < min_gas_price:
             object.__setattr__(self, 'suggested_gas_price', min_gas_price)
