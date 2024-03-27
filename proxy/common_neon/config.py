@@ -15,12 +15,12 @@ LOG = logging.getLogger(__name__)
 
 
 class StartSlot:
-    _NameType = NewType('StartSlot', str)
+    _NameType = NewType("StartSlot", str)
     Type = Union[int, _NameType]
 
-    Continue = _NameType('CONTINUE')
-    Latest = _NameType('LATEST')
-    Disable = _NameType('DISABLE')
+    Continue = _NameType("CONTINUE")
+    Latest = _NameType("LATEST")
+    Disable = _NameType("DISABLE")
 
     @staticmethod
     def to_type(value: Union[str, int]) -> Type:
@@ -35,174 +35,154 @@ class StartSlot:
 
 def parse_solana_ws_url(solana_url: str) -> str:
     parsed_solana_url = urlparse(solana_url)
-    scheme = 'wss' if parsed_solana_url.scheme == 'https' else 'ws'
+    scheme = "wss" if parsed_solana_url.scheme == "https" else "ws"
 
     if parsed_solana_url.port is not None:
         port = parsed_solana_url.port + 1
-        netloc = f'{parsed_solana_url.hostname}:{port}'
+        netloc = f"{parsed_solana_url.hostname}:{port}"
     else:
         netloc = parsed_solana_url.netloc
 
-    parsed_solana_ws_url = parsed_solana_url._replace(
-        scheme=scheme,
-        netloc=netloc
-    )
+    parsed_solana_ws_url = parsed_solana_url._replace(scheme=scheme, netloc=netloc)
 
     return parsed_solana_ws_url.geturl()
 
 
 class Config(DBConfig):
-    start_slot_name = 'START_SLOT'
-    reindex_start_slot_name = 'REINDEX_START_SLOT'
-    reindex_thread_cnt_name = 'REINDEX_THREAD_COUNT'
+    start_slot_name = "START_SLOT"
+    reindex_start_slot_name = "REINDEX_START_SLOT"
+    reindex_thread_cnt_name = "REINDEX_THREAD_COUNT"
 
     def __init__(self):
         super().__init__()
 
-        self._solana_url_list = self._split_str(os.environ.get('SOLANA_URL', ''))
+        self._solana_url_list = self._split_str(os.environ.get("SOLANA_URL", ""))
         if not len(self._solana_url_list):
             # LOG.warning('SOLANA_URL is not defined, force to use the default value')
-            self._solana_url_list = ['http://localhost:8899']
+            self._solana_url_list = ["http://localhost:8899"]
 
-        self._solana_timeout = self._env_num('SOLANA_TIMEOUT', Decimal('60.0'), Decimal('1.0'), Decimal('3600'))
-        self._hide_solana_url = self._env_bool('HIDE_SOLANA_URL', True)
+        self._solana_timeout = self._env_num("SOLANA_TIMEOUT", Decimal("60.0"), Decimal("1.0"), Decimal("3600"))
+        self._hide_solana_url = self._env_bool("HIDE_SOLANA_URL", True)
 
-        self._solana_ws_url_list = self._split_str(os.environ.get('SOLANA_WS_URL', ''))
+        self._solana_ws_url_list = self._split_str(os.environ.get("SOLANA_WS_URL", ""))
         if not len(self._solana_ws_url_list):
             # LOG.debug('SOLANA_WS_URL is not defined, force to use the default value calculated from the SOLANA_URL')
             self._solana_ws_url_list = [parse_solana_ws_url(s) for s in self._solana_url_list]
 
-        self._enable_private_api = self._env_bool('ENABLE_PRIVATE_API', False)
-        self._enable_send_tx_api = self._env_bool('ENABLE_SEND_TX_API', True)
-        self._use_earliest_block_if_0_passed = self._env_bool('USE_EARLIEST_BLOCK_IF_0_PASSED', False)
-        self._max_evm_step_cnt_emulate = self._env_num('MAX_EVM_STEP_COUNT_TO_EMULATE', 500_000, 1000, 4_000_000)
-        self._gather_statistics = self._env_bool('GATHER_STATISTICS', False)
+        self._enable_private_api = self._env_bool("ENABLE_PRIVATE_API", False)
+        self._enable_send_tx_api = self._env_bool("ENABLE_SEND_TX_API", True)
+        self._use_earliest_block_if_0_passed = self._env_bool("USE_EARLIEST_BLOCK_IF_0_PASSED", False)
+        self._max_evm_step_cnt_emulate = self._env_num("MAX_EVM_STEP_COUNT_TO_EMULATE", 500_000, 1000, 4_000_000)
+        self._gather_statistics = self._env_bool("GATHER_STATISTICS", False)
 
         # Neon Core API settings
-        self._neon_core_api_port = self._env_num('NEON_CORE_API_PORT', 9195, 8000, 12000)
+        self._neon_core_api_port = self._env_num("NEON_CORE_API_PORT", 9195, 8000, 12000)
         self._solana_key_for_evm_config = self._validate_sol_acct(
-            'SOLANA_KEY_FOR_EVM_CONFIG',
-            os.environ.get('SOLANA_KEY_FOR_EVM_CONFIG', '')
+            "SOLANA_KEY_FOR_EVM_CONFIG", os.environ.get("SOLANA_KEY_FOR_EVM_CONFIG", "")
         )
-        self._debug_core_api = self._env_bool('DEBUG_CORE_API', False)
+        self._debug_core_api = self._env_bool("DEBUG_CORE_API", False)
 
         # Mempool limits
-        self._mempool_capacity = self._env_num('MEMPOOL_CAPACITY', 4096, 10, 4096 * 1024)
-        self._mempool_capacity_high_watermark = self._env_num('MEMPOOL_CAPACITY_HIGH_WATERMARK', 0.9 , 0, 1)
-        self._mempool_eviction_timeout_sec = self._env_num('MEMPOOL_EVICTION_TIMEOUT_SEC', 60 * 60 * 3, 10, None)
-        self._mempool_executor_limit_cnt = self._env_num('MEMPOOL_EXECUTOR_LIMIT_COUNT', 128, 4, 1024)
-        self._mempool_gas_price_window = self._env_num('MEMPOOL_GAS_PRICE_WINDOW', 10, 1, None)
+        self._mempool_capacity = self._env_num("MEMPOOL_CAPACITY", 4096, 10, 4096 * 1024)
+        self._mempool_capacity_high_watermark = self._env_num("MEMPOOL_CAPACITY_HIGH_WATERMARK", 0.9, 0, 1)
+        self._mempool_eviction_timeout_sec = self._env_num("MEMPOOL_EVICTION_TIMEOUT_SEC", 60 * 60 * 3, 10, None)
+        self._mempool_executor_limit_cnt = self._env_num("MEMPOOL_EXECUTOR_LIMIT_COUNT", 128, 4, 1024)
+        self._mempool_gas_price_window = self._env_num("MEMPOOL_GAS_PRICE_WINDOW", 10, 1, None)
         self._mempool_cache_life_sec = self._env_num(
-            'MEMPOOL_CACHE_LIFE_SEC',
-            30 * 60,  # 30 min
-            15,      # 15 sec
-            60 * 60   # 1 hour
+            "MEMPOOL_CACHE_LIFE_SEC", 30 * 60, 15, 60 * 60  # 30 min  # 15 sec  # 1 hour
         )
         self._mempool_reschedule_time_sec = self._env_num(
-            'MEMPOOL_RESCHEDULE_TIME_SEC',
-            ONE_BLOCK_SEC,
-            ONE_BLOCK_SEC / 4,
-            ONE_BLOCK_SEC * 1000
+            "MEMPOOL_RESCHEDULE_TIME_SEC", ONE_BLOCK_SEC, ONE_BLOCK_SEC / 4, ONE_BLOCK_SEC * 1000
         )
 
         # Transaction execution settings
-        self._retry_on_fail = self._env_num('RETRY_ON_FAIL', 10, 1, 50)
-        self._confirm_timeout_sec = self._env_num('CONFIRM_TIMEOUT_SEC', int(MIN_FINALIZE_SEC), 4, 32)
+        self._retry_on_fail = self._env_num("RETRY_ON_FAIL", 10, 1, 50)
+        self._confirm_timeout_sec = self._env_num("CONFIRM_TIMEOUT_SEC", int(MIN_FINALIZE_SEC), 4, 32)
         self._commit_type, self._commit_level = self._env_commit_level(
-            'COMMIT_LEVEL',
-            SolCommit.Confirmed,
-            SolCommit.Confirmed
+            "COMMIT_LEVEL", SolCommit.Confirmed, SolCommit.Confirmed
         )
-        self._max_tx_account_cnt = self._env_num('MAX_TX_ACCOUNT_COUNT', 64, 20, 256)
+        self._max_tx_account_cnt = self._env_num("MAX_TX_ACCOUNT_COUNT", 64, 20, 256)
 
         # Gas-Price settings
-        self._pyth_mapping_acct = self._env_sol_acct('PYTH_MAPPING_ACCOUNT')
+        self._pyth_mapping_acct = self._env_sol_acct("PYTH_MAPPING_ACCOUNT")
 
-        self._pp_solana_url_list = self._split_str(os.environ.get('PP_SOLANA_URL', ''))
+        self._pp_solana_url_list = self._split_str(os.environ.get("PP_SOLANA_URL", ""))
         if (self._pyth_mapping_acct is not None) and (not len(self._pp_solana_url_list)):
             # LOG.debug('PP_SOLANA_URL is not defined, force to use the default value (SOLANA_URL)')
             self._pp_solana_url_list = self._solana_url_list
 
         self._update_pyth_mapping_period_sec = self._env_num(
-            'UPDATE_PYTH_MAPPING_PERIOD_SEC',
-            60 * 60,  # 1 hour
-            10,  # 10 sec
-            24 * 60 * 60  # 1 day
+            "UPDATE_PYTH_MAPPING_PERIOD_SEC", 60 * 60, 10, 24 * 60 * 60  # 1 hour  # 10 sec  # 1 day
         )
-        self._operator_fee = self._env_num('OPERATOR_FEE', Decimal('0.1'), Decimal('0.0'), Decimal('100.0'))
-        self._gas_price_slippage = self._env_num('GAS_PRICE_SLIPPAGE', Decimal('0.1'), Decimal('0.0'), Decimal('100.0'))
-        self._cu_priority_fee = self._env_num('CU_PRIORITY_FEE', 0, 0, 1_000_000)
+        self._operator_fee = self._env_num("OPERATOR_FEE", Decimal("0.1"), Decimal("0.0"), Decimal("100.0"))
+        self._gas_price_slippage = self._env_num("GAS_PRICE_SLIPPAGE", Decimal("0.1"), Decimal("0.0"), Decimal("100.0"))
+        self._cu_priority_fee = self._env_num("CU_PRIORITY_FEE", 0, 0, 1_000_000)
 
-        min_gas_price = self._env_num('MINIMAL_GAS_PRICE', 1, 0, 100_000_000)
-        self._min_gas_price = min_gas_price * (10 ** 9)
-        self._min_wo_chainid_gas_price = self._env_num('MINIMAL_WO_CHAINID_GAS_PRICE', 10, 0, 100_000_000) * (10 ** 9)
-        self._allow_underpriced_tx_wo_chainid = self._env_bool('ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID', False)
+        min_gas_price = self._env_num("MINIMAL_GAS_PRICE", 1, 0, 100_000_000)
+        self._min_gas_price = min_gas_price * (10**9)
+        self._min_wo_chainid_gas_price = self._env_num("MINIMAL_WO_CHAINID_GAS_PRICE", 10, 0, 100_000_000) * (10**9)
+        self._allow_underpriced_tx_wo_chainid = self._env_bool("ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID", False)
 
-        self._const_gas_price = self._env_num('CONST_GAS_PRICE', -1, min_gas_price, 100_000_000) * (10 ** 9)
+        self._const_gas_price = self._env_num("CONST_GAS_PRICE", -1, min_gas_price, 100_000_000) * (10**9)
 
         # Operator resource settings
-        self._holder_size = self._env_num('HOLDER_SIZE', 256 * 1024, 1024, 10 * 1024 * 1024)
-        self._min_op_balance_to_warn = self._env_num('MIN_OPERATOR_BALANCE_TO_WARN', 9_000_000_000, 1)
-        self._min_op_balance_to_err = self._env_num('MIN_OPERATOR_BALANCE_TO_ERR', 1_000_000_000, 1)
-        self._perm_account_id = self._env_num('PERM_ACCOUNT_ID', 1, 1, 128)
-        self._perm_account_limit = self._env_num('PERM_ACCOUNT_LIMIT', 2, 1, 128)
-        self._recheck_used_resource_sec = self._env_num('RECHECK_USED_RESOURCE_SEC', 60, 10, 24 * 60 * 60)
-        self._recheck_resource_after_uses_cnt = self._env_num('RECHECK_RESOURCE_AFTER_USES_CNT', 60, 10, 1_000_000)
+        self._holder_size = self._env_num("HOLDER_SIZE", 256 * 1024, 1024, 10 * 1024 * 1024)
+        self._min_op_balance_to_warn = self._env_num("MIN_OPERATOR_BALANCE_TO_WARN", 9_000_000_000, 1)
+        self._min_op_balance_to_err = self._env_num("MIN_OPERATOR_BALANCE_TO_ERR", 1_000_000_000, 1)
+        self._perm_account_id = self._env_num("PERM_ACCOUNT_ID", 1, 1, 128)
+        self._perm_account_limit = self._env_num("PERM_ACCOUNT_LIMIT", 2, 1, 128)
+        self._recheck_used_resource_sec = self._env_num("RECHECK_USED_RESOURCE_SEC", 60, 10, 24 * 60 * 60)
+        self._recheck_resource_after_uses_cnt = self._env_num("RECHECK_RESOURCE_AFTER_USES_CNT", 60, 10, 1_000_000)
 
         # HashiCorp Vault for operator keys
-        self._hvac_url = os.environ.get('HVAC_URL', None)
-        self._hvac_token = os.environ.get('HVAC_TOKEN', None)
-        self._hvac_mount = os.environ.get('HVAC_MOUNT', None)
-        self._hvac_path = os.environ.get('HVAC_PATH', '')
+        self._hvac_url = os.environ.get("HVAC_URL", None)
+        self._hvac_token = os.environ.get("HVAC_TOKEN", None)
+        self._hvac_mount = os.environ.get("HVAC_MOUNT", None)
+        self._hvac_path = os.environ.get("HVAC_PATH", "")
 
         # Indexing settings
         self._start_slot = self._env_start_slot(self.start_slot_name, StartSlot.Latest)
-        self._indexer_poll_block_cnt = self._env_num('INDEXER_POLL_BLOCK_COUNT', 32, 3, 1024)
-        self._indexer_check_msec = self._env_num('INDEXER_CHECK_MSEC', 200, 50, 10_000)
-        self._stuck_obj_blockout = self._env_num('STUCK_OBJECT_BLOCKOUT', 64, 16, 1024)
-        self._stuck_obj_validate_blockout = self._env_num('STUCK_OBJECT_VALIDATE_BLOCKOUT', 10000, 512, 1024 * 1024)
-        self._alt_freeing_depth = self._env_num('ALT_FREEING_DEPTH', 512 + 16, 512, 1024)
-        self._metrics_log_skip_cnt = self._env_num('METRICS_LOG_SKIP_COUNT', 1000, 1, 100_000)
+        self._indexer_poll_block_cnt = self._env_num("INDEXER_POLL_BLOCK_COUNT", 32, 3, 1024)
+        self._indexer_check_msec = self._env_num("INDEXER_CHECK_MSEC", 200, 50, 10_000)
+        self._stuck_obj_blockout = self._env_num("STUCK_OBJECT_BLOCKOUT", 64, 16, 1024)
+        self._stuck_obj_validate_blockout = self._env_num("STUCK_OBJECT_VALIDATE_BLOCKOUT", 10000, 512, 1024 * 1024)
+        self._alt_freeing_depth = self._env_num("ALT_FREEING_DEPTH", 512 + 16, 512, 1024)
+        self._metrics_log_skip_cnt = self._env_num("METRICS_LOG_SKIP_COUNT", 1000, 1, 100_000)
 
-        self._op_acct_set = self._env_sol_acct_set('OPERATOR_ACCOUNT_LIST')
+        self._op_acct_set = self._env_sol_acct_set("OPERATOR_ACCOUNT_LIST")
 
         # Integration Indexer with Tracer API
-        self._slot_processing_delay = self._env_num('SLOT_PROCESSING_DELAY', 0, 0, 64)
-        self._ch_dsn_list = self._env_dsn_list('CLICKHOUSE_DSN_LIST')
+        self._slot_processing_delay = self._env_num("SLOT_PROCESSING_DELAY", 0, 0, 64)
+        self._ch_dsn_list = self._env_dsn_list("CLICKHOUSE_DSN_LIST")
 
         # Reindexing settings
         self._reindex_start_slot = self._env_start_slot(self.reindex_start_slot_name, StartSlot.Continue)
         self._reindex_thread_cnt = self._env_num(self.reindex_thread_cnt_name, 3, 0, 128)
         self._reindex_range_len = self._env_num(
-            'REINDEX_BLOCK_COUNT_IN_RANGE',
-            int(60 * 60 / ONE_BLOCK_SEC),      # 1  hour
-            int(10 * 60 / ONE_BLOCK_SEC),      # 10 minutes
-            int(24 * 60 * 60 / ONE_BLOCK_SEC)  # 1 day
+            "REINDEX_BLOCK_COUNT_IN_RANGE",
+            int(60 * 60 / ONE_BLOCK_SEC),  # 1  hour
+            int(10 * 60 / ONE_BLOCK_SEC),  # 10 minutes
+            int(24 * 60 * 60 / ONE_BLOCK_SEC),  # 1 day
         )
-        self._reindex_max_range_cnt = self._env_num('REINDEX_MAX_RANGE_COUNT', 128, 1, 256)
+        self._reindex_max_range_cnt = self._env_num("REINDEX_MAX_RANGE_COUNT", 128, 1, 256)
 
         # Gas-less configuration
-        self._gas_tank_parallel_request_cnt = self._env_num('GAS_TANK_PARALLEL_REQUEST_COUNT', 10, 1, 100)
-        self._gas_tank_poll_tx_cnt = self._env_num('GAS_TANK_POLL_TX_COUNT', 1000, 1, 1000)
-        self._gas_less_tx_max_nonce = self._env_num('GAS_LESS_MAX_TX_NONCE', 5, 1, 1000)
+        self._gas_tank_parallel_request_cnt = self._env_num("GAS_TANK_PARALLEL_REQUEST_COUNT", 10, 1, 100)
+        self._gas_tank_poll_tx_cnt = self._env_num("GAS_TANK_POLL_TX_COUNT", 1000, 1, 1000)
+        self._gas_less_tx_max_nonce = self._env_num("GAS_LESS_MAX_TX_NONCE", 5, 1, 1000)
         self._gas_less_tx_max_gas = self._env_num(
-            'GAS_LESS_MAX_GAS',
-            20_000_000,  # Estimated gas on Mora = 18 mln
-            21_000,
-            1_000_000_000
+            "GAS_LESS_MAX_GAS", 20_000_000, 21_000, 1_000_000_000  # Estimated gas on Mora = 18 mln
         )
 
         # Testing settings
-        self._fuzz_fail_pct = self._env_num('FUZZ_FAIL_PCT', 0, 0, 100)
+        self._fuzz_fail_pct = self._env_num("FUZZ_FAIL_PCT", 0, 0, 100)
 
     def _validate(self) -> None:
         assert (self._const_gas_price < 0) or (self._const_gas_price >= self._min_gas_price)
 
     @staticmethod
     def _env_commit_level(
-        name: str,
-        default_value: SolCommit.Type,
-        min_value: Optional[SolCommit.Type] = None
+        name: str, default_value: SolCommit.Type, min_value: Optional[SolCommit.Type] = None
     ) -> Tuple[SolCommit.Type, int]:
         default_level = SolCommit.to_level(default_value)
 
@@ -214,12 +194,12 @@ class Config(DBConfig):
             value = SolCommit.to_type(value.lower())
             value_level = SolCommit.to_level(value)
             if (min_value is not None) and (value_level < SolCommit.to_level(min_value)):
-                LOG.error(f'{name} cannot be less than min value {min_value}')
+                LOG.error(f"{name} cannot be less than min value {min_value}")
                 return default_value, default_level
 
             return value, value_level
         except (BaseException,):
-            LOG.error(f'Bad value for {name}, force to use default value {default_value}')
+            LOG.error(f"Bad value for {name}, force to use default value {default_value}")
             return default_value, default_level
 
     @staticmethod
@@ -227,7 +207,7 @@ class Config(DBConfig):
         try:
             return SolPubKey.from_string(value)
         except (BaseException,):
-            LOG.error(f'{name} contains bad Solana account {value}')
+            LOG.error(f"{name} contains bad Solana account {value}")
             return None
 
     def _env_sol_acct(self, name: str) -> Optional[SolPubKey]:
@@ -264,13 +244,13 @@ class Config(DBConfig):
         try:
             dsn_list = self._split_str(raw_dsn_list_str)
         except (BaseException,):
-            LOG.error(f'{name} contains bad value')
+            LOG.error(f"{name} contains bad value")
 
         return dsn_list
 
     @staticmethod
     def _split_str(src: str) -> List[str]:
-        return [s.strip() for s in re.split(r',|;|\s', src) if len(s.strip())]
+        return [s.strip() for s in re.split(r",|;|\s", src) if len(s.strip())]
 
     @staticmethod
     def _env_start_slot(name: str, default_value: StartSlot.Type) -> StartSlot.Type:
@@ -279,27 +259,28 @@ class Config(DBConfig):
             return default_value
         try:
             return StartSlot.to_type(value)
-        except (BaseException, ):
-            LOG.error(f'{name} has bad value {value}, force to the default value {default_value}')
+        except (BaseException,):
+            LOG.error(f"{name} has bad value {value}, force to the default value {default_value}")
             return default_value
 
     @staticmethod
     def _env_bool(name: str, default_value: bool) -> bool:
-        true_value_list = ('YES', 'ON', 'TRUE')
-        false_value_list = ('NO', 'OFF', 'FALSE')
+        true_value_list = ("YES", "ON", "TRUE")
+        false_value_list = ("NO", "OFF", "FALSE")
 
         value = os.environ.get(name, true_value_list[0] if default_value else false_value_list[0]).upper().strip()
         if (value not in true_value_list) and (value not in false_value_list):
-            LOG.error(f'{name} cannot be: {true_value_list} or {false_value_list}')
+            LOG.error(f"{name} cannot be: {true_value_list} or {false_value_list}")
             return default_value
 
         return value in true_value_list
 
     @staticmethod
     def _env_num(
-        name: str, default_value: Union[int, Decimal],
+        name: str,
+        default_value: Union[int, Decimal],
         min_value: Optional[Union[int, Decimal]] = None,
-        max_value: Optional[Union[int, Decimal]] = None
+        max_value: Optional[Union[int, Decimal]] = None,
     ) -> Union[int, Decimal]:
         value = os.environ.get(name, None)
         if value is None:
@@ -312,15 +293,15 @@ class Config(DBConfig):
                 value = Decimal(value)
 
             if (min_value is not None) and (value < min_value):
-                LOG.error(f'{name} cannot be less than min value {min_value}')
+                LOG.error(f"{name} cannot be less than min value {min_value}")
                 value = min_value
             elif (max_value is not None) and (value > max_value):
-                LOG.error(f'{name} cannot be bigger than max value {max_value}')
+                LOG.error(f"{name} cannot be bigger than max value {max_value}")
                 value = max_value
             return value
 
-        except (BaseException, ):
-            LOG.error(f'Bad value for {name}, force to use default value {default_value}')
+        except (BaseException,):
+            LOG.error(f"Bad value for {name}, force to use default value {default_value}")
             return default_value
 
     ###################
@@ -336,7 +317,7 @@ class Config(DBConfig):
     @staticmethod
     def _random_from_list(src_list: List[str]) -> str:
         if len(src_list) == 0:
-            return ''
+            return ""
         elif len(src_list) == 1:
             return src_list[0]
         return src_list[random.randrange(0, len(src_list))]
@@ -640,99 +621,86 @@ class Config(DBConfig):
 
     def as_dict(self) -> dict:
         config_dict = {
-            'EVM_LOADER_ID': EVM_PROGRAM_ID_STR,
-
-            'SOLANA_TIMEOUT': self.solana_timeout,
-            'HIDE_SOLANA_URL': self.hide_solana_url,
-
-            'ENABLE_PRIVATE_API': self.enable_private_api,
-            'ENABLE_SEND_TX_API': self.enable_send_tx_api,
-            'USE_EARLIEST_BLOCK_IF_0_PASSED': self.use_earliest_block_if_0_passed,
-            'MAX_EVM_STEP_COUNT_TO_EMULATE': self.max_evm_step_cnt_emulate,
-            'GATHER_STATISTICS': self.gather_statistics,
-
+            "EVM_LOADER_ID": EVM_PROGRAM_ID_STR,
+            "SOLANA_TIMEOUT": self.solana_timeout,
+            "HIDE_SOLANA_URL": self.hide_solana_url,
+            "ENABLE_PRIVATE_API": self.enable_private_api,
+            "ENABLE_SEND_TX_API": self.enable_send_tx_api,
+            "USE_EARLIEST_BLOCK_IF_0_PASSED": self.use_earliest_block_if_0_passed,
+            "MAX_EVM_STEP_COUNT_TO_EMULATE": self.max_evm_step_cnt_emulate,
+            "GATHER_STATISTICS": self.gather_statistics,
             # Neon Core API settings
-            'NEON_CORE_API_PORT': self.neon_core_api_port,
-            'SOLANA_KEY_FOR_EVM_CONFIG': str(self.solana_key_for_evm_config),
-            'DEBUG_CORE_API': self.debug_core_api,
-
+            "NEON_CORE_API_PORT": self.neon_core_api_port,
+            "SOLANA_KEY_FOR_EVM_CONFIG": str(self.solana_key_for_evm_config),
+            "DEBUG_CORE_API": self.debug_core_api,
             # Mempool settings
-            'MEMPOOL_CAPACITY': self.mempool_capacity,
-            'MEMPOOL_CAPACITY_HIGH_WATERMARK': self.mempool_capacity_high_watermark,
-            'MEMPOOL_EVICTION_TIMEOUT_SEC': self.mempool_eviction_timeout_sec,
-            'MEMPOOL_EXECUTOR_LIMIT_CNT': self.mempool_executor_limit_cnt,
-            'MEMPOOL_CACHE_LIFE_SEC': self.mempool_cache_life_sec,
-            'MEMPOOL_RESCHEDULE_TIME_SEC': self.mempool_reschedule_time_sec,
-
+            "MEMPOOL_CAPACITY": self.mempool_capacity,
+            "MEMPOOL_CAPACITY_HIGH_WATERMARK": self.mempool_capacity_high_watermark,
+            "MEMPOOL_EVICTION_TIMEOUT_SEC": self.mempool_eviction_timeout_sec,
+            "MEMPOOL_EXECUTOR_LIMIT_CNT": self.mempool_executor_limit_cnt,
+            "MEMPOOL_CACHE_LIFE_SEC": self.mempool_cache_life_sec,
+            "MEMPOOL_RESCHEDULE_TIME_SEC": self.mempool_reschedule_time_sec,
             # Transaction execution settings
-            'RETRY_ON_FAIL': self.retry_on_fail,
-            'CONFIRM_TIMEOUT_SEC': self.confirm_timeout_sec,
-            'COMMIT_LEVEL': self.commit_type,
-            'MAX_TX_ACCOUNT_COUNT': self.max_tx_account_cnt,
-
+            "RETRY_ON_FAIL": self.retry_on_fail,
+            "CONFIRM_TIMEOUT_SEC": self.confirm_timeout_sec,
+            "COMMIT_LEVEL": self.commit_type,
+            "MAX_TX_ACCOUNT_COUNT": self.max_tx_account_cnt,
             # Gas price settings
             # 'PP_SOLANA_URL': self.pyth_solana_url,
-            'PYTH_MAPPING_ACCOUNT': str(self.pyth_mapping_account),
-            'UPDATE_PYTH_MAPPING_PERIOD_SEC': self.update_pyth_mapping_period_sec,
-            'OPERATOR_FEE': self.operator_fee,
-            'GAS_PRICE_SLIPPAGE': self.gas_price_slippage,
-            'CU_PRIORITY_FEE': self.cu_priority_fee,
-
-            'MINIMAL_GAS_PRICE': self.min_gas_price,
-            'MINIMAL_WO_CHAINID_GAS_PRICE': self.min_wo_chainid_gas_price,
-            'ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID': self.allow_underpriced_tx_wo_chainid,
-
-            'CONST_GAS_PRICE': self.const_gas_price,
-
+            "PYTH_MAPPING_ACCOUNT": str(self.pyth_mapping_account),
+            "UPDATE_PYTH_MAPPING_PERIOD_SEC": self.update_pyth_mapping_period_sec,
+            "OPERATOR_FEE": self.operator_fee,
+            "GAS_PRICE_SLIPPAGE": self.gas_price_slippage,
+            "CU_PRIORITY_FEE": self.cu_priority_fee,
+            "MINIMAL_GAS_PRICE": self.min_gas_price,
+            "MINIMAL_WO_CHAINID_GAS_PRICE": self.min_wo_chainid_gas_price,
+            "ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID": self.allow_underpriced_tx_wo_chainid,
+            "CONST_GAS_PRICE": self.const_gas_price,
             # Operator resources
-            'HOLDER_SIZE': self.holder_size,
-            'MIN_OPERATOR_BALANCE_TO_WARN': self.min_operator_balance_to_warn,
-            'MIN_OPERATOR_BALANCE_TO_ERR': self.min_operator_balance_to_err,
-            'PERM_ACCOUNT_ID': self.perm_account_id,
-            'PERM_ACCOUNT_LIMIT': self.perm_account_limit,
-            'RECHECK_USED_RESOURCE_SEC': self.recheck_used_resource_sec,
-            'RECHECK_RESOURCE_AFTER_USES_CNT': self.recheck_resource_after_uses_cnt,
-
+            "HOLDER_SIZE": self.holder_size,
+            "MIN_OPERATOR_BALANCE_TO_WARN": self.min_operator_balance_to_warn,
+            "MIN_OPERATOR_BALANCE_TO_ERR": self.min_operator_balance_to_err,
+            "PERM_ACCOUNT_ID": self.perm_account_id,
+            "PERM_ACCOUNT_LIMIT": self.perm_account_limit,
+            "RECHECK_USED_RESOURCE_SEC": self.recheck_used_resource_sec,
+            "RECHECK_RESOURCE_AFTER_USES_CNT": self.recheck_resource_after_uses_cnt,
             # Indexing settings
             self.start_slot_name: self.start_slot,
-            'INDEXER_POLL_BLOCK_COUNT': self.indexer_poll_block_cnt,
-            'INDEXER_CHECK_MSEC': self.indexer_check_msec,
-            'STUCK_OBJECT_BLOCKOUT': self.stuck_object_blockout,
-            'STUCK_OBJECT_VALIDATE_BLOCKOUT': self.stuck_object_validate_blockout,
-            'ALT_FREEING_DEPTH': self.alt_freeing_depth,
-            'METRICS_LOG_SKIP_COUNT': self.metrics_log_skip_cnt,
-            'OPERATOR_ACCOUNT_LIST': ';'.join(list(self.operator_account_set)),
-
+            "INDEXER_POLL_BLOCK_COUNT": self.indexer_poll_block_cnt,
+            "INDEXER_CHECK_MSEC": self.indexer_check_msec,
+            "STUCK_OBJECT_BLOCKOUT": self.stuck_object_blockout,
+            "STUCK_OBJECT_VALIDATE_BLOCKOUT": self.stuck_object_validate_blockout,
+            "ALT_FREEING_DEPTH": self.alt_freeing_depth,
+            "METRICS_LOG_SKIP_COUNT": self.metrics_log_skip_cnt,
+            "OPERATOR_ACCOUNT_LIST": ";".join(list(self.operator_account_set)),
             # HashiCorp Vault settings
             # 'HVAC_URL': self.hvac_url,
             # 'HVAC_TOKEN': self.hvac_token,
             # 'HVAC_PATH': self.hvac_path,
             # 'HVAC_MOUNT': self.hvac_mount,ga
-
             # Integration Indexer with Tracer API
-            'SLOT_PROCESSING_DELAY': self.slot_processing_delay,
+            "SLOT_PROCESSING_DELAY": self.slot_processing_delay,
             # 'CLICKHOUSE_DSN_LIST': ';'.join(self.ch_dsn_list),
-
             # Reindexing settings
             self.reindex_start_slot_name: self.reindex_start_slot,
             self.reindex_thread_cnt_name: self.reindex_thread_cnt,
-            'REINDEX_BLOCK_COUNT_IN_RANGE': self.reindex_range_len,
-            'REINDEX_MAX_RANGE_COUNT': self.reindex_max_range_cnt,
-
+            "REINDEX_BLOCK_COUNT_IN_RANGE": self.reindex_range_len,
+            "REINDEX_MAX_RANGE_COUNT": self.reindex_max_range_cnt,
             # Gas-less transaction configuration
-            'GAS_TANK_PARALLEL_REQUEST_COUNT': self.gas_tank_parallel_request_cnt,
-            'GAS_TANK_POLL_TX_COUNT': self.gas_tank_poll_tx_cnt,
-            'GAS_LESS_MAX_TX_NONCE': self.gas_less_tx_max_nonce,
-            'GAS_LESS_MAX_GAS': self.gas_less_tx_max_gas,
-
+            "GAS_TANK_PARALLEL_REQUEST_COUNT": self.gas_tank_parallel_request_cnt,
+            "GAS_TANK_POLL_TX_COUNT": self.gas_tank_poll_tx_cnt,
+            "GAS_LESS_MAX_TX_NONCE": self.gas_less_tx_max_nonce,
+            "GAS_LESS_MAX_GAS": self.gas_less_tx_max_gas,
             # Testing settings
-            'FUZZ_FAIL_PCT': self.fuzz_fail_pct,
+            "FUZZ_FAIL_PCT": self.fuzz_fail_pct,
         }
         if not self.hide_solana_url:
-            config_dict.update({
-                'SOLANA_URL': self.solana_url_list,
-                'SOLANA_WS_URL': self.solana_ws_url_list,
-                'PP_SOLANA_URL': self.pyth_solana_url_list
-            })
+            config_dict.update(
+                {
+                    "SOLANA_URL": self.solana_url_list,
+                    "SOLANA_WS_URL": self.solana_ws_url_list,
+                    "PP_SOLANA_URL": self.pyth_solana_url_list,
+                }
+            )
         config_dict.update(super().as_dict())
         return config_dict
