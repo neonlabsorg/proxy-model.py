@@ -81,7 +81,7 @@ class MPStuckTxInfo:
         return self.chain_id is not None
 
     def set_chain_id(self, chain_id: int) -> None:
-        object.__setattr__(self, 'chain_id', chain_id)
+        object.__setattr__(self, "chain_id", chain_id)
 
 
 @dataclass(frozen=True)
@@ -101,7 +101,7 @@ class MPTxRequest(MPRequest):
     @staticmethod
     def from_neon_tx(req_id: str, neon_tx: NeonTx, def_chain_id: int, neon_tx_exec_cfg: NeonTxExecCfg) -> MPTxRequest:
         neon_tx_info = NeonTxInfo.from_neon_tx(neon_tx)
-        chain_id = (neon_tx_info.chain_id or def_chain_id)
+        chain_id = neon_tx_info.chain_id or def_chain_id
         return MPTxRequest(
             req_id=req_id,
             neon_tx=neon_tx,
@@ -109,7 +109,7 @@ class MPTxRequest(MPRequest):
             neon_tx_exec_cfg=neon_tx_exec_cfg,
             chain_id=chain_id,
             gas_price=neon_tx.gasPrice,
-            start_time=time.time_ns()
+            start_time=time.time_ns(),
         )
 
     def __post_init__(self):
@@ -140,9 +140,7 @@ class MPTxExecRequest(MPTxRequest):
         return self.neon_tx is None
 
     @staticmethod
-    def from_tx_req(tx: MPTxRequest,
-                    res_info: OpResInfo,
-                    evm_config_data: EVMConfigInfo) -> MPTxExecRequest:
+    def from_tx_req(tx: MPTxRequest, res_info: OpResInfo, evm_config_data: EVMConfigInfo) -> MPTxExecRequest:
         return MPTxExecRequest(
             req_id=tx.req_id,
             neon_tx=tx.neon_tx,
@@ -152,14 +150,13 @@ class MPTxExecRequest(MPTxRequest):
             gas_price=tx.gas_price,
             start_time=tx.start_time,
             evm_config_data=evm_config_data,
-            res_info=res_info
+            res_info=res_info,
         )
 
     @staticmethod
-    def from_stuck_tx(stuck_tx: MPStuckTxInfo,
-                      neon_tx_exec_cfg: NeonTxExecCfg,
-                      res_info: OpResInfo,
-                      evm_config_data: EVMConfigInfo) -> MPTxExecRequest:
+    def from_stuck_tx(
+        stuck_tx: MPStuckTxInfo, neon_tx_exec_cfg: NeonTxExecCfg, res_info: OpResInfo, evm_config_data: EVMConfigInfo
+    ) -> MPTxExecRequest:
         return MPTxExecRequest(
             req_id=stuck_tx.req_id,
             neon_tx=None,
@@ -169,7 +166,7 @@ class MPTxExecRequest(MPTxRequest):
             gas_price=stuck_tx.neon_tx.gas_price,
             start_time=stuck_tx.start_time,
             evm_config_data=evm_config_data,
-            res_info=res_info
+            res_info=res_info,
         )
 
 
@@ -372,12 +369,12 @@ class MPGasPriceTokenResult:
     is_overloaded: bool = False
 
     def up_min_executable_gas_price(self, min_executable_gas_price: int) -> None:
-        object.__setattr__(self, 'min_executable_gas_price', min_executable_gas_price)
+        object.__setattr__(self, "min_executable_gas_price", min_executable_gas_price)
 
     def up_suggested_gas_price(self, min_gas_price: int) -> None:
         if self.suggested_gas_price < min_gas_price:
-            object.__setattr__(self, 'suggested_gas_price', min_gas_price)
-            object.__setattr__(self, 'is_overloaded', True)
+            object.__setattr__(self, "suggested_gas_price", min_gas_price)
+            object.__setattr__(self, "is_overloaded", True)
 
 
 @dataclass(frozen=True)
