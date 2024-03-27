@@ -65,18 +65,17 @@ class MPGasPriceTaskLoop(MPPeriodicTaskLoop[MPGasPriceRequest, MPGasPriceResult]
 
     async def _process_result(self, _: MPGasPriceRequest, mp_res: MPGasPriceResult) -> None:
         for token_list in mp_res.token_list:
-            chain_id_token_name = f'{token_list.chain_id}:{token_list.token_name}'
-
-            if chain_id_token_name not in self._min_executable_gas_prices:
-                self._min_executable_gas_prices[chain_id_token_name] = list()
+            if token_list.chain_id not in self._min_executable_gas_prices:
+                self._min_executable_gas_prices[token_list.chain_id] = list()
 
             if token_list.min_executable_gas_price > 0:
-                self._min_executable_gas_prices[chain_id_token_name].append(token_list.min_executable_gas_price)
+                min_executable_gas_prices = self._min_executable_gas_prices[token_list.chain_id]
+                min_executable_gas_prices.append(token_list.min_executable_gas_price)
 
-                while self._min_executable_gas_prices_count <= len(self._min_executable_gas_prices[chain_id_token_name]):
-                    self._min_executable_gas_prices[chain_id_token_name].pop(0)
+                while self._min_executable_gas_prices_count <= len(min_executable_gas_prices):
+                    min_executable_gas_prices.pop(0)
 
-            min_executable_gas_price = min(self._min_executable_gas_prices[chain_id_token_name])
+            min_executable_gas_price = min(min_executable_gas_prices)
 
             if min_executable_gas_price > 0:
                token_list.up_min_executable_gas_price(min_executable_gas_price)
