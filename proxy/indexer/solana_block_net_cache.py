@@ -115,9 +115,12 @@ class SolBlockNetCache:
             [(slot, ctx.sol_commit, True) for slot in empty_slot_list],
         )
         for block in block_list:
+            idx = self._calc_idx(block.block_slot)
+            if block.is_empty() and (not self._block_list[idx].is_empty()):
+                continue
             if not block.is_empty():
-                idx = self._calc_idx(block.block_slot)
-                self._block_list[idx] = block
+                LOG.debug(f"Load block: {block.block_slot}")
+            self._block_list[idx] = block
 
     def _extend_cache_with_empty_blocks(self, ctx: SolNeonDecoderCtx, base_slot: int, slot_list: List[int]) -> None:
         assert len(slot_list)
