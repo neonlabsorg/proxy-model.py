@@ -1034,7 +1034,7 @@ class SolNeonDecoderCtx:
     def has_neon_block(self) -> bool:
         return self._neon_block is not None
 
-    def complete_neon_block(self) -> None:
+    def add_neon_block_to_queue(self) -> None:
         def _last_neon_block_slot() -> int:
             if not len(self._neon_block_queue):
                 return self._start_slot - 1
@@ -1045,8 +1045,6 @@ class SolNeonDecoderCtx:
 
         if (not self._neon_block.is_done) and self._neon_block.is_corrupted:
             self._stat.inc_neon_corrupted_block_cnt()
-
-        self._neon_block = None
 
     def is_neon_block_queue_empty(self) -> bool:
         return len(self._neon_block_queue) == 0
