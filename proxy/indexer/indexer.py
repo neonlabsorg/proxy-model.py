@@ -87,28 +87,22 @@ class Indexer:
         dctx.clear_neon_block_queue()
 
     def _complete_neon_block(self, dctx: SolNeonDecoderCtx) -> None:
-        if not dctx.has_neon_block():
-            return
-
         neon_block = dctx.neon_block
+        neon_block.complete_block()
+        self._neon_block_dict.add_neon_block(neon_block)
         self._last_processed_slot = neon_block.block_slot
+        self._print_progress_stat()
+        self._commit_progress_stat()
 
+    def _add_neon_block_to_queue(self, dctx: SolNeonDecoderCtx) -> None:
         is_finalized = dctx.is_finalized()
-        if is_finalized:
+        neon_block = dctx.neon_block
+        if is_finalized and (not neon_block.is_finalized):
             neon_block.mark_finalized()
-
-        if not neon_block.is_completed:
-            neon_block.complete_block()
-            self._neon_block_dict.add_neon_block(neon_block)
-            self._print_progress_stat()
-            self._commit_progress_stat()
-        elif is_finalized:
-            self._commit_block_stat(neon_block)
-
-        dctx.complete_neon_block()
 
         # in not-finalize mode: collect all blocks
         # in finalized mode: collect blocks by batches
+        dctx.add_neon_block_to_queue()
         if is_finalized and dctx.is_neon_block_queue_full():
             self._save_checkpoint(dctx)
 
@@ -205,12 +199,13 @@ class Indexer:
                 raise SolHistoryNotFound(
                     f"Wrong root block {dctx.neon_block.block_slot} for the slot {sol_block.block_slot}"
                 )
+            LOG.debug(f"Clone slot {sol_block.block_slot} from {dctx.neon_block.block_slot}")
             neon_block = NeonIndexedBlockInfo.from_block(dctx.neon_block, sol_block)
         else:
+            LOG.debug(f"Create new block for slot {sol_block.block_slot}")
             neon_block = self._new_neon_block(dctx, sol_block)
 
         # The next step, the indexer chooses the next block and saves of the current block in DB, cache ...
-        self._complete_neon_block(dctx)
         dctx.set_neon_block(neon_block)
         return neon_block
 
@@ -229,6 +224,7 @@ class Indexer:
         for sol_block in self._sol_block_net_cache.iter_block(dctx):
             neon_block = self._locate_neon_block(dctx, sol_block)
             if neon_block.is_completed:
+                self._add_neon_block_to_queue(dctx)
                 continue
 
             for sol_tx_meta in dctx.iter_sol_neon_tx_meta(sol_block):
@@ -237,8 +233,8 @@ class Indexer:
 
                 for sol_neon_ix in dctx.iter_sol_neon_ix():
                     with logging_context(sol_neon_ix=sol_neon_ix.req_id):
-                        SolNeonIxDecoder = self._sol_neon_ix_decoder_dict.get(sol_neon_ix.ix_code, DummyIxDecoder)
-                        sol_neon_ix_decoder = SolNeonIxDecoder(dctx)
+                        _SolNeonIxDecoder = self._sol_neon_ix_decoder_dict.get(sol_neon_ix.ix_code, DummyIxDecoder)
+                        sol_neon_ix_decoder = _SolNeonIxDecoder(dctx)
                         if sol_neon_ix_decoder.is_stuck():
                             continue
 
@@ -248,9 +244,10 @@ class Indexer:
                             # LOG.debug('failed tx')
                             continue
                         sol_neon_ix_decoder.execute()
+            self._complete_neon_block(dctx)
+            self._add_neon_block_to_queue(dctx)
 
         with logging_context(sol_neon_ix=f'end-{dctx.sol_commit[:3]}-{dctx.stop_slot}'):
-            self._complete_neon_block(dctx)
             self._save_checkpoint(dctx)
 
     def run(self):
