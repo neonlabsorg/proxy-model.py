@@ -189,6 +189,21 @@ class TestGasTankIntegration(TestCase):
 
         transfer_amount = 123456
         tx = self.build_tx(
+            name='Prepare',
+            ix_list=[
+                SplTokenIxs.approve(SplTokenIxs.ApproveParams(
+                    program_id=self.token.program_id,
+                    source=from_spl_token_acc,
+                    delegate=self.erc20_for_spl.get_auth_account_address(signer_acct.address),
+                    owner=from_owner.pubkey(),
+                    amount=transfer_amount,
+                    signers=[],
+                )),
+            ]
+        )
+        self.solana.send_tx(tx, from_owner)
+
+        tx = self.build_tx(
             name='SimpleCase',
             ix_list=[
                 self.create_account_instruction(signer_acct.address, from_owner.pubkey()),
@@ -210,7 +225,6 @@ class TestGasTankIntegration(TestCase):
                 ).make_tx_exec_from_data_ix()
             ]
         )
-
         self.solana.send_tx(tx, from_owner)
 
         self.assertEqual(self.erc20_for_spl.get_balance(from_spl_token_acc), mint_amount - transfer_amount)
@@ -326,6 +340,21 @@ class TestGasTankIntegration(TestCase):
         self.assertEqual(self.proxy.conn.get_balance(to_neon_acct.address), initial_balance * 10**18)
 
         transfer_amount = 123456
+        tx = self.build_tx(
+            name='Prepare',
+            ix_list=[
+                SplTokenIxs.approve(SplTokenIxs.ApproveParams(
+                    program_id=self.token.program_id,
+                    source=from_spl_token_acc,
+                    delegate=self.erc20_for_spl.get_auth_account_address(signer_acct.address),
+                    owner=from_owner.pubkey(),
+                    amount=transfer_amount,
+                    signers=[],
+                )),
+            ]
+        )
+        self.solana.send_tx(tx, from_owner)
+
         tx = self.build_tx(
             name='NoGasTankAllowance',
             ix_list=[
