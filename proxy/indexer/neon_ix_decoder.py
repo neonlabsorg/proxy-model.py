@@ -259,6 +259,11 @@ class TxExecFromDataIxDecoder(BaseTxSimpleIxDecoder):
         rlp_sig_data = ix.ix_data[5:]
         return self._decode_neon_tx_from_data('SolIx.Data', rlp_sig_data)
 
+class TxExecFromDataSolanaCallIxDecoder(TxExecFromDataIxDecoder):
+    _ix_code = EvmIxCode.TxExecFromDataSolanaCall
+    
+    def execute(self) -> bool:
+        return self._decode_tx(f'NeonTxSolanaCall exec from SolIx.Data')
 
 class TxExecFromAccountIxDecoder(BaseTxSimpleIxDecoder):
     _ix_code = EvmIxCode.TxExecFromAccount
@@ -279,6 +284,11 @@ class TxExecFromAccountIxDecoder(BaseTxSimpleIxDecoder):
         self._decode_neon_tx_from_holder_account(tx)
         super()._add_return_event(tx)
 
+class TxExecFromAccountSolanaCallIxDecoder(TxExecFromAccountIxDecoder):
+    _ix_code = EvmIxCode.TxExecFromAccountSolanaCall
+
+    def execute(self) -> bool:
+        return self._decode_tx(f'NeonTxSolanaCall exec from NeonHolder.Data')
 
 class BaseTxStepIxDecoder(BaseTxIxDecoder):
     def _decode_tx(self, msg: str) -> bool:
@@ -572,7 +582,9 @@ class DepositIxDecoder(DummyIxDecoder):
 def get_neon_ix_decoder_list() -> List[Type[DummyIxDecoder]]:
     ix_decoder_list = [
         TxExecFromDataIxDecoder,
+        TxExecFromDataSolanaCallIxDecoder,
         TxExecFromAccountIxDecoder,
+        TxExecFromAccountSolanaCallIxDecoder,
         TxStepFromDataIxDecoder,
         TxStepFromAccountIxDecoder,
         TxStepFromAccountNoChainIdIxDecoder,

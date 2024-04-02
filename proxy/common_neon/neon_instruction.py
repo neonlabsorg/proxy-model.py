@@ -38,6 +38,9 @@ class EvmIxCode(IntEnum):
     TxStepFromAccount = 0x35              # 53
     TxStepFromAccountNoChainId = 0x36     # 54
 
+    TxExecFromDataSolanaCall = 0x38       # 56
+    TxExecFromAccountSolanaCall = 0x39    # 57
+
     CancelWithHash = 0x37                 # 55
 
     OldDeposit = 0x27                     # 39
@@ -299,6 +302,26 @@ class NeonIxBuilder:
             ] + self._simple_neon_acct_list
         )
 
+    def make_tx_exec_from_data_solana_call_ix(self) -> SolTxIx:
+        # if self._is_old_evm():
+        #     return self._make_old_tx_exec_from_data_ix()
+
+        ix_data = b''.join([
+            EvmIxCode.TxExecFromDataSolanaCall.value.to_bytes(1, byteorder='little'),
+            self._treasury_pool_index_buf,
+            self._msg
+        ])
+        return SolTxIx(
+            program_id=EVM_PROGRAM_ID,
+            data=ix_data,
+            accounts=[
+                SolAccountMeta(pubkey=self._operator_account, is_signer=True, is_writable=True),
+                SolAccountMeta(pubkey=self._treasury_pool_address, is_signer=False, is_writable=True),
+                SolAccountMeta(pubkey=self._operator_neon_address, is_signer=False, is_writable=True),
+                SolAccountMeta(pubkey=SYS_PROGRAM_ID, is_signer=False, is_writable=False),
+            ] + self._simple_neon_acct_list
+        )
+
     def _make_old_tx_exec_from_data_ix(self) -> SolTxIx:
         ix_data = b''.join([
             EvmIxCode.OldTxExecFromData.value.to_bytes(1, byteorder='little'),
@@ -323,6 +346,13 @@ class NeonIxBuilder:
 
         ix_data = b''.join([
             EvmIxCode.TxExecFromAccount.value.to_bytes(1, byteorder='little'),
+            self._treasury_pool_index_buf,
+        ])
+        return self._make_holder_ix(ix_data, self._simple_neon_acct_list)
+
+    def make_tx_exec_from_account_solana_call_ix(self) -> SolTxIx:
+        ix_data = b''.join([
+            EvmIxCode.TxExecFromAccountSolanaCall.value.to_bytes(1, byteorder='little'),
             self._treasury_pool_index_buf,
         ])
         return self._make_holder_ix(ix_data, self._simple_neon_acct_list)
