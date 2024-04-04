@@ -145,7 +145,7 @@ def build_docker_image(neon_evm_tag,  proxy_tag, head_ref_branch, skip_pull):
 @cli.command(name="publish_image")
 @click.option('--proxy_tag')
 @click.option('--head_ref')
-@click.option('--github_ref')
+@click.option('--github_ref_name')
 def publish_image(proxy_tag, head_ref, github_ref_name):
     push_image_with_tag(proxy_tag, proxy_tag)
     branch_name_tag = None
