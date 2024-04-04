@@ -147,7 +147,7 @@ class StatClient:
             return False
 
         now = self._current_time()
-        if abs(self._last_connect_time_sec - now) > self._reconnect_time_sec:
+        if self._last_connect_time_sec and abs(self._last_connect_time_sec - now) > self._reconnect_time_sec:
             return False
 
         self._last_connect_time_sec = now
