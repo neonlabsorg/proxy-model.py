@@ -66,6 +66,7 @@ CONTAINERS = ['proxy', 'solana', 'neon_test_invoke_program_loader',
 docker_client = docker.APIClient()
 terraform = Terraform(working_dir=pathlib.Path(
     __file__).parent / "full_test_suite")
+VERSION_BRANCH_TEMPLATE = r"[vt]{1}\d{1,2}\.\d{1,2}\.x.*"
 
 
 def docker_compose(args: str):
@@ -143,36 +144,41 @@ def build_docker_image(neon_evm_tag,  proxy_tag, head_ref_branch, skip_pull):
 
 @cli.command(name="publish_image")
 @click.option('--proxy_tag')
-def publish_image(proxy_tag):
-    docker_client.login(username=DOCKER_USERNAME, password=DOCKER_PASSWORD)
-    out = docker_client.push(f"{IMAGE_NAME}:{proxy_tag}", decode=True, stream=True)
-    process_output(out)
-
-
-@cli.command(name="finalize_image")
-@click.option('--head_ref_branch')
+@click.option('--head_ref')
 @click.option('--github_ref')
-@click.option('--proxy_tag')
-def finalize_image(head_ref_branch, github_ref, proxy_tag):
-    branch = github_ref.replace("refs/heads/", "")
-    if 'refs/tags/' in branch:
-        tag = branch.replace("refs/tags/", "")
-    elif branch == 'master':
-        tag = 'stable'
-    elif branch == 'develop':
-        tag = 'latest'
-    elif head_ref_branch != "":
-        tag = head_ref_branch.split('/')[-1]
-    else:
-        tag = branch.split('/')[-1]
+def publish_image(proxy_tag, head_ref, github_ref_name):
+    push_image_with_tag(proxy_tag, proxy_tag)
+    branch_name_tag = None
+    if head_ref:
+        branch_name_tag = head_ref.split('/')[-1]
+    elif re.match(VERSION_BRANCH_TEMPLATE,  github_ref_name):
+        branch_name_tag = github_ref_name
+    if branch_name_tag:
+        push_image_with_tag(proxy_tag, branch_name_tag)
 
+
+
+def push_image_with_tag(sha, tag):
     click.echo(f"The tag for publishing: {tag}")
     docker_client.login(username=DOCKER_USERNAME, password=DOCKER_PASSWORD)
-    out = docker_client.pull(f"{IMAGE_NAME}:{proxy_tag}", decode=True, stream=True)
-    process_output(out)
-    docker_client.tag(f"{IMAGE_NAME}:{proxy_tag}", f"{IMAGE_NAME}:{tag}")
+    docker_client.tag(f"{IMAGE_NAME}:{sha}", f"{IMAGE_NAME}:{tag}")
     out = docker_client.push(f"{IMAGE_NAME}:{tag}", decode=True, stream=True)
     process_output(out)
+
+@cli.command(name="finalize_image")
+@click.option('--github_ref')
+@click.option('--proxy_tag')
+def finalize_image(github_ref, proxy_tag):
+    final_tag = ""
+    if 'refs/tags/' in github_ref:
+        final_tag = github_ref.replace("refs/tags/", "")
+    elif github_ref == 'refs/tags/develop':
+        final_tag = 'latest'
+
+    if final_tag:
+        out = docker_client.pull(f"{IMAGE_NAME}:{proxy_tag}", decode=True, stream=True)
+        process_output(out)
+        push_image_with_tag(proxy_tag, final_tag)
 
 
 @cli.command(name="terraform_infrastructure")

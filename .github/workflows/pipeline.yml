@@ -181,7 +181,9 @@ jobs:
       - name: Publish image
         run: |
           python3 ./.github/workflows/deploy.py publish_image \
-          --proxy_tag=${{ steps.tags.outputs.proxy }}
+          --proxy_tag=${{ steps.tags.outputs.proxy }} \
+          --head_ref=${{ github.head_ref }} \
+          --github_ref_name=${{ github.ref_name }}
   deploy-check:
     needs:
       - build-image
@@ -447,7 +449,6 @@ jobs:
             github.event.inputs.neon_evm_branch == 'refs/heads/develop' }}
         run: |
           python3 ./.github/workflows/deploy.py finalize_image \
-          --head_ref_branch=${{ github.head_ref }} \
           --github_ref=${GITHUB_REF} \
           --proxy_tag=${{ needs.build-image.outputs.proxy_tag }}
   notification:
