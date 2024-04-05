@@ -23,33 +23,34 @@ LOG = logging.getLogger(__name__)
 
 class EvmIxCode(IntEnum):
     Unknown = -1
-    CollectTreasure = 0x1e                # 30
+    CollectTreasure = 0x1e                   # 30
 
-    HolderCreate = 0x24                   # 36
-    HolderDelete = 0x25                   # 37
-    HolderWrite = 0x26                    # 38
+    HolderCreate = 0x24                      # 36
+    HolderDelete = 0x25                      # 37
+    HolderWrite = 0x26                       # 38
 
-    CreateAccountBalance = 0x30           # 48
-    Deposit = 0x31                        # 49
+    CreateAccountBalance = 0x30              # 48
+    Deposit = 0x31                           # 49
 
-    TxExecFromData = 0x32                 # 50
-    TxExecFromAccount = 0x33              # 51
-    TxStepFromData = 0x34                 # 52
-    TxStepFromAccount = 0x35              # 53
-    TxStepFromAccountNoChainId = 0x36     # 54
+    TxExecFromData = 0x38                    # 56
+    TxExecFromAccount = 0x33                 # 51
+    TxStepFromData = 0x34                    # 52
+    TxStepFromAccount = 0x35                 # 53
+    TxStepFromAccountNoChainId = 0x36        # 54
 
-    CancelWithHash = 0x37                 # 55
+    CancelWithHash = 0x37                    # 55
 
-    OldDeposit = 0x27                     # 39
-    OldCreateAccount = 0x28               # 40
+    OldDepositV14 = 0x27                     # 39
+    OldCreateAccountV14 = 0x28               # 40
 
-    OldTxExecFromData = 0x1f              # 31
-    OldTxExecFromAccount = 0x2a           # 42
-    OldTxStepFromData = 0x20              # 32
-    OldTxStepFromAccount = 0x21           # 33
-    OldTxStepFromAccountNoChainId = 0x22  # 34
+    OldTxExecFromDataV14 = 0x1f              # 31
+    OldTxExecFromDataV111 = 0x32             # 50
+    OldTxExecFromAccountV14 = 0x2a           # 42
+    OldTxStepFromDataV14 = 0x20              # 32
+    OldTxStepFromAccountV14 = 0x21           # 33
+    OldTxStepFromAccountNoChainIdV14 = 0x22  # 34
 
-    OldCancelWithHash = 0x23              # 35
+    OldCancelWithHashV14 = 0x23              # 35
 
 
 @singleton
@@ -249,7 +250,7 @@ class NeonIxBuilder:
         )
 
         ix_data = b''.join([
-            EvmIxCode.OldCreateAccount.value.to_bytes(1, byteorder='little'),
+            EvmIxCode.OldCreateAccountV14.value.to_bytes(1, byteorder='little'),
             neon_account_info.neon_address.to_bytes()
         ])
 
@@ -288,20 +289,11 @@ class NeonIxBuilder:
             self._treasury_pool_index_buf,
             self._msg
         ])
-        return SolTxIx(
-            program_id=EVM_PROGRAM_ID,
-            data=ix_data,
-            accounts=[
-                SolAccountMeta(pubkey=self._operator_account, is_signer=True, is_writable=True),
-                SolAccountMeta(pubkey=self._treasury_pool_address, is_signer=False, is_writable=True),
-                SolAccountMeta(pubkey=self._operator_neon_address, is_signer=False, is_writable=True),
-                SolAccountMeta(pubkey=SYS_PROGRAM_ID, is_signer=False, is_writable=False),
-            ] + self._simple_neon_acct_list
-        )
+        return self._make_holder_ix(ix_data, self._simple_neon_acct_list)
 
     def _make_old_tx_exec_from_data_ix(self) -> SolTxIx:
         ix_data = b''.join([
-            EvmIxCode.OldTxExecFromData.value.to_bytes(1, byteorder='little'),
+            EvmIxCode.OldTxExecFromDataV14.value.to_bytes(1, byteorder='little'),
             self._treasury_pool_index_buf,
             self._msg
         ])
@@ -329,7 +321,7 @@ class NeonIxBuilder:
 
     def _make_old_tx_exec_from_account_ix(self) -> SolTxIx:
         ix_data = b''.join([
-            EvmIxCode.OldTxExecFromAccount.value.to_bytes(1, byteorder='little'),
+            EvmIxCode.OldTxExecFromAccountV14.value.to_bytes(1, byteorder='little'),
             self._treasury_pool_index_buf,
         ])
         return self._make_old_holder_ix(ix_data, self._simple_neon_acct_list)
@@ -351,7 +343,7 @@ class NeonIxBuilder:
     def _make_old_cancel_ix(self) -> SolTxIx:
         return SolTxIx(
             program_id=EVM_PROGRAM_ID,
-            data=EvmIxCode.OldCancelWithHash.value.to_bytes(1, byteorder='little') + self._neon_tx_sig,
+            data=EvmIxCode.OldCancelWithHashV14.value.to_bytes(1, byteorder='little') + self._neon_tx_sig,
             accounts=[
                 SolAccountMeta(pubkey=self._holder, is_signer=False, is_writable=True),
                 SolAccountMeta(pubkey=self._operator_account, is_signer=True, is_writable=True),
@@ -370,7 +362,7 @@ class NeonIxBuilder:
 
     def _make_old_tx_step_from_data_ix(self, step_cnt: int, index: int) -> SolTxIx:
         return self._make_old_tx_step_ix(
-            EvmIxCode.OldTxStepFromData.value.to_bytes(1, byteorder='little'),
+            EvmIxCode.OldTxStepFromDataV14.value.to_bytes(1, byteorder='little'),
             step_cnt, index, self._msg
         )
 
@@ -438,7 +430,7 @@ class NeonIxBuilder:
 
     def _make_old_tx_step_from_account_ix(self, neon_step_cnt: int, index: int) -> SolTxIx:
         return self._make_old_tx_step_ix(
-            EvmIxCode.OldTxStepFromAccount.value.to_bytes(1, byteorder='little'),
+            EvmIxCode.OldTxStepFromAccountV14.value.to_bytes(1, byteorder='little'),
             neon_step_cnt, index, None
         )
 
@@ -453,7 +445,7 @@ class NeonIxBuilder:
 
     def _make_old_tx_step_from_account_no_chainid_ix(self, neon_step_cnt: int, index: int) -> SolTxIx:
         return self._make_old_tx_step_ix(
-            EvmIxCode.OldTxStepFromAccountNoChainId.value.to_bytes(1, byteorder='little'),
+            EvmIxCode.OldTxStepFromAccountNoChainIdV14.value.to_bytes(1, byteorder='little'),
             neon_step_cnt, index, None
         )
 

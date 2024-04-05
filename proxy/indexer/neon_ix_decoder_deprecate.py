@@ -11,38 +11,43 @@ from ..indexer.neon_ix_decoder import (
 )
 
 
-class OldTxExecFromDataIxDecoder(TxExecFromDataIxDecoder):
-    _ix_code = EvmIxCode.OldTxExecFromData
+class OldTxExecFromDataIxDecoderV14(TxExecFromDataIxDecoder):
+    _ix_code = EvmIxCode.OldTxExecFromDataV14
     _is_deprecated = True
 
 
-class OldTxExecFromAccountIxDecoder(TxExecFromAccountIxDecoder):
-    _ix_code = EvmIxCode.OldTxExecFromAccount
+class OldTxExecFromDataIxDecoderV111(TxExecFromDataIxDecoder):
+    _ix_code = EvmIxCode.OldTxExecFromDataV111
     _is_deprecated = True
 
 
-class OldTxStepFromAccountIxDecoder(TxStepFromAccountIxDecoder):
-    _ix_code = EvmIxCode.OldTxStepFromAccount
+class OldTxExecFromAccountIxDecoderV14(TxExecFromAccountIxDecoder):
+    _ix_code = EvmIxCode.OldTxExecFromAccountV14
     _is_deprecated = True
 
 
-class OldTxStepFromDataIxDecoder(TxStepFromDataIxDecoder):
-    _ix_code = EvmIxCode.OldTxStepFromData
+class OldTxStepFromAccountIxDecoderV14(TxStepFromAccountIxDecoder):
+    _ix_code = EvmIxCode.OldTxStepFromAccountV14
     _is_deprecated = True
 
 
-class OldTxStepFromAccountNoChainIdIxDecoder(TxStepFromAccountNoChainIdIxDecoder):
-    _ix_code = EvmIxCode.OldTxStepFromAccountNoChainId
+class OldTxStepFromDataIxDecoderV14(TxStepFromDataIxDecoder):
+    _ix_code = EvmIxCode.OldTxStepFromDataV14
     _is_deprecated = True
 
 
-class OldCancelWithHashIxDecoder(CancelWithHashIxDecoder):
-    _ix_code = EvmIxCode.OldCancelWithHash
+class OldTxStepFromAccountNoChainIdIxDecoderV14(TxStepFromAccountNoChainIdIxDecoder):
+    _ix_code = EvmIxCode.OldTxStepFromAccountNoChainIdV14
     _is_deprecated = True
 
 
-class OldCreateAccountIxDecoder(DummyIxDecoder):
-    _ix_code = EvmIxCode.OldCreateAccount
+class OldCancelWithHashIxDecoderV14(CancelWithHashIxDecoder):
+    _ix_code = EvmIxCode.OldCancelWithHashV14
+    _is_deprecated = True
+
+
+class OldCreateAccountIxDecoderV14(DummyIxDecoder):
+    _ix_code = EvmIxCode.OldCreateAccountV14
     _is_deprecated = True
 
     def execute(self) -> bool:
@@ -64,8 +69,8 @@ class OldCreateAccountIxDecoder(DummyIxDecoder):
         return self._decoding_success(account_info, 'create NeonAccount')
 
 
-class OldDepositIxDecoder(DummyIxDecoder):
-    _ix_code = EvmIxCode.OldDeposit
+class OldDepositIxDecoderV14(DummyIxDecoder):
+    _ix_code = EvmIxCode.OldDepositV14
     _is_deprecated = True
 
     def execute(self) -> bool:
@@ -74,13 +79,14 @@ class OldDepositIxDecoder(DummyIxDecoder):
 
 def get_neon_ix_decoder_deprecated_list() -> List[Type[DummyIxDecoder]]:
     ix_decoder_list: List[Type[DummyIxDecoder]] = [
-        OldTxExecFromDataIxDecoder,
-        OldTxExecFromAccountIxDecoder,
-        OldTxStepFromDataIxDecoder,
-        OldTxStepFromAccountIxDecoder,
-        OldTxStepFromAccountNoChainIdIxDecoder,
-        OldCreateAccountIxDecoder,
-        OldDepositIxDecoder
+        OldTxExecFromDataIxDecoderV14,
+        OldTxExecFromDataIxDecoderV111,
+        OldTxExecFromAccountIxDecoderV14,
+        OldTxStepFromDataIxDecoderV14,
+        OldTxStepFromAccountIxDecoderV14,
+        OldTxStepFromAccountNoChainIdIxDecoderV14,
+        OldCreateAccountIxDecoderV14,
+        OldDepositIxDecoderV14
     ]
     for IxDecoder in ix_decoder_list:
         assert IxDecoder.is_deprecated(), f"{IxDecoder.name()} is NOT deprecated!"

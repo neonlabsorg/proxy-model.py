@@ -151,7 +151,8 @@ class NeonPassAnalyzer(GasTankSolTxAnalyzer):
                      call_ix: NPSolIx) -> Optional[NeonTxInfo]:
         # Must use the same Operator account
         approve_acct_idx = approve_ix['accounts'][2]
-        call_acct_idx = call_ix['accounts'][0]
+        # First is a holder acc, second is an operator.
+        call_acct_idx = call_ix['accounts'][1]
         if approve_acct_idx != call_acct_idx:
             LOG.debug(f'approve_account [{approve_acct_idx}] != call_account [{call_acct_idx}]')
             return None

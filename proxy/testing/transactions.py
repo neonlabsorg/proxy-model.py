@@ -7,7 +7,7 @@ evm_program = EVM_PROGRAM_ID_STR
 neon_pass_erc20_for_spl = '0x04b27acb0013a31822ec1624c1a3066b023e3a93'
 neon_pass_gas_less_account = '0x4136faa9cae6c9afde37045a255b087f2ccfee75'
 neon_pass_gas_less_amount = 123456
-neon_pass_claim_to_ix_data = 'jsnANuQyP1QMDqCNaghCenGeEuxWfSffJUnLu4BW6RgH6SVWxdXLtVZWQWP4A3PjpsEVXBHg6YcQ3FsCvV1uLzpWd4cRPinmycRSZWW41JyzEa3FKXMmYBnHuDfHmjLoFateZiKTzdEn7AX4MGaZLhiJAtJQfoGRGLHtEB3aoKcrXsSzJFPbKDPuuJLHDwEC2dy6ZadSnqCvwwbWsrPBGat3bbYSttdVtcrTCByicnVbHJfKHmEe45hE3DJrSwZjQ2y3pm72uQKkz85oYbh9fR2Rz'
+neon_pass_claim_to_ix_data = 'pyY2Qv7GbNP8GxYRfQhJtTFkojTP7GF43F9QKVpQKSE13P1USCDMrAfxafx1nzTV583VvjzrNi1DdLt3YxmAqkhTkS1S5oMB81hAq5fCHrFiG7y1zyHUnxKDcGrACrLtkTCaBFBhX8Jqwjgm4Y2RDCvJazHm3cgixE9GFS54hMEnDampNrc9a9YxLwiTeTMmG4KozRWnDWuXg9Uex992ePCm9hbXrE4Pnzbw6chtxXtHQXvQJjN7D31rdP8LxcW3ePAzqJ3G96JzreTrZ6Q91CqKa'
 
 
 # The Solana transaction for simple case gas-less tx
@@ -247,7 +247,8 @@ neon_pass_tx = {
                     "programIdIndex": 12
                 },
                 {
-                    "accounts": [0, 6, 5, 9, 13, 3, 5, 7, 8, 2, 4, 11, 12],
+                    # First account is a holder account which is currently skipped.
+                    "accounts": [14, 0, 6, 5, 9, 13, 3, 5, 7, 8, 2, 4, 11, 12],
                     "data": neon_pass_claim_to_ix_data,
                     "programIdIndex": 13
                 }

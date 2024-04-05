@@ -141,6 +141,7 @@ class ERC20Wrapper:
         return self.token.create_associated_token_account(owner)
 
     def create_claim_to_ix(self, owner: SolPubKey,
+                           holder: SolPubKey,
                            from_acct: SolPubKey,
                            to_acct: NeonAccount,
                            amount: int,
@@ -157,9 +158,9 @@ class ERC20Wrapper:
         ).build_transaction(
             {'nonce': nonce, 'gasPrice': 0}
         )
-        return self._create_builder(claim_tx, owner, signer_acct)
+        return self._create_builder(claim_tx, owner, holder, signer_acct)
 
-    def _create_builder(self, tx, owner: SolPubKey, signer_acct: NeonAccount):
+    def _create_builder(self, tx, owner: SolPubKey, holder: SolPubKey, signer_acct: NeonAccount):
         tx = self.proxy.eth.account.sign_transaction(tx, signer_acct.key)
         pda_acct = self.proxy.neon.get_neon_account(signer_acct.address).solanaAddress
 
@@ -178,6 +179,7 @@ class ERC20Wrapper:
         neon.init_operator_neon(SolPubKey.from_string(pda_acct))
         neon.init_neon_tx(NeonTx.from_string(neon_tx))
         neon.init_neon_account_list(neon_account_dict)
+        neon.init_iterative(holder)
         return neon
 
     def mint_to(self, destination: Union[SolPubKey, str], amount: int) -> RPCResponse:
