@@ -38,7 +38,7 @@ class StatDataSrv(AddrPickableDataSrv):
 
 
 class StatMiddlewareServer(IPickableDataServerUser):
-    _stat_address = ('0.0.0.0', 9093)
+    _stat_address = ("0.0.0.0", 9093)
 
     def __init__(self, stat_exporter: StatService):
         self._stat_srv = StatDataSrv(user=self, address=self._stat_address)
@@ -50,7 +50,7 @@ class StatMiddlewareServer(IPickableDataServerUser):
                 m = getattr(self._stat_exporter, data[0])
                 m(*data[1:])
         except Exception as err:
-            LOG.error(f'Failed to process statistic data: {data}', exc_info=err)
+            LOG.error(f"Failed to process statistic data: {data}", exc_info=err)
 
     async def start(self):
         await self._stat_srv.run_server()
@@ -92,7 +92,7 @@ class StatService(abc.ABC):
             self._process_init()
             self._event_loop.run_forever()
         except Exception as err:
-            LOG.error('Failed to process statistic service', exc_info=err)
+            LOG.error("Failed to process statistic service", exc_info=err)
 
     def _process_init(self) -> None:
         pass
@@ -115,7 +115,7 @@ def stat_method(method):
                 payload: bytes = encode_pickable((method.__name__, *args))
                 self._stat_mng_client._client_sock.sendall(payload)
             except (InterruptedError, Exception) as exc:
-                LOG.error(f'Failed to transfer data', exc_info=exc)
+                LOG.error(f"Failed to transfer data", exc_info=exc)
                 self._reconnect_middleware()
 
     return wrapper
@@ -147,7 +147,7 @@ class StatClient:
             return False
 
         now = self._current_time()
-        if abs(self._last_connect_time_sec - now) > self._reconnect_time_sec:
+        if self._last_connect_time_sec and abs(self._last_connect_time_sec - now) > self._reconnect_time_sec:
             return False
 
         self._last_connect_time_sec = now
@@ -158,7 +158,7 @@ class StatClient:
             self._connect_middleware()
 
     def _reconnect_middleware(self):
-        LOG.debug(f'Reconnecting statistic middleware server in: {self._reconnect_time_sec} sec')
+        LOG.debug(f"Reconnecting statistic middleware server in: {self._reconnect_time_sec} sec")
         self._stat_mng_client: Optional[AddrPickableDataClient] = None
 
     def _connect_middleware(self) -> bool:
@@ -171,7 +171,7 @@ class StatClient:
             return True
         except BaseException as exc:
             if not isinstance(exc, ConnectionRefusedError):
-                LOG.error(f'Failed to connect statistic middleware server: {self._stat_address}', exc_info=exc)
+                LOG.error(f"Failed to connect statistic middleware server: {self._stat_address}", exc_info=exc)
             else:
-                LOG.debug(f'Failed to connect statistic middleware server: {self._stat_address}, error: {str(exc)}')
+                LOG.debug(f"Failed to connect statistic middleware server: {self._stat_address}, error: {str(exc)}")
             return False
