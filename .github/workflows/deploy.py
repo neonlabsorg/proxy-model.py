@@ -157,7 +157,6 @@ def publish_image(proxy_tag, head_ref, github_ref_name):
         push_image_with_tag(proxy_tag, branch_name_tag)
 
 
-
 def push_image_with_tag(sha, tag):
     click.echo(f"The tag for publishing: {tag}")
     docker_client.login(username=DOCKER_USERNAME, password=DOCKER_PASSWORD)
@@ -235,7 +234,6 @@ def set_github_env(envs: tp.Dict, upper=True) -> None:
 @click.option('--proxy_tag')
 @click.option('--run_number')
 def destroy_terraform(proxy_tag, run_number):
-    ####
     log = logging.getLogger()
     log.handlers = []
     handler = logging.StreamHandler(sys.stdout)
@@ -249,7 +247,6 @@ def destroy_terraform(proxy_tag, run_number):
         return re.sub(r'(?m)^', ' ' * TF_OUTPUT_OFFSET, str(output))
 
     TF_OUTPUT_OFFSET = 16
-    ####
     os.environ["TF_VAR_proxy_image_tag"] = proxy_tag
     os.environ["TF_VAR_dockerhub_org_name"] = DOCKERHUB_ORG_NAME
     thstate_key = f'{TFSTATE_KEY_PREFIX}{proxy_tag}-{run_number}'
@@ -257,7 +254,6 @@ def destroy_terraform(proxy_tag, run_number):
     backend_config = {"bucket": TFSTATE_BUCKET,
                       "key": thstate_key, "region": TFSTATE_REGION}
     terraform.init(backend_config=backend_config)
-    #### terraform.apply('-destroy', skip_plan=True)
     tf_destroy = terraform.apply('-destroy', skip_plan=True)
     log.info(format_tf_output(tf_destroy))
 
