@@ -8,8 +8,10 @@ from typing import Dict, Any
 from solana.rpc.api import Client as RPCSolClient
 from solana.rpc.commitment import Confirmed as RPCSolConfirmed
 from solders.system_program import ID as SYS_PROGRAM_ID
+from solders.account import Account as SolAccountData
 
 from spl.token.client import Token as SplToken
+from spl.token._layouts import ACCOUNT_LAYOUT
 from spl.token.constants import TOKEN_PROGRAM_ID
 import spl.token.instructions as SplTokenIxs
 
@@ -43,7 +45,6 @@ class TestGasTankIntegration(TestCase):
     mint_authority: SolAccount
     token: SplToken
     erc20_for_spl: ERC20Wrapper
-    solana: SolClient
 
     @classmethod
     def setUpClass(cls):
@@ -188,20 +189,13 @@ class TestGasTankIntegration(TestCase):
         self.assertEqual(self.erc20_for_spl.get_balance(to_neon_acct.address), 0)
 
         transfer_amount = 123456
-        tx = self.build_tx(
-            name='Prepare',
-            ix_list=[
-                SplTokenIxs.approve(SplTokenIxs.ApproveParams(
-                    program_id=self.token.program_id,
-                    source=from_spl_token_acc,
-                    delegate=self.erc20_for_spl.get_auth_account_address(signer_acct.address),
-                    owner=from_owner.pubkey(),
-                    amount=transfer_amount,
-                    signers=[],
-                )),
-            ]
-        )
-        self.solana.send_tx(tx, from_owner)
+
+        from_account = self.solana.get_account_info(from_spl_token_acc)
+        print(f'from_balance: {from_account}')
+        from_data = ACCOUNT_LAYOUT.parse(from_account.data)
+        from_data.delegate_option = 1
+        from_data.delegate = bytes(self.erc20_for_spl.get_auth_account_address(signer_acct.address))
+        from_data.delegated_amount = transfer_amount
 
         tx = self.build_tx(
             name='SimpleCase',
@@ -222,6 +216,13 @@ class TestGasTankIntegration(TestCase):
                     to_acct=to_neon_acct,
                     amount=transfer_amount,
                     signer_acct=signer_acct,
+                    overrides={
+                        from_spl_token_acc: SolAccountData(
+                            lamports=from_account.lamports,
+                            owner=from_account.owner,
+                            data=ACCOUNT_LAYOUT.build(from_data)
+                        )
+                    }
                 ).make_tx_exec_from_data_ix()
             ]
         )

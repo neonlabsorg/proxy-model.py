@@ -15,7 +15,7 @@ from ..common_neon.config import Config
 from ..common_neon.data import NeonEmulatorResult, NeonEmulatorExitStatus
 from ..common_neon.errors import EthereumError
 from ..common_neon.solana_block import SolBlockInfo
-from ..common_neon.solana_tx import SolCommit, SolPubKey
+from ..common_neon.solana_tx import SolCommit, SolPubKey, SolAccountData
 from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.utils.utils import cached_property
 from ..common_neon.evm_config import EVMConfig
@@ -125,7 +125,8 @@ class NeonCoreApiClient(NeonClientBase):
         value: Optional[Union[str, int]],
         gas_limit: Optional[str] = None,
         block: Optional[SolBlockInfo] = None,
-        check_result=False
+        check_result=False,
+        overrides: Dict[SolPubKey,SolAccountData] = [],
     ) -> NeonEmulatorResult:
         if not sender:
             sender = '0x0000000000000000000000000000000000000000'
@@ -167,8 +168,10 @@ class NeonCoreApiClient(NeonClientBase):
                 # 'gas_limit': gas_limit,
                 # 'access_list': None
             },
+            solana_overrides=overrides,
         )
         request = self._add_block(request, block)
+        LOG.debug(f"emulate: {request}")
         response = self._call(_MethodName.emulate, request)
         self._check_emulated_error(response)
 

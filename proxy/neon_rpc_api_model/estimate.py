@@ -8,7 +8,7 @@ from ..common_neon.data import NeonEmulatorResult
 from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.neon_instruction import NeonIxBuilder
 from ..common_neon.solana_alt_limit import ALTLimit
-from ..common_neon.solana_tx import SolAccount, SolPubKey, SolAccountMeta, SolBlockHash, SolTxSizeError
+from ..common_neon.solana_tx import SolAccountData, SolAccount, SolPubKey, SolAccountMeta, SolBlockHash, SolTxSizeError
 from ..common_neon.solana_tx_legacy import SolLegacyTx
 from ..common_neon.solana_block import SolBlockInfo
 from ..common_neon.address import NeonAddress
@@ -102,7 +102,7 @@ class GasEstimate:
     def _execute(self, block: SolBlockInfo) -> None:
         self._emulator_result = self._core_api_client.emulate(
             self._contract, self._sender, self._def_chain_id, self._data, self._value,
-            gas_limit=self._gas, block=block, check_result=True,
+            gas_limit=self._gas, block=block, check_result=True, overrides=self._overrides,
         )
 
     def _tx_size_cost(self) -> int:
@@ -179,7 +179,8 @@ class GasEstimate:
         for account in self._emulator_result.solana_account_list:
             self._account_list.append(SolAccountMeta(SolPubKey.from_string(account['pubkey']), False, True))
 
-    def estimate(self, request: Dict[str, Any], block: SolBlockInfo):
+    def estimate(self, request: Dict[str, Any], block: SolBlockInfo, overrides: Dict[SolPubKey,SolAccountData]=[]):
+        self._overrides = overrides
         self._get_request_param(request)
         self._execute(block)
         self._build_account_list()

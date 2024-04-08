@@ -4,6 +4,7 @@ from typing import Sequence, Optional, Union, Dict, Any, Set, List, NewType
 
 import abc
 
+import solders.account
 import solders.hash
 import solders.keypair
 import solders.pubkey
@@ -16,6 +17,7 @@ from .eth_commit import EthCommit
 
 
 SolTxIx = solders.instruction.Instruction
+SolAccountData = solders.account.Account
 SolAccountMeta = solders.instruction.AccountMeta
 SolBlockHash = solders.hash.Hash
 SolAccount = solders.keypair.Keypair

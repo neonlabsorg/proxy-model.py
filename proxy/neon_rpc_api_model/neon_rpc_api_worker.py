@@ -31,7 +31,7 @@ from ..common_neon.neon_tx_result_info import NeonTxResultInfo
 from ..common_neon.solana_block import SolBlockInfo
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptInfo, SolAltIxInfo
-from ..common_neon.solana_tx import SolCommit
+from ..common_neon.solana_tx import SolCommit, SolPubKey, SolAccountData
 from ..common_neon.utils import NeonTxInfo
 from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.evm_log_decoder import NeonLogTxEvent
@@ -352,7 +352,7 @@ class NeonRpcApiWorker:
 
         return self._gas_tank.has_gas_less_tx_permit(addr)
 
-    def eth_estimateGas(self, param: Dict[str, Any], tag: Union[str, int, dict] = 'latest') -> str:
+    def neon_estimateGas(self, param: Dict[str, Any], tag: Union[str, int, dict] = 'latest', overrides: Dict[SolPubKey, SolAccountData]=[]) -> str:
         block = self._process_block_tag(tag)
 
         if not isinstance(param, dict):
@@ -364,13 +364,16 @@ class NeonRpcApiWorker:
 
         try:
             calculator = GasEstimate(self._config, self._core_api_client, self._chain_id)
-            return hex(calculator.estimate(param, block))
+            return hex(calculator.estimate(param, block, overrides))
 
         except EthereumError:
             raise
         except BaseException as exc:
             LOG.debug(f"Exception on eth_estimateGas: {str(exc)}")
             raise
+
+    def eth_estimateGas(self, param: Dict[str, Any], tag: Union[str, int, dict] = 'latest') -> str:
+        return self.neon_estimateGas(param, tag, [])
 
     def __repr__(self):
         return str(self.__dict__)

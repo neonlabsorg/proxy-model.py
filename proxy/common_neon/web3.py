@@ -4,8 +4,9 @@ from web3 import Web3
 from web3.module import Module
 from web3.method import Method, default_root_munger
 from web3.providers.base import BaseProvider
-from typing import Optional, Tuple, Callable, Union
-from web3.types import RPCEndpoint, HexBytes, ChecksumAddress, Address, BlockIdentifier
+from typing import Optional, Tuple, Callable, Union, Dict, List, Any
+from web3.types import RPCEndpoint, TxParams, HexBytes, ChecksumAddress, Address, BlockIdentifier, LatestBlockParam
+from ..common_neon.solana_tx import SolAccountData, SolPubKey
 
 
 @dataclasses.dataclass
@@ -29,6 +30,47 @@ class Neon(Module):
         _neon_emulate,
         mungers=[_neon_emulate_munger],
     )
+
+    _neon_estimateGas = RPCEndpoint('neon_estimateGas')
+
+    def _neon_estimateGas_munger(
+        self, transaction: TxParams, block_identifier: Optional[BlockIdentifier] = None, 
+        overrides: Dict[SolPubKey,Optional[SolAccountData]] = {}
+    ) -> Tuple[TxParams, BlockIdentifier, Dict[str,Optional[Dict[str,Any]]]]:
+        if block_identifier is None:
+            block_identifier = 'latest'
+
+        overrides = [
+            [
+                k.__str__(),
+                None if v is None else {
+                    'lamports': v.lamports,
+                    'data': v.data.hex(),
+                    'owner': v.owner.__str__(),
+                    'executable': v.executable,
+                    'rent_epoch': v.rent_epoch,
+                }
+            ]
+            for k, v in overrides.items()
+        ]
+
+        return transaction, block_identifier, overrides
+        
+    neon_estimateGas: Method[
+        Callable[[TxParams, Optional[BlockIdentifier], Dict[SolPubKey,SolAccountData]], int]
+    ] = Method(
+        _neon_estimateGas,
+        mungers=[_neon_estimateGas_munger],
+    )
+
+    # _estimate_gas: Method[
+    #     Callable[[TxParams, Optional[BlockIdentifier]], int]
+    # ] = Method(RPC.eth_estimateGas, mungers=[BaseEth.estimate_gas_munger])
+
+    # def estimate_gas(
+    #     self, transaction: TxParams, block_identifier: Optional[BlockIdentifier] = None
+    # ) -> int:
+    #     return self._estimate_gas(transaction, block_identifier)
 
     _neon_getEvmParams = RPCEndpoint('neon_getEvmParams')
 
