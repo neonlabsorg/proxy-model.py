@@ -83,7 +83,7 @@ class MPGasPriceTaskLoop(MPPeriodicTaskLoop[MPGasPriceRequest, MPGasPriceResult]
             min_executable_gas_price = min(min_executable_gas_prices)
 
             print(f":::::::::: AFTER :::")
-            print(f":::::::::::::::::: min_executable_gas_price: {token_list.min_executable_gas_price}")
+            print(f":::::::::::::::::: min_executable_gas_price: {min_executable_gas_price}")
             print(f":::::::::::::::::: {[gas_price for gas_price in self._min_executable_gas_prices[token_list.chain_id]]} ::::::::::")
             print("::::::::::::::::::")
 
