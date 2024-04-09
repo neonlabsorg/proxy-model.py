@@ -28,7 +28,7 @@ class GithubClient():
                              branch='develop'):
         dapps = "aave,saddle,uniswap-v3"
         if full_test_suite == "true":
-            dapps = dapps.join("uniswap-v2,yearn,compound,robonomics,curve,saddle,pancake")
+            dapps = dapps + ",uniswap-v2,yearn,compound,robonomics,curve,saddle,pancake"
 
         data = {"ref": branch,
                 "inputs": {"proxy_url": proxy_url,

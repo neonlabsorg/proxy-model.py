@@ -115,9 +115,9 @@ jobs:
       - name: Define test set
         id: full_test_suite
         run: |
-          if [[ "(${{ contains(github.event.pull_request.labels.*.name, 'fullTestSuite') }}" == "true" || "${{ github.event.inputs.full_test_suite }}" == "true" ||
-          "${{ github.ref_name }}" == 'develop' && "${{github.event.inputs.neon_evm_commit }}" == "" ||
-          "${{ steps.is_version_proxy_branch.outputs.is_version_proxy_branch }}" == 'true' && "${{ github.event.inputs.neon_evm_commit }}" == '' ||
+          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'fullTestSuite') }}" == "true" || "${{ github.event.inputs.full_test_suite }}" == "true" ||
+          ("${{ github.ref_name }}" == 'develop' && "${{github.event.inputs.neon_evm_commit }}" == "") ||
+          ("${{ steps.is_version_proxy_branch.outputs.is_version_proxy_branch }}" == 'true' && "${{ github.event.inputs.neon_evm_commit }}" == '') ||
           "${{ steps.tag_creation.outputs.base_branch }}" != "" ]]; then
             value=true
           else
