@@ -49,7 +49,11 @@ class EmulateParams:
 class Neon(Module):
     _neon_emulate = RPCEndpoint('neon_emulate')
 
-    def _neon_emulate_munger(self, tx: bytearray, params: Optional[EmulateParams]) -> Tuple[str, Optional[Dict[str,Any]]]:
+    def _neon_emulate_munger(
+        self,
+        tx: bytearray,
+        params: Optional[EmulateParams] = None
+    ) -> Tuple[str, Optional[Dict[str,Any]]]:
         if params is None:
             return (bytes(tx).hex(),)
         else:
@@ -65,9 +69,14 @@ class Neon(Module):
     _neon_estimateGas = RPCEndpoint('neon_estimateGas')
 
     def _neon_estimateGas_munger(
-        self, transaction: TxParams, params: Optional[EmulateParams]
+        self,
+        transaction: TxParams,
+        params: Optional[EmulateParams] = None
     ) -> Tuple[TxParams, Optional[Dict[str,Any]]]:
-        return transaction, params.to_dict()
+        if params is None:
+            return transaction
+        else:
+            return transaction, params.to_dict()
         
     neon_estimateGas: Method[
         Callable[[TxParams, Optional[EmulateParams]], int]
