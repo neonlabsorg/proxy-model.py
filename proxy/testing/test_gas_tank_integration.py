@@ -174,6 +174,18 @@ class TestGasTankIntegration(TestCase):
         self.assertNotEqual(big_gas_price, 0)
 
         return gas_price
+    
+    def get_spl_token_account_with_approve(self, spl_token_acc: SolPubKey, delegate: SolPubKey, transfer_amount: int):
+        account = self.solana.get_account_info(spl_token_acc)
+        data = ACCOUNT_LAYOUT.parse(account.data)
+        data.delegate_option = 1
+        data.delegate = bytes(delegate)
+        data.delegated_amount = transfer_amount
+        return SolAccountData(
+            lamports=account.lamports,
+            owner=account.owner,
+            data=ACCOUNT_LAYOUT.build(data)
+        )
 
     def test_success_gas_less_simple_case(self):
         from_owner = self.create_sol_account()
@@ -189,14 +201,6 @@ class TestGasTankIntegration(TestCase):
         self.assertEqual(self.erc20_for_spl.get_balance(to_neon_acct.address), 0)
 
         transfer_amount = 123456
-
-        from_account = self.solana.get_account_info(from_spl_token_acc)
-        print(f'from_balance: {from_account}')
-        from_data = ACCOUNT_LAYOUT.parse(from_account.data)
-        from_data.delegate_option = 1
-        from_data.delegate = bytes(self.erc20_for_spl.get_auth_account_address(signer_acct.address))
-        from_data.delegated_amount = transfer_amount
-
         tx = self.build_tx(
             name='SimpleCase',
             ix_list=[
@@ -217,11 +221,11 @@ class TestGasTankIntegration(TestCase):
                     amount=transfer_amount,
                     signer_acct=signer_acct,
                     overrides={
-                        from_spl_token_acc: SolAccountData(
-                            lamports=from_account.lamports,
-                            owner=from_account.owner,
-                            data=ACCOUNT_LAYOUT.build(from_data)
-                        )
+                        from_spl_token_acc: self.get_spl_token_account_with_approve(
+                            from_spl_token_acc,
+                            self.erc20_for_spl.get_auth_account_address(signer_acct.address),
+                            transfer_amount
+                        ),
                     }
                 ).make_tx_exec_from_data_ix()
             ]
@@ -342,21 +346,6 @@ class TestGasTankIntegration(TestCase):
 
         transfer_amount = 123456
         tx = self.build_tx(
-            name='Prepare',
-            ix_list=[
-                SplTokenIxs.approve(SplTokenIxs.ApproveParams(
-                    program_id=self.token.program_id,
-                    source=from_spl_token_acc,
-                    delegate=self.erc20_for_spl.get_auth_account_address(signer_acct.address),
-                    owner=from_owner.pubkey(),
-                    amount=transfer_amount,
-                    signers=[],
-                )),
-            ]
-        )
-        self.solana.send_tx(tx, from_owner)
-
-        tx = self.build_tx(
             name='NoGasTankAllowance',
             ix_list=[
                 self.create_account_instruction(signer_acct.address, from_owner.pubkey()),
@@ -374,6 +363,13 @@ class TestGasTankIntegration(TestCase):
                     to_acct=to_neon_acct,
                     amount=transfer_amount,
                     signer_acct=signer_acct,
+                    overrides={
+                        from_spl_token_acc: self.get_spl_token_account_with_approve(
+                            from_spl_token_acc,
+                            self.erc20_for_spl.get_auth_account_address(signer_acct.address),
+                            transfer_amount
+                        ),
+                    }
                 ).make_tx_exec_from_data_ix()
             ]
         )

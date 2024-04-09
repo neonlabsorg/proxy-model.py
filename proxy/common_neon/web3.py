@@ -7,6 +7,7 @@ from web3.providers.base import BaseProvider
 from typing import Optional, Tuple, Callable, Union, Dict, List, Any
 from web3.types import RPCEndpoint, TxParams, HexBytes, ChecksumAddress, Address, BlockIdentifier, LatestBlockParam
 from ..common_neon.solana_tx import SolAccountData, SolPubKey
+from ..common_neon.data import SolanaOverrides
 
 
 @dataclasses.dataclass
@@ -19,14 +20,44 @@ class NeonAccountData:
     solanaAddress: str
     contractSolanaAddress: str
 
+@dataclasses.dataclass
+class EmulateParams:
+    tag: Optional[BlockIdentifier]
+    solana_overrides: Optional[SolanaOverrides]
+
+    def __init__(self, tag: Optional[BlockIdentifier] = None, solana_overrides: Optional[SolanaOverrides] = None):
+        self.tag = tag
+        self.solana_overrides = solana_overrides
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = dict()
+        if self.tag is not None:
+            result['tag'] = self.tag
+        if self.solana_overrides is not None:
+            result['solana_overrides'] = {
+                k.__str__(): None if v is None else {
+                    'lamports': v.lamports,
+                    'data': v.data.hex(),
+                    'owner': v.owner.__str__(),
+                    'executable': v.executable,
+                    'rent_epoch': v.rent_epoch,
+                }
+                for k, v in self.solana_overrides.items()
+            }
+        return result
 
 class Neon(Module):
     _neon_emulate = RPCEndpoint('neon_emulate')
 
-    def _neon_emulate_munger(self, tx: bytearray) -> Tuple[str]:
-        return (bytes(tx).hex(),)
+    def _neon_emulate_munger(self, tx: bytearray, params: Optional[EmulateParams]) -> Tuple[str, Optional[Dict[str,Any]]]:
+        if params is None:
+            return (bytes(tx).hex(),)
+        else:
+            return (bytes(tx).hex(), params.to_dict())
 
-    neon_emulate = Method(
+    neon_emulate: Method[
+        Callable[[bytearray, Optional[EmulateParams]], Dict[str, Any]]
+    ] = Method(
         _neon_emulate,
         mungers=[_neon_emulate_munger],
     )
@@ -34,43 +65,16 @@ class Neon(Module):
     _neon_estimateGas = RPCEndpoint('neon_estimateGas')
 
     def _neon_estimateGas_munger(
-        self, transaction: TxParams, block_identifier: Optional[BlockIdentifier] = None, 
-        overrides: Dict[SolPubKey,Optional[SolAccountData]] = {}
-    ) -> Tuple[TxParams, BlockIdentifier, Dict[str,Optional[Dict[str,Any]]]]:
-        if block_identifier is None:
-            block_identifier = 'latest'
-
-        overrides = [
-            [
-                k.__str__(),
-                None if v is None else {
-                    'lamports': v.lamports,
-                    'data': v.data.hex(),
-                    'owner': v.owner.__str__(),
-                    'executable': v.executable,
-                    'rent_epoch': v.rent_epoch,
-                }
-            ]
-            for k, v in overrides.items()
-        ]
-
-        return transaction, block_identifier, overrides
+        self, transaction: TxParams, params: Optional[EmulateParams]
+    ) -> Tuple[TxParams, Optional[Dict[str,Any]]]:
+        return transaction, params.to_dict()
         
     neon_estimateGas: Method[
-        Callable[[TxParams, Optional[BlockIdentifier], Dict[SolPubKey,SolAccountData]], int]
+        Callable[[TxParams, Optional[EmulateParams]], int]
     ] = Method(
         _neon_estimateGas,
         mungers=[_neon_estimateGas_munger],
     )
-
-    # _estimate_gas: Method[
-    #     Callable[[TxParams, Optional[BlockIdentifier]], int]
-    # ] = Method(RPC.eth_estimateGas, mungers=[BaseEth.estimate_gas_munger])
-
-    # def estimate_gas(
-    #     self, transaction: TxParams, block_identifier: Optional[BlockIdentifier] = None
-    # ) -> int:
-    #     return self._estimate_gas(transaction, block_identifier)
 
     _neon_getEvmParams = RPCEndpoint('neon_getEvmParams')
 

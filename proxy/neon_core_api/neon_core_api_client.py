@@ -12,10 +12,10 @@ from .neon_layouts import NeonAccountInfo, NeonContractInfo, EVMConfigInfo, Hold
 
 from ..common_neon.address import NeonAddress
 from ..common_neon.config import Config
-from ..common_neon.data import NeonEmulatorResult, NeonEmulatorExitStatus
+from ..common_neon.data import NeonEmulatorResult, NeonEmulatorExitStatus, SolanaOverrides
 from ..common_neon.errors import EthereumError
 from ..common_neon.solana_block import SolBlockInfo
-from ..common_neon.solana_tx import SolCommit, SolPubKey, SolAccountData
+from ..common_neon.solana_tx import SolCommit, SolPubKey
 from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.utils.utils import cached_property
 from ..common_neon.evm_config import EVMConfig
@@ -126,7 +126,7 @@ class NeonCoreApiClient(NeonClientBase):
         gas_limit: Optional[str] = None,
         block: Optional[SolBlockInfo] = None,
         check_result=False,
-        overrides: Dict[SolPubKey,SolAccountData] = [],
+        solana_overrides: Optional[SolanaOverrides] = None
     ) -> NeonEmulatorResult:
         if not sender:
             sender = '0x0000000000000000000000000000000000000000'
@@ -168,7 +168,7 @@ class NeonCoreApiClient(NeonClientBase):
                 # 'gas_limit': gas_limit,
                 # 'access_list': None
             },
-            solana_overrides=overrides,
+            solana_overrides=solana_overrides
         )
         request = self._add_block(request, block)
         LOG.debug(f"emulate: {request}")
@@ -179,13 +179,14 @@ class NeonCoreApiClient(NeonClientBase):
             return self._get_emulated_result(response)
         return NeonEmulatorResult(response.get('value'))
 
-    def emulate_neon_tx(self, neon_tx: NeonTx, chain_id: int) -> NeonEmulatorResult:
+    def emulate_neon_tx(self, neon_tx: NeonTx, chain_id: int, solana_overrides: Optional[SolanaOverrides] = None) -> NeonEmulatorResult:
         return self.emulate(
             NeonAddress.from_raw(neon_tx.toAddress, chain_id),
             NeonAddress.from_raw(neon_tx.sender, chain_id),
             chain_id,
             neon_tx.hex_call_data,
-            neon_tx.value
+            neon_tx.value,
+            solana_overrides=solana_overrides,
         )
 
     def get_storage_at(self, contract: NeonAddress, position: str, block: SolBlockInfo) -> str:

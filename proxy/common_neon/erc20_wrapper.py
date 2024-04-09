@@ -17,8 +17,9 @@ from .solana_tx import SolAccountMeta, SolAccount, SolPubKey
 from .constants import ACCOUNT_SEED_VERSION, EVM_PROGRAM_ID
 from .utils.eth_proto import NeonTx
 from .neon_instruction import NeonIxBuilder
-from .web3 import NeonWeb3, ChecksumAddress
+from .web3 import NeonWeb3, ChecksumAddress, EmulateParams
 from ..common_neon.solana_tx import SolPubKey, SolAccountData
+from ..common_neon.data import SolanaOverrides
 
 install_solc(version='0.7.6')
 
@@ -148,7 +149,7 @@ class ERC20Wrapper:
                            amount: int,
                            signer_acct: NeonAccount,
                            nonce: Optional[int] = None,
-                           overrides: Dict[SolPubKey,SolAccountData] = []):
+                           overrides: Optional[SolanaOverrides] = None):
         erc20 = self.proxy.eth.contract(address=self.neon_contract_address, abi=self.wrapper['abi'])
         if nonce is None:
             nonce = self.proxy.eth.get_transaction_count(signer_acct.address)
@@ -160,16 +161,18 @@ class ERC20Wrapper:
         ).build_transaction(
             {'nonce': nonce, 'gasPrice': 0, 'from': signer_acct.address, 'gas': 0}
         )
-        claim_tx.update({'gas': self.proxy.neon.neon_estimateGas(claim_tx, overrides=overrides)})
+        emulate_params = EmulateParams(solana_overrides=overrides) if overrides else None
+        claim_tx.update({'gas': self.proxy.neon.neon_estimateGas(claim_tx, emulate_params)})
         print(f"Claim_tx: {claim_tx}")
-        return self._create_builder(claim_tx, owner, signer_acct)
+        return self._create_builder(claim_tx, owner, signer_acct, emulate_params=emulate_params)
 
-    def _create_builder(self, tx, owner: SolPubKey, signer_acct: NeonAccount, overrides: Dict[SolPubKey,SolAccountData] = []):
+    def _create_builder(self, tx, owner: SolPubKey, signer_acct: NeonAccount, emulate_params: Optional[EmulateParams] = None):
         tx = self.proxy.eth.account.sign_transaction(tx, signer_acct.key)
         pda_acct = self.proxy.neon.get_neon_account(signer_acct.address).solanaAddress
 
         neon_tx = bytearray.fromhex(tx.rawTransaction.hex()[2:])
-        emulating_result = self.proxy.neon.neon_emulate(neon_tx)   # TODO: Add overrides
+        emulating_result = self.proxy.neon.neon_emulate(neon_tx, emulate_params)   # TODO: Add overrides
+        print(f"Emulating result: {emulating_result}")
 
         neon_account_dict = dict()
         for account in emulating_result['solana_accounts']:
