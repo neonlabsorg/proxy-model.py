@@ -352,7 +352,11 @@ class NeonRpcApiWorker:
 
         return self._gas_tank.has_gas_less_tx_permit(addr)
 
-    def eth_estimateGas(self, param: Dict[str, Any], tag: Union[str, int, dict] = 'latest') -> str:
+    def neon_estimateGas(self, param: Dict[str, Any], emulate_params: Optional[Dict[str,Any]]) -> str:
+        if emulate_params is None:
+            emulate_params = dict()
+
+        tag = emulate_params.get('tag') or 'latest'
         block = self._process_block_tag(tag)
 
         if not isinstance(param, dict):
@@ -364,13 +368,16 @@ class NeonRpcApiWorker:
 
         try:
             calculator = GasEstimate(self._config, self._core_api_client, self._chain_id)
-            return hex(calculator.estimate(param, block))
+            return hex(calculator.estimate(param, block, emulate_params.get('solana_overrides')))
 
         except EthereumError:
             raise
         except BaseException as exc:
             LOG.debug(f"Exception on eth_estimateGas: {str(exc)}")
             raise
+
+    def eth_estimateGas(self, param: Dict[str, Any], tag: Union[str, int, dict] = 'latest') -> str:
+        return self.neon_estimateGas(param, dict(tag=tag))
 
     def __repr__(self):
         return str(self.__dict__)
@@ -1358,13 +1365,14 @@ class NeonRpcApiWorker:
                 return sol_sig_list
         return sol_sig_list
 
-    def neon_emulate(self, raw_signed_tx: str):
+    def neon_emulate(self, raw_signed_tx: str, emulate_params: Optional[Dict[str,Any]]=None):
         """Executes emulator with given transaction"""
         LOG.debug(f'Call neon_emulate: {raw_signed_tx}')
 
         neon_tx = NeonTx.from_string(bytearray.fromhex(raw_signed_tx))
         chain_id = neon_tx.chain_id or self._chain_id
-        emulator_result = self._core_api_client.emulate_neon_tx(neon_tx, chain_id)
+        solana_overrides = emulate_params.get('solana_overrides') if emulate_params else None
+        emulator_result = self._core_api_client.emulate_neon_tx(neon_tx, chain_id, solana_overrides)
         return emulator_result.full_dict
 
     def neon_finalizedBlockNumber(self) -> str:

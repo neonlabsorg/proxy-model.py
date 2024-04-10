@@ -4,8 +4,9 @@ from web3 import Web3
 from web3.module import Module
 from web3.method import Method, default_root_munger
 from web3.providers.base import BaseProvider
-from typing import Optional, Tuple, Callable, Union
-from web3.types import RPCEndpoint, HexBytes, ChecksumAddress, Address, BlockIdentifier
+from typing import Optional, Tuple, Callable, Union, Dict, Any
+from web3.types import RPCEndpoint, TxParams, HexBytes, ChecksumAddress, Address, BlockIdentifier, LatestBlockParam
+from ..common_neon.data import SolanaOverrides
 
 
 @dataclasses.dataclass
@@ -18,16 +19,69 @@ class NeonAccountData:
     solanaAddress: str
     contractSolanaAddress: str
 
+@dataclasses.dataclass
+class EmulateParams:
+    tag: Optional[BlockIdentifier]
+    solana_overrides: Optional[SolanaOverrides]
+
+    def __init__(self, tag: Optional[BlockIdentifier] = None, solana_overrides: Optional[SolanaOverrides] = None):
+        self.tag = tag
+        self.solana_overrides = solana_overrides
+
+    def to_dict(self) -> Dict[str, Any]:
+        result = dict()
+        if self.tag is not None:
+            result['tag'] = self.tag
+        if self.solana_overrides is not None:
+            result['solana_overrides'] = {
+                k.__str__(): None if v is None else {
+                    'lamports': v.lamports,
+                    'data': v.data.hex(),
+                    'owner': v.owner.__str__(),
+                    'executable': v.executable,
+                    'rent_epoch': v.rent_epoch,
+                }
+                for k, v in self.solana_overrides.items()
+            }
+        return result
 
 class Neon(Module):
     _neon_emulate = RPCEndpoint('neon_emulate')
 
-    def _neon_emulate_munger(self, tx: bytearray) -> Tuple[str]:
-        return (bytes(tx).hex(),)
+    def _neon_emulate_munger(
+        self,
+        tx: bytearray,
+        params: Optional[EmulateParams] = None
+    ) -> Tuple[str, Optional[Dict[str,Any]]]:
+        if params is None:
+            return (bytes(tx).hex(),)
+        else:
+            return (bytes(tx).hex(), params.to_dict())
 
-    neon_emulate = Method(
+    neon_emulate: Method[
+        Callable[[bytearray, Optional[EmulateParams]], Dict[str, Any]]
+    ] = Method(
         _neon_emulate,
         mungers=[_neon_emulate_munger],
+    )
+
+    _neon_estimateGas = RPCEndpoint('neon_estimateGas')
+
+    def _neon_estimateGas_munger(
+        self,
+        transaction: TxParams,
+        params: Optional[EmulateParams] = None
+    ) -> Tuple[TxParams, Optional[Dict[str,Any]]]:
+        if params is None:
+            return transaction
+        else:
+            return transaction, params.to_dict()
+        
+    neon_estimateGas: Method[
+        Callable[[TxParams, Optional[EmulateParams]], int]
+    ] = Method(
+        _neon_estimateGas,
+        mungers=[_neon_estimateGas_munger],
     )
 
     _neon_getEvmParams = RPCEndpoint('neon_getEvmParams')

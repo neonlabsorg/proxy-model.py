@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Dict, Any, List, Optional, NewType
 
 from .solana_alt import ALTAddress
-from .solana_tx import SolTx, SolPubKey
+from .solana_tx import SolTx, SolPubKey, SolAccountData
 from .utils import str_fmt_object, cached_property, cached_method
 
 
@@ -17,6 +17,7 @@ class NeonEmulatorExitStatus:
     def to_type(value: str) -> Type:
         return NeonEmulatorExitStatus.Type(value.lower())
 
+SolanaOverrides = Dict[SolPubKey, Optional[SolAccountData]]
 
 class NeonEmulatorResult:
     def __init__(self, res_dict: Optional[Dict[str, Any]] = None):

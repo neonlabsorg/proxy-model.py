@@ -10,11 +10,12 @@ from solana.rpc.commitment import Confirmed as RPCSolConfirmed
 from solders.system_program import ID as SYS_PROGRAM_ID
 
 from spl.token.client import Token as SplToken
+from spl.token._layouts import ACCOUNT_LAYOUT
 from spl.token.constants import TOKEN_PROGRAM_ID
 import spl.token.instructions as SplTokenIxs
 
 from proxy.common_neon.metaplex import create_metadata_instruction_data, create_metadata_instruction
-from proxy.common_neon.solana_tx import SolAccountMeta, SolTxIx, SolAccount, SolPubKey
+from proxy.common_neon.solana_tx import SolAccountMeta, SolTxIx, SolAccount, SolPubKey, SolAccountData
 from proxy.common_neon.neon_instruction import NeonIxBuilder
 from proxy.common_neon.erc20_wrapper import ERC20Wrapper
 from proxy.common_neon.config import Config
@@ -173,6 +174,18 @@ class TestGasTankIntegration(TestCase):
         self.assertNotEqual(big_gas_price, 0)
 
         return gas_price
+    
+    def get_spl_token_account_with_approve(self, spl_token_acc: SolPubKey, delegate: SolPubKey, transfer_amount: int):
+        account = self.solana.get_account_info(spl_token_acc)
+        data = ACCOUNT_LAYOUT.parse(account.data)
+        data.delegate_option = 1
+        data.delegate = bytes(delegate)
+        data.delegated_amount = transfer_amount
+        return SolAccountData(
+            lamports=account.lamports,
+            owner=account.owner,
+            data=ACCOUNT_LAYOUT.build(data)
+        )
 
     def test_success_gas_less_simple_case(self):
         from_owner = self.create_sol_account()
@@ -188,21 +201,6 @@ class TestGasTankIntegration(TestCase):
         self.assertEqual(self.erc20_for_spl.get_balance(to_neon_acct.address), 0)
 
         transfer_amount = 123456
-        tx = self.build_tx(
-            name='Prepare',
-            ix_list=[
-                SplTokenIxs.approve(SplTokenIxs.ApproveParams(
-                    program_id=self.token.program_id,
-                    source=from_spl_token_acc,
-                    delegate=self.erc20_for_spl.get_auth_account_address(signer_acct.address),
-                    owner=from_owner.pubkey(),
-                    amount=transfer_amount,
-                    signers=[],
-                )),
-            ]
-        )
-        self.solana.send_tx(tx, from_owner)
-
         tx = self.build_tx(
             name='SimpleCase',
             ix_list=[
@@ -222,6 +220,13 @@ class TestGasTankIntegration(TestCase):
                     to_acct=to_neon_acct,
                     amount=transfer_amount,
                     signer_acct=signer_acct,
+                    overrides={
+                        from_spl_token_acc: self.get_spl_token_account_with_approve(
+                            from_spl_token_acc,
+                            self.erc20_for_spl.get_auth_account_address(signer_acct.address),
+                            transfer_amount
+                        ),
+                    }
                 ).make_tx_exec_from_data_ix()
             ]
         )
@@ -341,21 +346,6 @@ class TestGasTankIntegration(TestCase):
 
         transfer_amount = 123456
         tx = self.build_tx(
-            name='Prepare',
-            ix_list=[
-                SplTokenIxs.approve(SplTokenIxs.ApproveParams(
-                    program_id=self.token.program_id,
-                    source=from_spl_token_acc,
-                    delegate=self.erc20_for_spl.get_auth_account_address(signer_acct.address),
-                    owner=from_owner.pubkey(),
-                    amount=transfer_amount,
-                    signers=[],
-                )),
-            ]
-        )
-        self.solana.send_tx(tx, from_owner)
-
-        tx = self.build_tx(
             name='NoGasTankAllowance',
             ix_list=[
                 self.create_account_instruction(signer_acct.address, from_owner.pubkey()),
@@ -373,6 +363,13 @@ class TestGasTankIntegration(TestCase):
                     to_acct=to_neon_acct,
                     amount=transfer_amount,
                     signer_acct=signer_acct,
+                    overrides={
+                        from_spl_token_acc: self.get_spl_token_account_with_approve(
+                            from_spl_token_acc,
+                            self.erc20_for_spl.get_auth_account_address(signer_acct.address),
+                            transfer_amount
+                        ),
+                    }
                 ).make_tx_exec_from_data_ix()
             ]
         )
