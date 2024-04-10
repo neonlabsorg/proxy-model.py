@@ -356,6 +356,7 @@ class MPGasPriceTokenResult:
     operator_fee: int
     gas_price_slippage: int
     cu_priority_fee: int
+    simple_cu_priority_fee: int
 
     suggested_gas_price: int
     is_const_gas_price: bool
