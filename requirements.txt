@@ -8,7 +8,7 @@ ecdsa==0.18.0
 safe-pysha3==1.0.4
 rlp==4.0.0
 rusty-rlp==0.3.0
-solana==0.32.0
+solana==0.33.0
 solders==0.21.0
 psycopg2-binary==2.9.9
 py-solc-x==1.1.1
