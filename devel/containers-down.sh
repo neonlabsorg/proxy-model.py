@@ -11,8 +11,14 @@ export REVISION=${REVISION:-$PROXY_REVISION}
 export VIRTUAL_ENV=${VIRTUAL_ENV:-}
 
 BINDIR="$(dirname $BASH_SOURCE)"
+COMPOSE_OVERRIDES=""
+
+if [ "$PROXY_REVISION" == "local" ]; then
+    COMPOSE_OVERRIDES="-f $BINDIR/../docker-compose/docker-compose-local-development.yml"
+fi
 
 docker-compose \
     -f "$BINDIR/../docker-compose/docker-compose-ci.yml" \
+    $COMPOSE_OVERRIDES \
     -p "$PROJECT_NAME" \
-    down
+    down -v
