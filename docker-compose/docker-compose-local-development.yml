@@ -1,0 +1,13 @@
+services:
+  proxy:
+    volumes:
+      - host:/opt
+    entrypoint: tail -f /dev/null
+
+volumes:
+  host:
+    driver: local
+    driver_opts:
+      type: none
+      device: ${PWD}
+      o: bind
