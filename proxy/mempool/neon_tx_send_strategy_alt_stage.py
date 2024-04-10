@@ -23,7 +23,12 @@ class ALTNeonTxPrepStage(BaseNeonTxPrepStage):
         self._test_legacy_tx: Optional[SolLegacyTx] = None
         self._actual_alt_info: Optional[ALTInfo] = None
         self._alt_info_dict: Dict[str, ALTInfo] = dict()
-        self._alt_builder = ALTTxBuilder(self._ctx.solana, self._ctx.ix_builder, self._ctx.signer)
+        self._alt_builder = ALTTxBuilder(
+            self._ctx.solana,
+            self._ctx.ix_builder,
+            self._ctx.signer,
+            ctx.config.simple_cu_priority_fee
+        )
         self._alt_tx_set = ALTTxSet()
 
     @property

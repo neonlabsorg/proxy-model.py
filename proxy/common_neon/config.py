@@ -123,6 +123,7 @@ class Config(DBConfig):
         self._operator_fee = self._env_num('OPERATOR_FEE', Decimal('0.1'), Decimal('0.0'), Decimal('100.0'))
         self._gas_price_slippage = self._env_num('GAS_PRICE_SLIPPAGE', Decimal('0.1'), Decimal('0.0'), Decimal('100.0'))
         self._cu_priority_fee = self._env_num('CU_PRIORITY_FEE', 0, 0, 1_000_000)
+        self._simple_cu_priority_fee = self._env_num('SIMPLE_CU_PRIORITY_FEE', 0, 0, 1_000_000)
 
         min_gas_price = self._env_num('MINIMAL_GAS_PRICE', Decimal(1), Decimal(0), Decimal(100_000_000))
         self._min_gas_price = int(min_gas_price * (10 ** 9))
@@ -449,6 +450,10 @@ class Config(DBConfig):
         return self._cu_priority_fee
 
     @property
+    def simple_cu_priority_fee(self) -> int:
+        return self._simple_cu_priority_fee
+
+    @property
     def min_gas_price(self) -> int:
         """Minimal gas price to accept tx into the mempool"""
         return self._min_gas_price
@@ -644,6 +649,7 @@ class Config(DBConfig):
             'OPERATOR_FEE': self.operator_fee,
             'GAS_PRICE_SLIPPAGE': self.gas_price_slippage,
             'CU_PRIORITY_FEE': self.cu_priority_fee,
+            'SIMPLE_CU_PRIORITY_FEE': self.simple_cu_priority_fee,
 
             'MINIMAL_GAS_PRICE': self.min_gas_price,
             'MINIMAL_WO_CHAINID_GAS_PRICE': self.min_wo_chainid_gas_price,

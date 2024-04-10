@@ -120,13 +120,14 @@ class WriteHolderNeonTxPrepStage(BaseNeonTxPrepStage):
         holder_msg_offset = 0
         holder_msg = copy.copy(builder.holder_msg)
 
-        holder_msg_size = 950
+        holder_msg_size = 900
         while len(holder_msg):
             (holder_msg_part, holder_msg) = (holder_msg[:holder_msg_size], holder_msg[holder_msg_size:])
-            tx = SolLegacyTx(
-                name=self.name,
-                ix_list=[builder.make_write_ix(holder_msg_offset, holder_msg_part)]
-            )
+            ix_list = []
+            if self._cu_priority_fee:
+                ix_list.append(builder.make_compute_budget_cu_fee_ix(self._cu_priority_fee))
+            ix_list.append(builder.make_write_ix(holder_msg_offset, holder_msg_part))
+            tx = SolLegacyTx(name=self.name, ix_list=ix_list)
             tx_list.append(tx)
             holder_msg_offset += holder_msg_size
 

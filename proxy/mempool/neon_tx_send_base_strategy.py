@@ -20,6 +20,7 @@ LOG = logging.getLogger(__name__)
 class BaseNeonTxPrepStage(abc.ABC):
     def __init__(self, ctx: NeonTxSendCtx):
         self._ctx = ctx
+        self._cu_priority_fee = self._ctx.config.simple_cu_priority_fee
 
     @abc.abstractmethod
     def complete_init(self) -> None:
@@ -45,7 +46,7 @@ class BaseNeonTxStrategy(abc.ABC):
         self._validation_error_msg: Optional[str] = None
         self._prep_stage_list: List[BaseNeonTxPrepStage] = list()
         self._ctx = ctx
-        self._cu_priority_fee = 0
+        self._cu_priority_fee = ctx.config.simple_cu_priority_fee
 
     @property
     def ctx(self) -> NeonTxSendCtx:
