@@ -31,7 +31,7 @@ from ..common_neon.neon_tx_result_info import NeonTxResultInfo
 from ..common_neon.solana_block import SolBlockInfo
 from ..common_neon.solana_interactor import SolInteractor
 from ..common_neon.solana_neon_tx_receipt import SolNeonIxReceiptInfo, SolAltIxInfo
-from ..common_neon.solana_tx import SolCommit, SolPubKey, SolAccountData
+from ..common_neon.solana_tx import SolCommit
 from ..common_neon.utils import NeonTxInfo
 from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.evm_log_decoder import NeonLogTxEvent

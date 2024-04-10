@@ -171,7 +171,6 @@ class NeonCoreApiClient(NeonClientBase):
             solana_overrides=solana_overrides
         )
         request = self._add_block(request, block)
-        LOG.debug(f"emulate: {request}")
         response = self._call(_MethodName.emulate, request)
         self._check_emulated_error(response)
 

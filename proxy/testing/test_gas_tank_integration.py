@@ -8,7 +8,6 @@ from typing import Dict, Any
 from solana.rpc.api import Client as RPCSolClient
 from solana.rpc.commitment import Confirmed as RPCSolConfirmed
 from solders.system_program import ID as SYS_PROGRAM_ID
-from solders.account import Account as SolAccountData
 
 from spl.token.client import Token as SplToken
 from spl.token._layouts import ACCOUNT_LAYOUT
@@ -16,7 +15,7 @@ from spl.token.constants import TOKEN_PROGRAM_ID
 import spl.token.instructions as SplTokenIxs
 
 from proxy.common_neon.metaplex import create_metadata_instruction_data, create_metadata_instruction
-from proxy.common_neon.solana_tx import SolAccountMeta, SolTxIx, SolAccount, SolPubKey
+from proxy.common_neon.solana_tx import SolAccountMeta, SolTxIx, SolAccount, SolPubKey, SolAccountData
 from proxy.common_neon.neon_instruction import NeonIxBuilder
 from proxy.common_neon.erc20_wrapper import ERC20Wrapper
 from proxy.common_neon.config import Config
@@ -45,6 +44,7 @@ class TestGasTankIntegration(TestCase):
     mint_authority: SolAccount
     token: SplToken
     erc20_for_spl: ERC20Wrapper
+    solana: SolClient
 
     @classmethod
     def setUpClass(cls):

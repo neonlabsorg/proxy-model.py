@@ -4,9 +4,8 @@ from web3 import Web3
 from web3.module import Module
 from web3.method import Method, default_root_munger
 from web3.providers.base import BaseProvider
-from typing import Optional, Tuple, Callable, Union, Dict, List, Any
+from typing import Optional, Tuple, Callable, Union, Dict, Any
 from web3.types import RPCEndpoint, TxParams, HexBytes, ChecksumAddress, Address, BlockIdentifier, LatestBlockParam
-from ..common_neon.solana_tx import SolAccountData, SolPubKey
 from ..common_neon.data import SolanaOverrides
 
 
