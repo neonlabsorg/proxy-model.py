@@ -5,6 +5,7 @@ from aioprometheus import Counter, Gauge, Histogram
 from .data import NeonTxStatData, NeonBlockStatData, NeonDoneBlockStatData
 from .middleware import StatService
 from .stat_data_peeker import StatDataPeeker, IHealthStatService
+from .types import PositiveCounter
 
 from ..common_neon.config import Config
 
@@ -35,7 +36,7 @@ class IndexerStatService(StatService, IHealthStatService):
             'tx_sol_spent', 'LAMPORTs spent on tx execution',
             registry=self._registry
         )
-        self._metr_tx_op_sol_spent = Counter(
+        self._metr_tx_op_sol_spent = PositiveCounter(
             'tx_op_sol_spent', 'LAMPORTs spent by operator on tx execution',
             registry=self._registry
         )
