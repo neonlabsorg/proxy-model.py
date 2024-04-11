@@ -156,7 +156,7 @@ class TestGasTankIntegration(TestCase):
 
     def neon_gas_price_impl(self, param: Dict[str, Any]) -> int:
         gas_price = self.proxy.web3.neon.neon_gasPrice(param)
-        return int(gas_price.gas_price[2:], 16)
+        return int(gas_price.gasPrice[2:], 16)
 
     def neon_gas_price(self, account: str) -> int:
         gas = 1_000_000

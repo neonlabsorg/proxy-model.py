@@ -191,20 +191,21 @@ class NeonRpcApiWorker:
         return self._format_gas_price(self._gas_price.suggested_gas_price)
 
     def _format_gas_price(self, gas_price: int) -> Union[str, Dict[str, str]]:
-        gas_price_info = self._gas_price
+        token_gas_price_info = self._gas_price
         return dict(
-            gas_price=hex(gas_price),
-            suggested_gas_price=hex(gas_price_info.suggested_gas_price),
-            is_const_gas_price=gas_price_info.is_const_gas_price,
-            min_acceptable_gas_price=hex(gas_price_info.min_acceptable_gas_price),
-            min_executable_gas_price=hex(gas_price_info.min_executable_gas_price),
-            min_wo_chainid_acceptable_gas_price=hex(gas_price_info.min_wo_chainid_acceptable_gas_price),
-            allow_underpriced_tx_wo_chainid=gas_price_info.allow_underpriced_tx_wo_chainid,
-            sol_price_usd=hex(gas_price_info.sol_price_usd),
-            neon_price_usd=hex(gas_price_info.neon_price_usd),
-            operator_fee=hex(gas_price_info.operator_fee),
-            gas_price_slippage=hex(gas_price_info.gas_price_slippage),
-            cu_priority_usd=hex(gas_price_info.cu_priority_fee)
+            gasPrice=hex(gas_price),
+            suggestedGasPrice=hex(token_gas_price_info.suggested_gas_price),
+            isConstGasPrice=token_gas_price_info.is_const_gas_price,
+            minAcceptableGasPrice=hex(token_gas_price_info.min_acceptable_gas_price),
+            minExecutableGasPrice=hex(token_gas_price_info.min_executable_gas_price),
+            minWoChainIDAcceptableGasPrice=hex(token_gas_price_info.min_wo_chainid_acceptable_gas_price),
+            allowUnderpricedTxWoChainID=token_gas_price_info.allow_underpriced_tx_wo_chainid,
+            solPriceUsd=hex(token_gas_price_info.sol_price_usd),
+            neonPriceUsd=hex(token_gas_price_info.neon_price_usd),
+            operatorFee=hex(token_gas_price_info.operator_fee),
+            gasPriceSlippage=hex(token_gas_price_info.gas_price_slippage),
+            solanaCUPriorityFee=hex(token_gas_price_info.cu_priority_fee),
+            solanaSimpleCUPriorityFee=hex(token_gas_price_info.simple_cu_priority_fee),
         )
 
     @staticmethod
