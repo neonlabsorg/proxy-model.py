@@ -62,7 +62,7 @@ class MemPool:
         self._stat_client = stat_client
 
         self._elf_param_dict_task_loop = MPElfParamDictTaskLoop(executor_mng)
-        self._gas_price_task_loop = MPGasPriceTaskLoop(executor_mng)
+        self._gas_price_task_loop = MPGasPriceTaskLoop(config, executor_mng)
         self._state_tx_cnt_task_loop = MPSenderTxCntTaskLoop(executor_mng, self._tx_schedule)
 
         self._reschedule_time_sec = config.mempool_reschedule_time_sec
