@@ -351,7 +351,7 @@ jobs:
     needs:
       - prepare-infrastructure
       - build-image
-    uses: neonlabsorg/neon-tests/.github/workflows/dapps.yml@NDEV-2772
+    uses: neonlabsorg/neon-tests/.github/workflows/dapps_reusable.yml@NDEV-2772
     with:
       network: custom
       dapps: ${{ needs.build-image.outputs.dapps_list }}
@@ -362,6 +362,7 @@ jobs:
       pr_url_for_report: ${{ github.event.inputs.initial_pr }}
       proxy_ip: ${{ needs.prepare-infrastructure.outputs.proxy_ip }}
       solana_ip: ${{ needs.prepare-infrastructure.outputs.solana_ip }}
+      external_call: true
 
   #  will be fixed by NDEV-2766
 #  economy-tests:
