@@ -337,6 +337,9 @@ class MPGasPriceResult:
     sol_price_account: SolPubKey
     neon_price_account: SolPubKey
 
+    def up_min_executable_gas_price(self, min_executable_gas_price: int) -> None:
+        object.__setattr__(self, 'min_executable_gas_price', min_executable_gas_price)
+
 
 @dataclass(frozen=True)
 class MPElfParamDictResult:

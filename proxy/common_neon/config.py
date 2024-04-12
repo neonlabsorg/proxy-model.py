@@ -83,6 +83,7 @@ class Config(DBConfig):
         # Mempool limits
         self._mempool_capacity = self._env_num('MEMPOOL_CAPACITY', 4096, 10, 4096 * 1024)
         self._mempool_executor_limit_cnt = self._env_num('MEMPOOL_EXECUTOR_LIMIT_COUNT', 128, 4, 1024)
+        self._mempool_gas_price_window = self._env_num('MEMPOOL_GAS_PRICE_WINDOW', 10, 1, None)
         self._mempool_cache_life_sec = self._env_num(
             'MEMPOOL_CACHE_LIFE_SEC',
             30 * 60,  # 30 min
@@ -387,6 +388,10 @@ class Config(DBConfig):
     @property
     def mempool_executor_limit_cnt(self) -> int:
         return self._mempool_executor_limit_cnt
+
+    @property
+    def mempool_gas_price_window(self) -> int:
+        return self._mempool_gas_price_window
 
     @property
     def mempool_cache_life_sec(self) -> int:
