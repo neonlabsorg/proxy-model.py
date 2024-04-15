@@ -66,10 +66,11 @@ CONTAINERS = ['proxy', 'solana', 'neon_test_invoke_program_loader',
 docker_client = docker.APIClient()
 terraform = Terraform(working_dir=pathlib.Path(
     __file__).parent / "full_test_suite")
+VERSION_BRANCH_TEMPLATE = r"[vt]{1}\d{1,2}\.\d{1,2}\.x.*"
 
 
 def docker_compose(args: str):
-    command = f'docker-compose {args}'
+    command = f'docker-compose --compatibility {args}'
     click.echo(f"run command: {command}")
     out = subprocess.run(command, shell=True)
     click.echo("return code: " + str(out.returncode))
@@ -122,14 +123,11 @@ def build_docker_image(neon_evm_tag,  proxy_tag, head_ref_branch, skip_pull):
     neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
     neon_evm_image = f'{DOCKERHUB_ORG_NAME}/evm_loader:{neon_evm_tag}'
     click.echo(f"neon-evm image: {neon_evm_image}")
-    neon_test_invoke_program_image = f"{DOCKERHUB_ORG_NAME}/neon_test_invoke_program:develop"
     if not skip_pull:
         click.echo('pull docker images...')
         out = docker_client.pull(neon_evm_image, stream=True, decode=True)
         process_output(out)
 
-        out = docker_client.pull(neon_test_invoke_program_image, stream=True, decode=True)
-        process_output(out)
     else:
         click.echo('skip pulling of docker images')
 
@@ -146,36 +144,40 @@ def build_docker_image(neon_evm_tag,  proxy_tag, head_ref_branch, skip_pull):
 
 @cli.command(name="publish_image")
 @click.option('--proxy_tag')
-def publish_image(proxy_tag):
-    docker_client.login(username=DOCKER_USERNAME, password=DOCKER_PASSWORD)
-    out = docker_client.push(f"{IMAGE_NAME}:{proxy_tag}", decode=True, stream=True)
-    process_output(out)
+@click.option('--head_ref')
+@click.option('--github_ref_name')
+def publish_image(proxy_tag, head_ref, github_ref_name):
+    push_image_with_tag(proxy_tag, proxy_tag)
+    branch_name_tag = None
+    if head_ref:
+        branch_name_tag = head_ref.split('/')[-1]
+    elif re.match(VERSION_BRANCH_TEMPLATE,  github_ref_name):
+        branch_name_tag = github_ref_name
+    if branch_name_tag:
+        push_image_with_tag(proxy_tag, branch_name_tag)
 
 
-@cli.command(name="finalize_image")
-@click.option('--head_ref_branch')
-@click.option('--github_ref')
-@click.option('--proxy_tag')
-def finalize_image(head_ref_branch, github_ref, proxy_tag):
-    branch = github_ref.replace("refs/heads/", "")
-    if 'refs/tags/' in branch:
-        tag = branch.replace("refs/tags/", "")
-    elif branch == 'master':
-        tag = 'stable'
-    elif branch == 'develop':
-        tag = 'latest'
-    elif head_ref_branch != "":
-        tag = head_ref_branch.split('/')[-1]
-    else:
-        tag = branch.split('/')[-1]
-
+def push_image_with_tag(sha, tag):
     click.echo(f"The tag for publishing: {tag}")
     docker_client.login(username=DOCKER_USERNAME, password=DOCKER_PASSWORD)
-    out = docker_client.pull(f"{IMAGE_NAME}:{proxy_tag}", decode=True, stream=True)
-    process_output(out)
-    docker_client.tag(f"{IMAGE_NAME}:{proxy_tag}", f"{IMAGE_NAME}:{tag}")
+    docker_client.tag(f"{IMAGE_NAME}:{sha}", f"{IMAGE_NAME}:{tag}")
     out = docker_client.push(f"{IMAGE_NAME}:{tag}", decode=True, stream=True)
     process_output(out)
+
+@cli.command(name="finalize_image")
+@click.option('--github_ref')
+@click.option('--proxy_tag')
+def finalize_image(github_ref, proxy_tag):
+    final_tag = ""
+    if 'refs/tags/' in github_ref:
+        final_tag = github_ref.replace("refs/tags/", "")
+    elif github_ref == 'refs/tags/develop':
+        final_tag = 'latest'
+
+    if final_tag:
+        out = docker_client.pull(f"{IMAGE_NAME}:{proxy_tag}", decode=True, stream=True)
+        process_output(out)
+        push_image_with_tag(proxy_tag, final_tag)
 
 
 @cli.command(name="terraform_infrastructure")
@@ -232,7 +234,6 @@ def set_github_env(envs: tp.Dict, upper=True) -> None:
 @click.option('--proxy_tag')
 @click.option('--run_number')
 def destroy_terraform(proxy_tag, run_number):
-    ####
     log = logging.getLogger()
     log.handlers = []
     handler = logging.StreamHandler(sys.stdout)
@@ -246,7 +247,6 @@ def destroy_terraform(proxy_tag, run_number):
         return re.sub(r'(?m)^', ' ' * TF_OUTPUT_OFFSET, str(output))
 
     TF_OUTPUT_OFFSET = 16
-    ####
     os.environ["TF_VAR_proxy_image_tag"] = proxy_tag
     os.environ["TF_VAR_dockerhub_org_name"] = DOCKERHUB_ORG_NAME
     thstate_key = f'{TFSTATE_KEY_PREFIX}{proxy_tag}-{run_number}'
@@ -254,7 +254,6 @@ def destroy_terraform(proxy_tag, run_number):
     backend_config = {"bucket": TFSTATE_BUCKET,
                       "key": thstate_key, "region": TFSTATE_REGION}
     terraform.init(backend_config=backend_config)
-    #### terraform.apply('-destroy', skip_plan=True)
     tf_destroy = terraform.apply('-destroy', skip_plan=True)
     log.info(format_tf_output(tf_destroy))
 
@@ -281,7 +280,7 @@ def get_all_containers_logs():
     ssh_client.connect(hostname=solana_ip, username='root',
                        key_filename=ssh_key, timeout=120)
 
-    upload_remote_logs(ssh_client, "solana", artifact_logs)
+    upload_remote_logs(ssh_client, "opt_solana_1", artifact_logs)
 
     ssh_client.connect(hostname=proxy_ip, username='root',
                        key_filename=ssh_key, timeout=120)
@@ -472,8 +471,8 @@ def run_uniswap_test(project_name):
 @click.option("--proxy_ip", help="proxy ip")
 @click.option('--pr_url_for_report', default="", help="Url to send the report as comment for PR")
 @click.option('--token', help="github token")
-@click.option('--test_set', help="fullTestSuite or extendedFullTestSuite")
-def trigger_dapps_tests(solana_ip, proxy_ip, pr_url_for_report, token, test_set):
+@click.option('--full_test_suite', help="set in true to run all dapps tests")
+def trigger_dapps_tests(solana_ip, proxy_ip, pr_url_for_report, token, full_test_suite):
     github = GithubClient(token)
 
     runs_before = github.get_dapps_runs_list()
@@ -482,7 +481,7 @@ def trigger_dapps_tests(solana_ip, proxy_ip, pr_url_for_report, token, test_set)
     solana_url = f"http://{solana_ip}:8899/"
     faucet_url = f"http://{proxy_ip}:3333/"
 
-    github.run_dapps_dispatches(proxy_url, solana_url, faucet_url, pr_url_for_report, test_set)
+    github.run_dapps_dispatches(proxy_url, solana_url, faucet_url, pr_url_for_report, full_test_suite)
     wait_condition(lambda: github.get_dapps_runs_count() > runs_count_before, timeout_sec=180)
 
     runs_after = github.get_dapps_runs_list()
