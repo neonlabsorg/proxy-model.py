@@ -351,7 +351,7 @@ jobs:
     needs:
       - prepare-infrastructure
       - build-image
-    uses: neonlabsorg/neon-tests/.github/workflows/dapps_reusable.yml@NDEV-2772
+    uses: neonlabsorg/neon-tests/.github/workflows/dapps_reusable.yml@develop
     with:
       network: custom
       dapps: ${{ needs.build-image.outputs.dapps_list }}
