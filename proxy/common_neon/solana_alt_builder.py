@@ -36,9 +36,16 @@ class ALTTxBuilder:
     _create_name = 'CreateLookupTable'
     _extend_name = 'ExtendLookupTable'
 
-    def __init__(self, solana: SolInteractor, ix_builder: NeonIxBuilder, signer: SolAccount) -> None:
+    def __init__(
+        self,
+        solana: SolInteractor,
+        ix_builder: NeonIxBuilder,
+        signer: SolAccount,
+        cu_priority_fee: int
+    ) -> None:
         self._solana = solana
         self._ix_builder = ix_builder
+        self._cu_priority_fee = cu_priority_fee
         self._signer = signer
         self._recent_block_slot: Optional[int] = None
 
@@ -88,15 +95,11 @@ class ALTTxBuilder:
         max_tx_account_cnt = ALTLimit.max_tx_account_cnt
         while len(acct_list):
             acct_list_part, acct_list = acct_list[:max_tx_account_cnt], acct_list[max_tx_account_cnt:]
-            tx = SolLegacyTx(
-                name=self._extend_name,
-                ix_list=[
-                    self._ix_builder.make_extend_lookup_table_ix(
-                        alt_info.table_account,
-                        acct_list_part
-                    )
-                ]
-            )
+            ix_list = list()
+            if self._cu_priority_fee:
+                ix_list.append(self._ix_builder.make_compute_budget_cu_fee_ix(self._cu_priority_fee))
+            ix_list.append(self._ix_builder.make_extend_lookup_table_ix(alt_info.table_account, acct_list_part))
+            tx = SolLegacyTx(name=self._extend_name, ix_list=ix_list)
             extend_alt_tx_list.append(tx)
 
         # If list of accounts is small, including of first extend-tx into create-tx will decrease time of tx execution

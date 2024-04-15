@@ -322,7 +322,8 @@ class NeonRpcApiWorker:
             tokenPriceUsd=hex(token_gas_price_info.token_price_usd),
             operatorFee=hex(token_gas_price_info.operator_fee),
             gasPriceSlippage=hex(token_gas_price_info.gas_price_slippage),
-            solanaCUPriorityFee=hex(token_gas_price_info.cu_priority_fee)
+            solanaCUPriorityFee=hex(token_gas_price_info.cu_priority_fee),
+            solanaSimpleCUPriorityFee=hex(token_gas_price_info.simple_cu_priority_fee),
         )
 
     @staticmethod
