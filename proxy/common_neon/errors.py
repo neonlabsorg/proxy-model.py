@@ -176,6 +176,10 @@ class NonceTooHighError(RescheduleError):
     def __str__(self) -> str:
         return 'tx nonce is too high for execution'
 
+class InvalidChainIdError(EthereumError):
+    def __init__(self, chain_id: int):
+        super().__init__(f'invalid chain id: {chain_id}')
+
 
 class OutOfGasError(BaseException):
     def __init__(self, has_gas_limit: int, req_gas_limit: int):

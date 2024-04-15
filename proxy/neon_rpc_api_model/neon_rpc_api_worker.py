@@ -21,7 +21,7 @@ from ..common_neon.config import Config
 from ..common_neon.constants import EVM_PROGRAM_ID_STR
 from ..common_neon.data import NeonTxExecCfg
 from ..common_neon.db.db_connect import DBConnection
-from ..common_neon.errors import EthereumError, InvalidParamError, NonceTooHighError, NonceTooLowError
+from ..common_neon.errors import EthereumError, InvalidChainIdError, InvalidParamError, NonceTooHighError, NonceTooLowError
 from ..common_neon.eth_commit import EthCommit
 from ..common_neon.evm_config import EVMConfig
 from ..common_neon.keys_storage import KeyStorage
@@ -1075,6 +1075,8 @@ class NeonRpcApiWorker:
                 NonceTooLowError.raise_error(neon_tx.hex_sender, neon_tx.nonce, result.state_tx_cnt)
             elif result.code == MPTxSendResultCode.NonceTooHigh:
                 raise NonceTooHighError(result.state_tx_cnt)
+            elif result.code == MPTxSendResultCode.InvalidChainId:
+                raise InvalidChainIdError(neon_tx.chain_id)
             else:
                 raise EthereumError(message='unknown error')
         except BaseException as exc:
@@ -1189,7 +1191,7 @@ class NeonRpcApiWorker:
         return hex(len(tx_list))
 
     @staticmethod
-    def eth_accounts() -> [str]:
+    def eth_accounts() -> List[str]:
         storage = KeyStorage()
         account_list = storage.get_list()
         return [a.checksum_address for a in account_list]

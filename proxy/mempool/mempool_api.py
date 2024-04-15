@@ -338,6 +338,7 @@ class MPTxSendResultCode(IntEnum):
     Underprice = 2
     AlreadyKnown = 3
     NonceTooHigh = 4
+    InvalidChainId = 5
     Unspecified = 255
 
 

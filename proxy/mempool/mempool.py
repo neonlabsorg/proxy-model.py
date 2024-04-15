@@ -88,6 +88,16 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
 
     def _update_gas_price(self, tx: MPTxRequest) -> Optional[MPTxSendResult]:
         if not tx.has_chain_id():
+            if not self._has_evm_config:
+                LOG.debug("No chain-id supplied while evm config not initialized")
+                return MPTxSendResult(code=MPTxSendResultCode.InvalidChainId, state_tx_cnt=None)
+
+            neon_chain_id = EVMConfig().get_token_info_by_name("NEON").chain_id
+
+            if neon_chain_id is None or EVMConfig().chain_id != neon_chain_id:
+                LOG.debug("No chain-id supplied to non-NEON chain")
+                return MPTxSendResult(code=MPTxSendResultCode.InvalidChainId, state_tx_cnt=None)
+
             LOG.debug("Increase gas-price for wo-chain-id tx")
         elif tx.gas_price == 0:
             LOG.debug("Increase gas-price for gas-less tx")
