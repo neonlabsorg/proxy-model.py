@@ -241,6 +241,7 @@ class TestMemPool(unittest.IsolatedAsyncioTestCase):
                     gas_price_slippage=1,
                     operator_fee=10,
                     cu_priority_fee=0,
+                    simple_cu_priority_fee=0,
                     allow_underpriced_tx_wo_chainid=True,
                     min_wo_chainid_acceptable_gas_price=1,
                 )
@@ -598,11 +599,10 @@ class TestMPSchedule(unittest.TestCase):
             account_nonces.append(0)
 
             for _ in range(0, reqs_per_acc):
-                if random.choice([True, False]):  # 50% chance of having a nonce gap
+                # Once we are over the limit, there is a 50% chance of having a nonce gap
+                if len(req_list) > mp_schedule_capacity_limit and random.choice([True, False]):
                     nonce = account_nonces[acc_idx] + randint(2, 100)
-
-                    if len(req_list) > mp_schedule_capacity_limit:
-                        expected_nonce_gap_error_count += 1
+                    expected_nonce_gap_error_count += 1
                 else:
                     nonce = account_nonces[acc_idx]
                     account_nonces[acc_idx] += 1
@@ -619,6 +619,7 @@ class TestMPSchedule(unittest.TestCase):
 
         nonce_too_high_error_count = 0
         underprice_error_count = 0
+        success_count = 0
 
         for req in req_list:
             result = schedule.add_tx(req)
@@ -627,13 +628,16 @@ class TestMPSchedule(unittest.TestCase):
                 nonce_too_high_error_count += 1
             elif result.code == MPTxSendResultCode.Underprice:
                 underprice_error_count += 1
-            elif result.code != MPTxSendResultCode.Success:
+            elif result.code == MPTxSendResultCode.Success:
+                success_count += 1
+            else:
                 self.fail(f"Unexpected result code: {result.code}")
 
         self.assertGreater(expected_nonce_gap_error_count, 0)
         self.assertGreater(nonce_too_high_error_count, 0)
         self.assertGreater(underprice_error_count, 0)
-        self.assertGreater(nonce_too_high_error_count + underprice_error_count, mp_schedule_capacity_limit)
+        self.assertGreater(success_count, 0)
+        self.assertEqual(nonce_too_high_error_count + underprice_error_count + success_count, len(req_list))
         self.assertEqual(mp_schedule_capacity, schedule.tx_cnt)
 
     def test_tx_lifecycle(self):
