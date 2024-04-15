@@ -114,8 +114,6 @@ class GasPriceCalculator:
             price = self._pyth_network_client.get_price(token_price_symbol)
             if price is None:
                 raise RuntimeError(f'{token_price_symbol} price is absent in the pyth.network list')
-            if price.get('status', 0) != 1:  # tradable
-                raise PythNetworkError(f'{token_price_symbol} price status is not tradable')
             return Decimal(price['price'])
         except PythNetworkError as exc:
             LOG.debug(f'Failed to retrieve {token_price_symbol} price: {str(exc)}')
