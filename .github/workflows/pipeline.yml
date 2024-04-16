@@ -352,6 +352,7 @@ jobs:
       - prepare-infrastructure
       - build-image
     uses: neonlabsorg/neon-tests/.github/workflows/dapps_reusable.yml@develop
+    secrets: inherit
     with:
       network: custom
       dapps: ${{ needs.build-image.outputs.dapps_list }}
