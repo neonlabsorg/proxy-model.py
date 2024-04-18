@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from ..common_neon.config import Config
 from ..common_neon.data import NeonTxExecCfg
@@ -17,11 +17,11 @@ class NeonTxValidator:
     _max_u64 = 2 ** 64 - 1
     _max_u256 = 2 ** 256 - 1
 
-    def __init__(self, cfg: Config, client: NeonCoreApiClient, def_chain_id: int, valid_chain_id_list: List[int]):
+    def __init__(self, cfg: Config, client: NeonCoreApiClient, def_chain_id: int, chain_id: int):
         self._config = cfg
         self._core_api_client = client
         self._def_chain_id = def_chain_id
-        self._valid_chain_id_list = valid_chain_id_list
+        self._chain_id = chain_id
 
     def _get_tx_gas_limit(self, neon_tx: NeonTx) -> int:
         if neon_tx.has_chain_id() or (not self._config.allow_underpriced_tx_wo_chainid):
@@ -40,6 +40,7 @@ class NeonTxValidator:
         return (not neon_tx.has_chain_id()) and (neon_tx.gasPrice < min_gas_price)
 
     def validate(self, neon_tx: NeonTx, gas_limit_permit: bool, min_gas_price: int) -> NeonTxExecCfg:
+        self._prevalidate_tx_chain_id(neon_tx.chain_id)
         chain_id = neon_tx.chain_id or self._def_chain_id
 
         sender_addr = NeonAddress.from_raw(neon_tx.sender, chain_id)
@@ -50,7 +51,6 @@ class NeonTxValidator:
         tx_gas_limit = self._get_tx_gas_limit(neon_tx)
 
         self._prevalidate_sender_eoa(neon_contract_info)
-        self._prevalidate_tx_chain_id(chain_id)
         self._prevalidate_tx_size(neon_tx)
         self._prevalidate_tx_gas(neon_tx, tx_gas_limit, gas_limit_permit)
         self._prevalidate_sender_balance(neon_tx, neon_account_info, tx_gas_limit)
@@ -86,8 +86,11 @@ class NeonTxValidator:
         if tx_gas_limit < 21_000:
             raise EthereumError(message='gas limit reached')
 
-    def _prevalidate_tx_chain_id(self, chain_id: int):
-        if chain_id not in self._valid_chain_id_list:
+    def _prevalidate_tx_chain_id(self, tx_chain_id: Optional[int]):
+        if tx_chain_id is None:
+            if self._chain_id != self._def_chain_id:
+                raise EthereumError(message='wrong chain id')
+        elif tx_chain_id != self._chain_id:
             raise EthereumError(message='wrong chain id')
 
     @staticmethod
