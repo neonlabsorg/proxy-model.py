@@ -49,10 +49,6 @@ TFSTATE_KEY_PREFIX = os.environ.get("TFSTATE_KEY_PREFIX")
 TFSTATE_REGION = os.environ.get("TFSTATE_REGION")
 IMAGE_NAME = os.environ.get("IMAGE_NAME")
 
-UNISWAP_V2_CORE_REPO = os.environ.get("UNISWAP_V2_CORE_REPO")
-UNISWAP_V2_CORE_COMMIT = os.environ.get("UNISWAP_V2_CORE_COMMIT")
-UNISWAP_V2_CORE_IMAGE = f'{UNISWAP_V2_CORE_REPO}:{UNISWAP_V2_CORE_COMMIT}'
-
 FAUCET_COMMIT = os.environ.get("FAUCET_COMMIT")
 
 NEON_TESTS_IMAGE = os.environ.get("NEON_TESTS_IMAGE")
@@ -308,10 +304,9 @@ def upload_remote_logs(ssh_client, service, artifact_logs):
 @click.option('--faucet_tag', help="the neon faucet image tag")
 @click.option('--head_ref_branch')
 @click.option('--github_ref_name')
-@click.option('--skip_uniswap', is_flag=True, show_default=True, default=False, help="flag for skipping uniswap tests")
 @click.option('--test_files', help="comma-separated file names if you want to run a specific list of tests")
 @click.option('--skip_pull', is_flag=True, default=False, help="skip pulling of docker images from the docker-hub")
-def deploy_check(proxy_tag, neon_evm_tag, faucet_tag, head_ref_branch, github_ref_name, skip_uniswap, test_files, skip_pull):
+def deploy_check(proxy_tag, neon_evm_tag, faucet_tag, head_ref_branch, github_ref_name, test_files, skip_pull):
     feature_branch = head_ref_branch if head_ref_branch != "" else github_ref_name
     neon_evm_tag = update_neon_evm_tag_if_same_branch_exists(head_ref_branch, neon_evm_tag)
     if feature_branch not in ['master', 'develop']:
@@ -341,9 +336,6 @@ def deploy_check(proxy_tag, neon_evm_tag, faucet_tag, head_ref_branch, github_re
 
     for service_name in ['SOLANA', 'PROXY', 'FAUCET']:
         wait_for_service(project_name, service_name)
-
-    if not skip_uniswap:
-        run_uniswap_test(project_name)
 
     if test_files is None:
         test_list = get_test_list(project_name)
@@ -449,20 +441,6 @@ def wait_for_service(project_name: str, service_name: str):
         except:
             raise RuntimeError(f"Error during run command {command}")
         time.sleep(1)
-
-
-def run_uniswap_test(project_name):
-    faucet_name = 'FAUCET'
-    faucet_url = get_service_url(project_name, faucet_name)
-    os.environ[f'{faucet_name}_URL'] = faucet_url
-
-    docker_client.pull(UNISWAP_V2_CORE_IMAGE)
-    command = f'docker run --rm --network=container:{project_name}_proxy_1 -e {faucet_name}_URL \
-        --entrypoint ./deploy-test.sh {UNISWAP_V2_CORE_IMAGE} all 2>&1'
-    out = subprocess.run(command, shell=True)
-    click.echo("return code: " + str(out.returncode))
-    if out.returncode != 0:
-        raise RuntimeError(f"Uniswap tests failed. Err: {out.stderr}")
 
 
 @cli.command(name="send_notification", help="Send notification to slack")
