@@ -1137,8 +1137,7 @@ class NeonRpcApiWorker:
             gas_less_permit = self._has_gas_less_tx_permit(tx_sender, neon_tx.nonce, neon_tx.gasLimit)
 
         min_gas_price = self._gas_price.min_executable_gas_price
-        chain_id_list = [self._chain_id, None] if self._data.def_chain_id == self._chain_id else [self._chain_id]
-        neon_tx_validator = NeonTxValidator(self._config, self._core_api_client, self._chain_id, chain_id_list)
+        neon_tx_validator = NeonTxValidator(self._config, self._core_api_client, self._data._def_chain_id, self._chain_id)
         neon_tx_exec_cfg = neon_tx_validator.validate(neon_tx, gas_less_permit, min_gas_price)
         return neon_tx_exec_cfg
 
@@ -1189,7 +1188,7 @@ class NeonRpcApiWorker:
         return hex(len(tx_list))
 
     @staticmethod
-    def eth_accounts() -> [str]:
+    def eth_accounts() -> List[str]:
         storage = KeyStorage()
         account_list = storage.get_list()
         return [a.checksum_address for a in account_list]
