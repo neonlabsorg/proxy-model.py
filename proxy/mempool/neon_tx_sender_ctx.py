@@ -148,6 +148,10 @@ class NeonTxSendCtx:
         evm_step_cnt = self._neon_tx_exec_cfg.emulator_result.evm_step_cnt
         assert evm_step_cnt >= 0
         return evm_step_cnt
+    
+    @property
+    def has_external_solana_call(self) -> bool:
+        return self._neon_tx_exec_cfg.emulator_result.external_solana_call
 
     @property
     def state_tx_cnt(self) -> int:
