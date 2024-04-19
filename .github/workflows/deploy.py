@@ -170,13 +170,15 @@ def finalize_image(github_ref, proxy_tag):
     final_tag = ""
     if 'refs/tags/' in github_ref:
         final_tag = github_ref.replace("refs/tags/", "")
-    elif github_ref == 'refs/tags/develop':
+    elif github_ref == 'refs/heads/develop':
         final_tag = 'latest'
 
     if final_tag:
         out = docker_client.pull(f"{IMAGE_NAME}:{proxy_tag}", decode=True, stream=True)
         process_output(out)
         push_image_with_tag(proxy_tag, final_tag)
+    else:
+        click.echo(f"Nothing to finalize, github_ref {github_ref} is not a tag or develop ref")
 
 
 @cli.command(name="terraform_infrastructure")
