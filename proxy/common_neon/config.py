@@ -96,6 +96,7 @@ class Config(DBConfig):
             ONE_BLOCK_SEC / 4,
             ONE_BLOCK_SEC * 1000
         )
+        self._mempool_skip_stuck_txs = self._env_bool('MEMPOOL_SKIP_STUCK_TRANSACTIONS', False)
 
         # Transaction execution settings
         self._retry_on_fail = self._env_num('RETRY_ON_FAIL', 10, 1, 50)
@@ -401,6 +402,10 @@ class Config(DBConfig):
     def mempool_reschedule_time_sec(self) -> int:
         return self._mempool_reschedule_time_sec
 
+    @property
+    def mempool_skip_stuck_txs(self) -> bool:
+        return self._mempool_skip_stuck_txs
+
     #################################
     # Transaction execution settings
 
@@ -640,6 +645,7 @@ class Config(DBConfig):
             'MEMPOOL_EXECUTOR_LIMIT_CNT': self.mempool_executor_limit_cnt,
             'MEMPOOL_CACHE_LIFE_SEC': self.mempool_cache_life_sec,
             'MEMPOOL_RESCHEDULE_TIME_SEC': self.mempool_reschedule_time_sec,
+            'MEMPOOL_SKIP_STUCK_TRANSACTIONS': self.mempool_skip_stuck_txs,
 
             # Transaction execution settings
             'RETRY_ON_FAIL': self.retry_on_fail,

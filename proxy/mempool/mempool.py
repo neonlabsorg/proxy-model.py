@@ -74,7 +74,8 @@ class MemPool:
         self._op_res_get_list_task_loop = MPOpResGetListTaskLoop(executor_mng, self._op_res_mng)
         self._op_res_init_task_loop = MPInitOpResTaskLoop(executor_mng, self._op_res_mng, self._stuck_tx_dict)
         self._free_alt_queue_task_loop = MPFreeALTQueueTaskLoop(config, executor_mng, self._op_res_mng)
-        self._stuck_list_task_loop = MPStuckTxListLoop(executor_mng, self._stuck_tx_dict)
+        if not config.mempool_skip_stuck_txs:
+            self._stuck_list_task_loop = MPStuckTxListLoop(executor_mng, self._stuck_tx_dict)
 
         self._process_tx_result_task_loop = asyncio.get_event_loop().create_task(self._process_tx_result_loop())
         self._process_tx_schedule_task_loop = asyncio.get_event_loop().create_task(self._process_tx_schedule_loop())
