@@ -1,14 +1,13 @@
+import logging
 import os
 import random
 import re
-import logging
-
 from decimal import Decimal
-from urllib.parse import urlparse
 from typing import Optional, Union, Set, List, Tuple, NewType
+from urllib.parse import urlparse
 
-from .db.db_config import DBConfig
 from .constants import EVM_PROGRAM_ID_STR, ONE_BLOCK_SEC, MIN_FINALIZE_SEC
+from .db.db_config import DBConfig
 from .solana_tx import SolPubKey, SolCommit
 
 LOG = logging.getLogger(__name__)
@@ -94,6 +93,7 @@ class Config(DBConfig):
         self._mempool_reschedule_time_sec = self._env_num(
             "MEMPOOL_RESCHEDULE_TIME_SEC", ONE_BLOCK_SEC, ONE_BLOCK_SEC / 4, ONE_BLOCK_SEC * 1000
         )
+        self._mempool_skip_stuck_txs = self._env_bool("MEMPOOL_SKIP_STUCK_TRANSACTIONS", False)
 
         # Transaction execution settings
         self._retry_on_fail = self._env_num("RETRY_ON_FAIL", 10, 1, 50)
@@ -121,11 +121,11 @@ class Config(DBConfig):
         self._cu_limit = self._env_num("CU_LIMIT", 1_400_000, 10_000, 1_400_000)
 
         min_gas_price = self._env_num("MINIMAL_GAS_PRICE", 1, 0, 100_000_000)
-        self._min_gas_price = min_gas_price * (10**9)
-        self._min_wo_chainid_gas_price = self._env_num("MINIMAL_WO_CHAINID_GAS_PRICE", 10, 0, 100_000_000) * (10**9)
+        self._min_gas_price = min_gas_price * (10 ** 9)
+        self._min_wo_chainid_gas_price = self._env_num("MINIMAL_WO_CHAINID_GAS_PRICE", 10, 0, 100_000_000) * (10 ** 9)
         self._allow_underpriced_tx_wo_chainid = self._env_bool("ALLOW_UNDERPRICED_TX_WITHOUT_CHAINID", False)
 
-        self._const_gas_price = self._env_num("CONST_GAS_PRICE", -1, min_gas_price, 100_000_000) * (10**9)
+        self._const_gas_price = self._env_num("CONST_GAS_PRICE", -1, min_gas_price, 100_000_000) * (10 ** 9)
 
         # Operator resource settings
         self._holder_size = self._env_num("HOLDER_SIZE", 256 * 1024, 1024, 10 * 1024 * 1024)
@@ -406,6 +406,10 @@ class Config(DBConfig):
     def mempool_reschedule_time_sec(self) -> int:
         return self._mempool_reschedule_time_sec
 
+    @property
+    def mempool_skip_stuck_txs(self) -> bool:
+        return self._mempool_skip_stuck_txs
+
     #################################
     # Transaction execution settings
 
@@ -650,6 +654,7 @@ class Config(DBConfig):
             "MEMPOOL_EXECUTOR_LIMIT_CNT": self.mempool_executor_limit_cnt,
             "MEMPOOL_CACHE_LIFE_SEC": self.mempool_cache_life_sec,
             "MEMPOOL_RESCHEDULE_TIME_SEC": self.mempool_reschedule_time_sec,
+            "MEMPOOL_SKIP_STUCK_TRANSACTIONS": self.mempool_skip_stuck_txs,
             # Transaction execution settings
             "RETRY_ON_FAIL": self.retry_on_fail,
             "CONFIRM_TIMEOUT_SEC": self.confirm_timeout_sec,
