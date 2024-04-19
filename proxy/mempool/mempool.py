@@ -519,12 +519,13 @@ class MemPool(IEVMConfigUser, IGasPriceUser, IMPExecutorMngUser):
                 MPSenderTxCntTaskLoop(self._executor_mng, self._tx_schedule_dict),
                 MPOpResGetListTaskLoop(self._executor_mng, self._op_res_mng),
                 MPInitOpResTaskLoop(self._executor_mng, self._op_res_mng, self._stuck_tx_dict),
-                MPStuckTxListLoop(self._executor_mng, self._stuck_tx_dict),
                 asyncio.get_event_loop().create_task(self._process_tx_result_loop()),
                 asyncio.get_event_loop().create_task(self._process_tx_schedule_loop()),
                 asyncio.get_event_loop().create_task(self._process_tx_dict_clear_loop()),
             ]
         )
+        if not self._config.mempool_skip_stuck_txs:
+            self._async_task_list.append(MPStuckTxListLoop(self._executor_mng, self._stuck_tx_dict))
 
     def _create_kick_tx_schedule_task(self) -> None:
         asyncio.get_event_loop().create_task(self._kick_tx_schedule())
