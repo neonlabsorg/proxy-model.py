@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from decimal import Decimal
 from typing import List, Union
 
@@ -26,6 +27,7 @@ class ProxyStatDataPeeker(StatDataPeeker):
         self._sol_account_list: List[str] = list()
         self._neon_account_list: List[str] = list()
 
+        self._next_op_time = 0
         self._last_sol_op_pos = 0
         self._last_neon_op_pos = 0
 
@@ -38,8 +40,11 @@ class ProxyStatDataPeeker(StatDataPeeker):
 
     async def _run(self) -> None:
         await super()._run()
-        self._stat_operator_sol_balance()
-        self._stat_operator_neon_balance()
+        now = int(time.time())
+        if self._next_op_time < now:
+            self._next_op_time = now + 10
+            self._stat_operator_sol_balance()
+            self._stat_operator_neon_balance()
 
     def _stat_operator_sol_balance(self) -> None:
         sol_acct_list: List[str] = list()
@@ -48,8 +53,8 @@ class ProxyStatDataPeeker(StatDataPeeker):
             end_pos = pos + self._config.stat_number_operator_balance_at_time
             sol_acct_list = self._sol_account_list[pos:end_pos]
             if len(sol_acct_list):
+                self._last_sol_op_pos = end_pos
                 break
-
             self._last_sol_op_pos = 0
 
         sol_balance_list = self._solana.get_sol_balance_list(sol_acct_list)
@@ -63,6 +68,7 @@ class ProxyStatDataPeeker(StatDataPeeker):
             end_pos = pos + self._config.stat_number_operator_balance_at_time
             neon_acct_list = self._neon_account_list[pos:end_pos]
             if len(neon_acct_list):
+                self._last_neon_op_pos = end_pos
                 break
 
             self._last_neon_op_pos = 0
