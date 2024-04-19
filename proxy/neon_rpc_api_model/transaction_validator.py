@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from ..common_neon.config import Config
 from ..common_neon.data import NeonTxExecCfg
@@ -14,14 +14,14 @@ from ..neon_core_api.neon_layouts import NeonAccountInfo, NeonContractInfo
 
 
 class NeonTxValidator:
-    _max_u64 = 2 ** 64 - 1
-    _max_u256 = 2 ** 256 - 1
+    _max_u64 = 2**64 - 1
+    _max_u256 = 2**256 - 1
 
-    def __init__(self, cfg: Config, client: NeonCoreApiClient, def_chain_id: int, valid_chain_id_list: List[int]):
+    def __init__(self, cfg: Config, client: NeonCoreApiClient, def_chain_id: int, chain_id: int):
         self._config = cfg
         self._core_api_client = client
         self._def_chain_id = def_chain_id
-        self._valid_chain_id_list = valid_chain_id_list
+        self._chain_id = chain_id
 
     def _get_tx_gas_limit(self, neon_tx: NeonTx) -> int:
         if neon_tx.has_chain_id() or (not self._config.allow_underpriced_tx_wo_chainid):
@@ -40,6 +40,7 @@ class NeonTxValidator:
         return (not neon_tx.has_chain_id()) and (neon_tx.gasPrice < min_gas_price)
 
     def validate(self, neon_tx: NeonTx, gas_limit_permit: bool, min_gas_price: int) -> NeonTxExecCfg:
+        self._prevalidate_tx_chain_id(neon_tx.chain_id)
         chain_id = neon_tx.chain_id or self._def_chain_id
 
         sender_addr = NeonAddress.from_raw(neon_tx.sender, chain_id)
@@ -50,7 +51,6 @@ class NeonTxValidator:
         tx_gas_limit = self._get_tx_gas_limit(neon_tx)
 
         self._prevalidate_sender_eoa(neon_contract_info)
-        self._prevalidate_tx_chain_id(chain_id)
         self._prevalidate_tx_size(neon_tx)
         self._prevalidate_tx_gas(neon_tx, tx_gas_limit, gas_limit_permit)
         self._prevalidate_sender_balance(neon_tx, neon_account_info, tx_gas_limit)
@@ -63,9 +63,9 @@ class NeonTxValidator:
 
     def _prevalidate_tx_gas(self, neon_tx: NeonTx, tx_gas_limit: int, has_gas_less_permit: bool):
         if tx_gas_limit > self._max_u64:
-            raise EthereumError(message='gas uint64 overflow')
+            raise EthereumError(message="gas uint64 overflow")
         if (tx_gas_limit * neon_tx.gasPrice) > (self._max_u256 - 1):
-            raise EthereumError(message='max fee per gas higher than 2^256-1')
+            raise EthereumError(message="max fee per gas higher than 2^256-1")
 
         # Operator can set minimum gas price to accept txs into mempool
         if neon_tx.gasPrice >= self._config.min_gas_price:
@@ -79,26 +79,29 @@ class NeonTxValidator:
             if (not neon_tx.has_chain_id()) and (neon_tx.gasPrice >= self._config.min_wo_chainid_gas_price):
                 return
 
-        raise EthereumError(f'transaction underpriced: have {neon_tx.gasPrice} want {self._config.min_gas_price}')
+        raise EthereumError(f"transaction underpriced: have {neon_tx.gasPrice} want {self._config.min_gas_price}")
 
     @staticmethod
     def _prevalidate_min_tx_gas(tx_gas_limit: int):
         if tx_gas_limit < 21_000:
-            raise EthereumError(message='gas limit reached')
+            raise EthereumError(message="gas limit reached")
 
-    def _prevalidate_tx_chain_id(self, chain_id: int):
-        if chain_id not in self._valid_chain_id_list:
-            raise EthereumError(message='wrong chain id')
+    def _prevalidate_tx_chain_id(self, tx_chain_id: Optional[int]):
+        if tx_chain_id is None:
+            if self._chain_id != self._def_chain_id:
+                raise EthereumError(message="wrong chain id")
+        elif tx_chain_id != self._chain_id:
+            raise EthereumError(message="wrong chain id")
 
     @staticmethod
     def _prevalidate_tx_size(neon_tx: NeonTx):
         if len(neon_tx.callData) > (128 * 1024 - 1024):
-            raise EthereumError(message='transaction size is too big')
+            raise EthereumError(message="transaction size is too big")
 
     @staticmethod
     def _prevalidate_sender_eoa(neon_contract_info: NeonContractInfo):
         if neon_contract_info.chain_id:
-            raise EthereumError(message='sender not an eoa')
+            raise EthereumError(message="sender not an eoa")
 
     def _prevalidate_sender_balance(self, neon_tx: NeonTx, neon_account_info: NeonAccountInfo, tx_gas_limit: int):
         user_balance = neon_account_info.balance
@@ -109,11 +112,11 @@ class NeonTxValidator:
             return
 
         if len(neon_tx.callData) == 0:
-            message = 'insufficient funds for transfer'
+            message = "insufficient funds for transfer"
         else:
-            message = 'insufficient funds for gas * price + value'
+            message = "insufficient funds for gas * price + value"
 
-        raise EthereumError(f'{message}: address {neon_tx.hex_sender} have {user_balance} want {required_balance}')
+        raise EthereumError(f"{message}: address {neon_tx.hex_sender} have {user_balance} want {required_balance}")
 
     def _prevalidate_underpriced_tx_wo_chainid(self, neon_tx: NeonTx, min_gas_price: int):
         if not self._is_underpriced_tx_wo_chainid(neon_tx, min_gas_price):
@@ -131,7 +134,7 @@ class NeonTxValidator:
         if self._max_u64 in (state_tx_cnt, tx_nonce):
             raise EthereumError(
                 code=NonceTooLowError.eth_error_code,
-                message=f'nonce has max value: address {tx_sender}, tx: {tx_nonce} state: {state_tx_cnt}'
+                message=f"nonce has max value: address {tx_sender}, tx: {tx_nonce} state: {state_tx_cnt}",
             )
 
         NonceTooLowError.raise_if_error(tx_sender, tx_nonce, state_tx_cnt)
