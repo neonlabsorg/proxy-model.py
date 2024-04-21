@@ -193,7 +193,7 @@ class BaseNeonTxStrategy(abc.ABC):
 
         ix_list = [
             self._ctx.ix_builder.make_compute_budget_heap_ix(),
-            self._ctx.ix_builder.make_compute_budget_cu_ix()
+            self._ctx.ix_builder.make_compute_budget_cu_ix(self._ctx.config.cu_limit),
         ]
         if self._cu_priority_fee:
             ix_list.append(self._ctx.ix_builder.make_compute_budget_cu_fee_ix(self._cu_priority_fee))
