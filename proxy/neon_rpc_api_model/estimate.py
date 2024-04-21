@@ -46,7 +46,7 @@ class _GasTxBuilder:
 
         ix_list = [
             self._neon_ix_builder.make_compute_budget_heap_ix(),
-            self._neon_ix_builder.make_compute_budget_cu_ix()
+            self._neon_ix_builder.make_compute_budget_cu_ix(config.cu_limit)
         ]
 
         if config.cu_priority_fee > 0:

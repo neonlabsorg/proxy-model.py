@@ -388,8 +388,7 @@ class NeonIxBuilder:
         )
 
     @staticmethod
-    def make_compute_budget_cu_ix() -> SolTxIx:
-        compute_unit_cnt = 1_400_000
+    def make_compute_budget_cu_ix(compute_unit_cnt: int = 1_400_000) -> SolTxIx:
         ix_data = (
             int(ComputeBudgetIxCode.CURequest).to_bytes(1, 'little') +
             compute_unit_cnt.to_bytes(4, 'little')
