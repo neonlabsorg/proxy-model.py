@@ -51,8 +51,6 @@ env:
   TFSTATE_BUCKET: ${{vars.TFSTATE_BUCKET}}
   TFSTATE_KEY_PREFIX: ${{vars.TFSTATE_KEY_PREFIX}}
   TFSTATE_REGION: ${{vars.TFSTATE_REGION}}
-  UNISWAP_V2_CORE_COMMIT: ${{vars.UNISWAP_V2_CORE_COMMIT}}
-  UNISWAP_V2_CORE_REPO: ${{vars.UNISWAP_V2_CORE_REPO}}
   GITHUB_RUN_NUMBER: ${{ github.run_number }}
 
 concurrency:
@@ -203,7 +201,6 @@ jobs:
         timeout-minutes: 60
         run: |
           python3 ./.github/workflows/deploy.py deploy_check \
-          --skip_uniswap \
           --proxy_tag=${{ needs.build-image.outputs.proxy_tag }} \
           --neon_evm_tag=${{ needs.build-image.outputs.neon_evm_tag }} \
           --faucet_tag=${{ env.FAUCET_TAG }} \
