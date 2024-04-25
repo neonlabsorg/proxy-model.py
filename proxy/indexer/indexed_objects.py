@@ -196,6 +196,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
                  neon_tx_res: NeonTxResultInfo = None,
                  neon_tx_event_list: List[NeonLogTxEvent] = None,
                  gas_used=0,
+                 is_log_truncated=False,
                  total_gas_used=0,
                  **kwargs):
         super().__init__(**kwargs)
@@ -215,6 +216,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
         self._neon_event_list = neon_tx_event_list
         self._operator = operator
         self._gas_used = gas_used
+        self._is_log_truncated = is_log_truncated
         self._total_gas_used = total_gas_used
 
     @staticmethod
@@ -272,7 +274,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
 
     def is_corrupted(self) -> bool:
         """Return true if indexer didn't find all instructions for the tx"""
-        return (self.neon_tx.gas_limit <= 0) or (self._gas_used != self._total_gas_used)
+        return (self.neon_tx.gas_limit <= 0) or (self._gas_used != self._total_gas_used) or self._is_log_truncated
 
     def as_dict(self) -> Dict[str, Any]:
         return dict(
@@ -284,6 +286,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
             holder_account=self._holder_acct,
             operator=self._operator,
             gas_used=self._gas_used,
+            is_log_truncated=self._is_log_truncated,
             total_gas_used=self._total_gas_used,
             neon_tx=self._neon_receipt.neon_tx.as_dict(),
             neon_tx_res=self._neon_receipt.neon_tx_res.as_dict(),
@@ -309,6 +312,8 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
             self._total_gas_used = sol_neon_ix.neon_total_gas_used
         if self._operator is None:
             self._operator = sol_neon_ix.sol_tx_cost.operator
+        if sol_neon_ix.is_log_truncated:
+            self._is_log_truncated = True
 
     def add_neon_event(self, event: NeonLogTxEvent) -> None:
         self._neon_event_list.append(event)
