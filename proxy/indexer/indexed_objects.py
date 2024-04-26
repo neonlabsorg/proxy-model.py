@@ -798,7 +798,13 @@ class NeonIndexedBlockInfo:
                 self._has_corrupted_tx = True
                 continue
 
-            tx.complete_event_list()
+            try:
+                tx.complete_event_list()
+            except IndexError as e:
+                LOG.warning(f'Tried to pop from an empty address stack: {tx}')
+                self._has_corrupted_tx = True
+                continue
+
             sum_gas_used += tx.neon_tx_res.gas_used
             log_idx = tx.neon_tx_res.set_block_info(self._sol_block, tx.neon_tx.sig, tx_idx, log_idx, sum_gas_used)
             tx_idx += 1
