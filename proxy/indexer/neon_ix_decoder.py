@@ -204,10 +204,12 @@ class BaseTxIxDecoder(DummyIxDecoder):
         ix = self.state.sol_neon_ix
 
         total_gas_used = ix.neon_total_gas_used
+        total_step_cnt = ix.neon_total_step_cnt
         for event in ix.neon_tx_event_list:
             event = dataclasses.replace(
                 event,
                 total_gas_used=total_gas_used,
+                total_step_cnt=total_step_cnt,
                 sol_sig=ix.sol_sig,
                 idx=ix.idx,
                 inner_idx=ix.inner_idx

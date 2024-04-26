@@ -337,9 +337,22 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
         current_level = 0
         current_order = 0
         addr_stack: List[bytes] = list()
+        total_step_cnt = 0
 
         neon_event_list = self._get_sorted_neon_event_list()
         for event in neon_event_list:
+            # events from broken iterations
+            if event.is_reverted:
+                continue
+
+            # tx restart
+            if event.total_step_cnt < total_step_cnt:
+                current_level = 0
+                current_order = 0
+                addr_stack.clear()
+
+            total_step_cnt = event.total_step_cnt
+
             if event.is_start_event_type():
                 current_level += 1
                 event_level = current_level
@@ -361,11 +374,19 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
 
         reverted_level = -1
         is_failed = (self.neon_tx_res.status == 0)
+        is_dropped = False
+        total_step_cnt = 2**64
 
         for event in reversed(neon_event_list):
-            if event.is_reverted:
-                is_reverted = True
-                is_hidden = True
+            if is_dropped:
+                # events from restarted iterations
+                is_reverted, is_hidden = True, True
+            elif event.is_reverted:
+                # events from broken iterations
+                is_reverted, is_hidden = True, True
+            elif event.total_step_cnt > total_step_cnt:
+                # tx restart
+                is_dropped, is_reverted, is_hidden = True, True, True
             else:
                 if event.is_start_event_type():
                     if event.event_level == reverted_level:
@@ -374,6 +395,7 @@ class NeonIndexedTxInfo(BaseNeonIndexedObjInfo):
                     if (event.event_type == NeonLogTxEvent.Type.ExitRevert) and (reverted_level == -1):
                         reverted_level = event.event_level
 
+                total_step_cnt = event.total_step_cnt
                 is_reverted = (reverted_level != -1) or is_failed
                 is_hidden = (event.is_hidden or is_reverted)
 

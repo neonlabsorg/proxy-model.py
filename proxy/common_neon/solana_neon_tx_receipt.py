@@ -494,6 +494,7 @@ class SolNeonIxReceiptInfo:
     neon_step_cnt: int
     neon_gas_used: int
     neon_total_gas_used: int
+    neon_total_step_cnt: int
 
     sol_tx_cost: SolTxCostInfo
 
@@ -523,6 +524,10 @@ class SolNeonIxReceiptInfo:
             neon_ix_gas_usage = log_info.neon_tx_ix.gas_used
             neon_ix_total_gas_usage = log_info.neon_tx_ix.total_gas_used
 
+        neon_ix_total_step_cnt = 0
+        if log_info.neon_tx_step is not None:
+            neon_ix_total_step_cnt = log_info.neon_tx_step.total_step_cnt
+
         acct_list = ix_meta.ix.get('accounts', list())
 
         ix_data = SolNeonIxReceiptInfo._decode_ix_data(ix_meta)
@@ -549,6 +554,7 @@ class SolNeonIxReceiptInfo:
             neon_step_cnt=0,
             neon_gas_used=neon_ix_gas_usage,
             neon_total_gas_used=neon_ix_total_gas_usage,
+            neon_total_step_cnt=neon_ix_total_step_cnt,
 
             _acct_list=acct_list,
             _log_info=log_info,
