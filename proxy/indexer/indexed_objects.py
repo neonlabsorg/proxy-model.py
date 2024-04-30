@@ -799,8 +799,16 @@ class NeonIndexedBlockInfo:
         log_idx = 0
         tx_idx = 0
         sum_gas_used = 0
+
+        # If a single transaction has its log truncted, mark all as having log truncated
+        is_log_truncated = any(tx._is_log_truncated for tx in self._done_neon_tx_list)
+
         for tx in self._done_neon_tx_list:
             self._del_neon_tx(tx)
+
+            if is_log_truncated:
+                tx._is_log_truncated = True
+
             if self._has_corrupted_tx:
                 continue
             elif tx.is_corrupted():
