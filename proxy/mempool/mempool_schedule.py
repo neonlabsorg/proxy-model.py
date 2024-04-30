@@ -529,6 +529,7 @@ class MPTxSchedule:
 
         self._set_sender_tx_cnt(sender_pool, tx.nonce)
         self._drop_tx_from_sender_pool(sender_pool, tx)
+        self._sync_sender_state(sender_pool)
         return True
 
     @property
