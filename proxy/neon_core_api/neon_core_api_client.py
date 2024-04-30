@@ -254,7 +254,7 @@ class NeonCoreApiClient(NeonClientBase):
     def get_evm_config(self, last_deployed_slot: int) -> EVMConfigInfo:
         response = self._call(_MethodName.get_config, dict())
         json_cfg = response.get('value')
-        return EVMConfigInfo.from_json(last_deployed_slot, json_cfg)
+        return EVMConfigInfo.from_json(last_deployed_slot, self._config, json_cfg)
 
     def get_holder_account_info(self, addr: SolPubKey) -> HolderAccountInfo:
         request = dict(pubkey=str(addr))

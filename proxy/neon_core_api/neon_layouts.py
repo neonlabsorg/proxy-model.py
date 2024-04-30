@@ -4,6 +4,7 @@ import enum
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, List, Tuple
 
+from ..common_neon.config import Config
 from ..common_neon.solana_tx import SolPubKey
 from ..common_neon.address import NeonAddress
 
@@ -125,7 +126,6 @@ class _EVMConfigConst(enum.Enum):
     VersionName = "VERSION"
     RevisionName = "REVISION"
 
-    NeonTokenName = "NEON"
     NeonTokenChainID = "NEON_CHAIN_ID"
     NeonTokenMint = "NEON_TOKEN_MINT"
 
@@ -151,7 +151,7 @@ class EVMConfigInfo:
 
     @staticmethod
     def from_json(
-        last_deployed_slot: int, json_config: Dict[str, Any]
+        last_deployed_slot: int, config: Config, json_config: Dict[str, Any]
     ) -> EVMConfigInfo:
         evm_param_dict: Dict[str, str] = dict()
         token_info_list: List[EVMTokenInfo] = list()
@@ -185,7 +185,7 @@ class EVMConfigInfo:
 
         chain_id = 0
         for token in token_info_list:
-            if token.token_name != _EVMConfigConst.NeonTokenName.value:
+            if token.token_name !=  config.default_token_name:
                 continue
             chain_id = token.chain_id
             break
@@ -199,7 +199,7 @@ class EVMConfigInfo:
             token_mint = (
                 SolPubKey.from_string(token_mint) if token_mint else SolPubKey.default()
             )
-            token_info_list = [EVMTokenInfo(chain_id, "NEON", token_mint)]
+            token_info_list = [EVMTokenInfo(chain_id, config.default_token_name, token_mint)]
 
         # the call of neon-cli utility
         if not len(version):

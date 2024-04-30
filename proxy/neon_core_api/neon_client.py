@@ -87,4 +87,4 @@ class NeonClient(CliBase, NeonClientBase):
     def get_evm_config(self) -> EVMConfigInfo:
         LOG.debug('Read EVM config')
         json_cfg = self.call('neon-elf-params')
-        return EVMConfigInfo.from_json(1, {'config': json_cfg})
+        return EVMConfigInfo.from_json(1, self._config, {'config': json_cfg})
