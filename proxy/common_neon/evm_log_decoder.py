@@ -37,6 +37,12 @@ class NeonLogTxIx:
 
 
 @dataclass(frozen=True)
+class NeonLogTxStep:
+    step_cnt: int
+    total_step_cnt: int
+
+
+@dataclass(frozen=True)
 class NeonLogTxEvent:
     class Type(enum.IntEnum):
         Log = 1
@@ -86,6 +92,7 @@ class NeonLogTxEvent:
     idx: int = 0
     inner_idx: Optional[int] = None
     total_gas_used: int = 0
+    total_step_cnt: int = 0
     is_reverted: bool = False
     event_level: int = 0
     event_order: int = 0
@@ -148,6 +155,7 @@ class NeonLogTxEvent:
             idx=src.get('neonIxIdx', 0),
             inner_idx=src.get('neonInnerIxIdx', None),
             total_gas_used=0,
+            total_step_cnt=0,
             event_level=src.get('neonEventLevel', 0),
             event_order=src.get('neonEventOrder', 0),
             neon_sig=src.get('transactionHash', ''),
@@ -262,6 +270,7 @@ class NeonLogTxSig:
 class NeonLogInfo:
     neon_tx_sig: Optional[NeonLogTxSig]
     neon_tx_ix: Optional[NeonLogTxIx]
+    neon_tx_step: Optional[NeonLogTxStep]
     neon_tx_return: Optional[NeonLogTxReturn]
     neon_tx_event_list: List[NeonLogTxEvent]
     is_truncated: bool
@@ -443,11 +452,26 @@ class _NeonLogDecoder:
 
         return NeonLogTxIx(gas_used=gas_used, total_gas_used=total_gas_used)
 
+    @staticmethod
+    def _decode_neon_tx_step(data_list: List[str]) -> Optional[NeonLogTxStep]:
+        if len(data_list) != 2:
+            LOG.error('failed to decode STEPS: should be 1 element in {data_list}')
+            return None
+
+        bs = base64.b64decode(data_list[0])
+        step_cnt = int.from_bytes(bs, "little")
+
+        bs = base64.b64decode(data_list[1])
+        total_step_cnt = int.from_bytes(bs, "little")
+
+        return NeonLogTxStep(step_cnt=step_cnt, total_step_cnt=total_step_cnt)
+
     def decode_neon_log(self, log_iter: Iterator[str]) -> NeonLogInfo:
         """Extracts Neon transaction result information"""
 
         neon_tx_sig: Optional[NeonLogTxSig] = None
         neon_tx_ix: Optional[NeonLogTxIx] = None
+        neon_tx_step: Optional[NeonLogTxStep] = None
         neon_tx_return: Optional[NeonLogTxReturn] = None
         neon_tx_event_list: List[NeonLogTxEvent] = list()
         is_truncated = False
@@ -492,10 +516,16 @@ class _NeonLogDecoder:
                     neon_tx_ix = self._decode_neon_tx_gas(data_list)
                 else:
                     LOG.warning('GAS is already exist!')
+            elif name == 'STEPS':
+                if neon_tx_step is None:
+                    neon_tx_step = self._decode_neon_tx_step(data_list)
+                else:
+                    LOG.warning('STEPS is already exist!')
 
         return NeonLogInfo(
             neon_tx_sig=neon_tx_sig,
             neon_tx_ix=neon_tx_ix,
+            neon_tx_step=neon_tx_step,
             neon_tx_return=neon_tx_return,
             neon_tx_event_list=neon_tx_event_list,
             is_truncated=is_truncated,
