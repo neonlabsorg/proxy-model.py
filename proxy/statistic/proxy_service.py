@@ -140,7 +140,7 @@ class ProxyStatService(StatService, IHealthStatService):
             registry=self._registry
         )
         self._metr_op_neon_balance = Gauge(
-            'operator_neon_balance', f"Operator Balance in {self._config.default_token_name}s",
+            'operator_neon_balance', f"Operator Balance in {self._config.native_token_name}s",
             registry=self._registry
         )
         self._metr_key_total = Gauge(

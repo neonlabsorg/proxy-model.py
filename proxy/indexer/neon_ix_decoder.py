@@ -588,7 +588,7 @@ class Deposit3IxDecoder(DummyIxDecoder):
         self._config = config
 
     def execute(self) -> bool:
-        return self._decoding_success(None, f"deposit {self._config._default_token_name}s")
+        return self._decoding_success(None, f"deposit {self._config.native_token_name}s")
 
 
 def get_neon_ix_decoder_list() -> List[Type[DummyIxDecoder]]:
