@@ -129,7 +129,7 @@ class TestGasTankIntegration(TestCase):
 
     def create_sol_account(self):
         account = SolAccount()
-        print(f"New solana account created: {account.pubkey()}. Airdropping SOL...")
+        print(f"New solana account created: {account.pubkey()}. Airdropping {self.config.operator_token_name}...")
         self.solana.request_airdrop(account.pubkey(), 1000_000_000_000)
         return account
 
