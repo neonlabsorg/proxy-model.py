@@ -73,7 +73,7 @@ class InfoHandler:
             balance = Decimal(holder_info.lamports) / 1_000_000_000
             holder_address = str(op_res_info.holder_account)
             op_key = op_res_ident.public_key
-            print(f'{ holder_address }\t { op_key }:{ op_res_ident.res_id }\t { balance:,.9f} SOL')
+            print(f'{ holder_address }\t { op_key }:{ op_res_ident.res_id }\t { balance:,.9f} {self._config.operator_token_name}')
 
     @staticmethod
     def _solana_private_key_info(_) -> None:

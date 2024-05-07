@@ -136,10 +136,11 @@ class Config(DBConfig):
         self._const_gas_price = self._env_num('CONST_GAS_PRICE', -1, min_gas_price, 100_000_000) * (10 ** 9)
 
         # Operator resource settings
-        self._native_token_name = os.environ.get("NATIVE_TOKEN_NAME", "NEON")
         self._holder_size = self._env_num('HOLDER_SIZE', 256 * 1024, 1024, 10 * 1024 * 1024)
         self._min_op_balance_to_warn = self._env_num('MIN_OPERATOR_BALANCE_TO_WARN', 9_000_000_000, 1)
         self._min_op_balance_to_err = self._env_num('MIN_OPERATOR_BALANCE_TO_ERR', 1_000_000_000, 1)
+        self._native_token_name = os.environ.get("NATIVE_TOKEN_NAME", "NEON")
+        self._operator_token_name = os.environ.get("OPERATOR_TOKEN_NAME", "SOL")
         self._perm_account_id = self._env_num('PERM_ACCOUNT_ID', 1, 1, 128)
         self._perm_account_limit = self._env_num('PERM_ACCOUNT_LIMIT', 2, 1, 128)
         self._recheck_used_resource_sec = self._env_num('RECHECK_USED_RESOURCE_SEC', 60, 10, 24 * 60 * 60)
@@ -325,6 +326,10 @@ class Config(DBConfig):
     @property
     def native_token_name(self) -> str:
         return self._native_token_name
+
+    @property
+    def operator_token_name(self) -> str:
+        return self._operator_token_name
 
     @property
     def solana_url_list(self) -> List[str]:
