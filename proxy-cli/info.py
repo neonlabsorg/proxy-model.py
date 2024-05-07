@@ -106,9 +106,9 @@ class InfoHandler:
             balance = self._get_neon_balance(neon_acct)
             total_balance += balance
 
-            print(f'{ address }\t { str(sol_acct.pubkey()) }\t { balance:,.18f} NEON')
+            print(f'{ address }\t { str(sol_acct.pubkey()) }\t { balance:,.18f} {self._config.default_token_name}')
 
-        print(f'total_balance\t { total_balance:,.18f} NEON')
+        print(f'total_balance\t { total_balance:,.18f} {self._config.default_token_name}')
 
     def _solana_accounts_info(self, _) -> None:
         total_balance = Decimal(0)
