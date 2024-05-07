@@ -142,7 +142,7 @@ class TestGasTankIntegration(TestCase):
     def create_eth_account(self):
         self.acc_num += 1
         account = self.proxy.create_account(f'neonlabsorg/proxy-model.py/issues/344/eth_account{self.acc_num}')
-        print(f"{self.config.default_token_name} account created: {account.address}")
+        print(f"{self.config.native_token_name} account created: {account.address}")
         return account
 
     def build_tx(self, name: str, ix_list) -> SolLegacyTx:
