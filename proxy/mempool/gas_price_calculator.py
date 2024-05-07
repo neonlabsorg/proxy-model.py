@@ -16,7 +16,6 @@ LOG = logging.getLogger(__name__)
 
 class GasPriceCalculator:
     _sol_price_symbol = 'Crypto.SOL/USD'
-    _neon_price_symbol = 'Crypto.NEON/USD'
 
     def __init__(self, config: Config, solana: SolInteractor) -> None:
         self._config = config
@@ -26,6 +25,7 @@ class GasPriceCalculator:
         self._is_const_gas_price = True
         self._min_gas_price: Optional[int] = None
         self._suggested_gas_price: Optional[int] = None
+        self._neon_price_symbol = f"Crypto.{self._config.default_token_name}/USD"
 
     def set_price_account(self, sol_price_account: Optional[SolPubKey], neon_price_account: Optional[SolPubKey]):
         if (sol_price_account is None) or (neon_price_account is None):
@@ -95,9 +95,9 @@ class GasPriceCalculator:
         try:
             self._neon_price_usd = self._get_token_price(self._neon_price_symbol)
         except PythNetworkError as exc:
-            LOG.debug(f'Failed to retrieve NEON price: {str(exc)}')
+            LOG.debug(f'Failed to retrieve {self._config.default_token_name} price: {str(exc)}')
         except BaseException as exc:
-            LOG.error('Failed to retrieve NEON price', exc_info=exc)
+            LOG.error(f'Failed to retrieve {self._config.default_token_name} price', exc_info=exc)
 
         try:
             self._sol_price_usd = self._get_token_price(self._sol_price_symbol)

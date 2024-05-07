@@ -12,13 +12,15 @@ from web3 import Web3
 from eth_typing import Address
 from eth_account import Account
 
+from proxy.common_neon.config import Config
 from proxy.common_neon.address import NeonAddress
 
 from .secret import get_solana_acct_list
 
 
 class NeonHandler:
-    def __init__(self):
+    def __init__(self, config: Option[Config]=Config()):
+        self._config = config
         self.command = 'neon-account'
 
     @staticmethod
@@ -34,7 +36,7 @@ class NeonHandler:
         n.withdraw_parser.add_argument('amount', type=int, help='withdrawing amount')
         n.withdraw_parser.add_argument(
             'type', type=str, default='PERCENT', nargs='?',
-            help='type of amount <PERCENT|NEON>'
+            help=f"type of amount <PERCENT|{n._config.default_token_name}>"
         )
         return n
 
@@ -85,7 +87,7 @@ class NeonHandler:
         tx_hash = self._proxy.send_raw_transaction(tx_signed.rawTransaction)
         amount = self._get_neon_amount(amount)
 
-        print(f'send {amount:,.18} NEON from {str(from_addr)} to 0x{to_addr.hex()}: {tx_hash.hex()}')
+        print(f'send {amount:,.18} {self._config.default_token_name} from {str(from_addr)} to 0x{to_addr.hex()}: {tx_hash.hex()}')
 
     def _estimate_tx(self, from_addr: NeonAddress, to_addr: Address) -> int:
         tx = self._create_tx(from_addr, to_addr, 1)
@@ -113,8 +115,8 @@ class NeonHandler:
 
         amount = args.amount
         a_type = args.type.upper()
-        if a_type not in {'PERCENT', 'NEON'}:
-            print(f'wrong type of amount type {a_type}, should be PERCENT or NEON', file=sys.stderr)
+        if a_type not in {'PERCENT', self._config.default_token_name}:
+            print(f'wrong type of amount type {a_type}, should be PERCENT or {self._config.default_token_name}', file=sys.stderr)
             return
         elif amount <= 0:
             print(f'amount {amount} should be more than 0', file=sys.stderr)
@@ -131,7 +133,7 @@ class NeonHandler:
         for balance in neon_acct_dict.values():
             total_balance += balance
 
-        if a_type == 'NEON':
+        if a_type == self._config.default_token_name:
             check_balance = math.ceil(total_balance / 1_000_000_000 / 1_000_000_000)
             if check_balance < amount:
                 print(f'amount {amount} is too big, should be less than {check_balance}', file=sys.stderr)
@@ -162,4 +164,4 @@ class NeonHandler:
                 break
 
         total_amount = self._get_neon_amount(total_amount)
-        print(f'successfully send {total_amount:,.18} NEON to 0x{dest_addr.hex()}')
+        print(f'successfully send {total_amount:,.18} {self._config.default_token_name} to 0x{dest_addr.hex()}')

@@ -3,6 +3,7 @@ import dataclasses
 
 from typing import Any, List, Type, Optional, Iterator
 
+from ..common_neon.config import Config
 from ..common_neon.utils import NeonTxInfo
 from ..common_neon.neon_instruction import EvmIxCode, EvmIxCodeName
 from ..common_neon.utils.evm_log_decoder import NeonLogTxEvent
@@ -582,8 +583,12 @@ class Deposit3IxDecoder(DummyIxDecoder):
     _ix_code = EvmIxCode.DepositV03
     _is_deprecated = False
 
+    def __init__(self, state: SolNeonDecoderCtx, config=Config()):
+        super().__init__(state)
+        self._config = config
+
     def execute(self) -> bool:
-        return self._decoding_success(None, 'deposit NEONs')
+        return self._decoding_success(None, f"deposit {self._config._default_token_name}s")
 
 
 def get_neon_ix_decoder_list() -> List[Type[DummyIxDecoder]]:

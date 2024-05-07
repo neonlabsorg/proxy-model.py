@@ -122,7 +122,7 @@ class GasTank:
 
         holder = self._neon_holder_dict.get(key.value, None)
         if holder is None:
-            LOG.debug(f'new NEON tx {key}: {str(chunk)}')
+            LOG.debug(f'new {self._config.default_token_name} tx {key}: {str(chunk)}')
             holder = NeonIndexedHolderInfo(key)
             self._neon_holder_dict[key.value] = holder
 
