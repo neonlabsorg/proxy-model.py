@@ -392,7 +392,6 @@ jobs:
 #        if: always()
 #        run: docker rm -f ${{ env.CONTAINER }}
 
-
   destroy-terraform:
     needs:
       - prepare-infrastructure
@@ -454,6 +453,21 @@ jobs:
           python3 ./.github/workflows/deploy.py finalize_image \
           --github_ref=${GITHUB_REF} \
           --proxy_tag=${{ needs.build-image.outputs.proxy_tag }}
+  trigger-tracer-tests:
+    if: contains(github.event.pull_request.labels.*.name, 'runTracerTests')
+    needs: build-image
+    runs-on: test-runner
+    steps:
+      - name: Run a script
+        run: echo "PR was labeled with runTracerTests so triggering Tracer CI tests!"
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Python
+        run: |
+          python3 ./.github/workflows/trigger_tracer_tests.py --proxy_image=${{ needs.build-image.outputs.proxy_tag }} \
+          --evm_loader_image=${{ needs.build-image.outputs.neon_evm_tag }} \
+          --token=${{ secrets.GHTOKEN }}
   notification:
     runs-on: build-runner
     needs:
