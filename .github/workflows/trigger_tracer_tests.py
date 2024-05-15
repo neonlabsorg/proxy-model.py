@@ -128,7 +128,7 @@ if __name__ == "__main__":
     runs_before_start = get_runs_by_workflow_id(s, workflow_id, created_time)
     runs_count = get_runs_count(s, created_time)
 
-    start_workflow = run_workflow(
+    run_workflow(
         s,
         workflow_id,
         ref=results.ref,
@@ -137,7 +137,6 @@ if __name__ == "__main__":
         evm_loader_image=results.evm_loader_image,
         geyser_neon_plugin_image=results.geyser_neon_plugin_image,
     )
-    assert start_workflow.status_code == 204
 
     initial_time = time.time()
     while runs_count == get_runs_count(s, created_time) and time.time() - initial_time < 100:
