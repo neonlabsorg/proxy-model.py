@@ -11,8 +11,7 @@ def get_tracer_workflows(session: Session):
     """
     Get all avialable workflows for Tracer CI.
     """
-    workflows = session.get(f"https://api.github.com/repos/neonlabsorg/tracer-api/actions/workflows").json()
-    return workflows
+    return session.get(f"https://api.github.com/repos/neonlabsorg/tracer-api/actions/workflows").json()
 
 
 def find_workflow_id_by_key(workflows, key: str, value):
@@ -79,7 +78,7 @@ def get_runs_by_workflow_id(
         for run in resp["workflow_runs"]:
             if run["workflow_id"] == workflow_id:
                 result.add(run["id"])
-    print(f"Workflow id {workflow_id} has runs: {result}")
+    print(f"Workflow id {workflow_id} has runs: {result}.")
     return result
 
 
@@ -100,7 +99,7 @@ def wait_for_run_completion(session: Session, run_id: int, timeout: int = 1000):
         r = session.get(run_url)
         assert r.status_code == 200
         status = r.json()["status"]
-        print(f"Time elapsed: {time.time() - initial_time}. Status: {status}")
+        print(f"Time elapsed: {time.time() - initial_time}. Status: {status}.")
         time.sleep(10)
     assert status in ["completed", "success"]
 

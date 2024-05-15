@@ -463,11 +463,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Python
+      - name: Run Tracer CI test workflow
         run: |
           python3 ./.github/workflows/trigger_tracer_tests.py --proxy_image=${{ needs.build-image.outputs.proxy_tag }} \
           --evm_loader_image=${{ needs.build-image.outputs.neon_evm_tag }} \
           --token=${{ secrets.GHTOKEN }}
+      - name: Cancel the build if job failed
+        if: "failure()"
+        uses: "andymckay/cancel-action@0.4"
   notification:
     runs-on: build-runner
     needs:
