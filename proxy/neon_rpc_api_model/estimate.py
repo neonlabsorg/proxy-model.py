@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Optional
 
 from ..common_neon.evm_config import EVMConfig
 from ..common_neon.data import NeonEmulatorResult, SolanaOverrides
+from ..common_neon.errors import EthereumError
 from ..common_neon.utils.eth_proto import NeonTx
 from ..common_neon.neon_instruction import NeonIxBuilder
 from ..common_neon.solana_alt_limit import ALTLimit
@@ -183,6 +184,11 @@ class GasEstimate:
         self._get_request_param(request)
         self._execute(block, solana_overrides)
         self._build_account_list()
+
+        if len(self._account_list) > self._config.max_tx_account_cnt:
+            message = f"execution reverted: {len(self._account_list)} accounts provided exceeds the maximum {self._config.max_tx_account_cnt} allowed"
+            LOG.debug(message)
+            raise EthereumError(code=3, message=message)
 
         execution_cost = self._execution_cost()
         tx_size_cost = self._tx_size_cost()
