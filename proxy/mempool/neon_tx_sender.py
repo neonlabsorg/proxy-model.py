@@ -5,6 +5,7 @@ from ..common_neon.errors import (
     NoMoreRetriesError, TxAccountCntTooBig
 )
 
+from ..common.constants import DEFAULT_MAX_ACCOUNT_COUNT
 from ..common_neon.neon_tx_result_info import NeonTxResultInfo
 
 from .neon_tx_send_base_strategy import BaseNeonTxStrategy
@@ -134,7 +135,7 @@ class NeonTxSendStrategyExecutor:
 
     def _validate_tx_acct_amount(self) -> None:
         # 6 is the base number of account in Neon Instruction. see NeonIxBuilder
-        acct_cnt = self._ctx.len_account_list + 5
+        acct_cnt = self._ctx.len_account_list + DEFAULT_MAX_ACCOUNT_COUNT
         if acct_cnt > self._ctx.config.max_tx_account_cnt:
             raise TxAccountCntTooBig(acct_cnt, self._ctx.config.max_tx_account_cnt)
 

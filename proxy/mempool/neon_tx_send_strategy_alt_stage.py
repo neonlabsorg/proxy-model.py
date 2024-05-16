@@ -2,6 +2,7 @@ import logging
 
 from typing import List, Optional, Dict
 
+from ..common.constants import DEFAULT_MAX_ACCOUNT_COUNT
 from ..common_neon.errors import ALTContentError
 from ..common_neon.solana_alt import ALTInfo
 from ..common_neon.solana_alt_limit import ALTLimit
@@ -148,7 +149,7 @@ def alt_strategy(cls):
             )
 
         def _validate_account_list_len(self) -> bool:
-            len_account_list = self._ctx.len_account_list + 5
+            len_account_list = self._ctx.len_account_list + DEFAULT_MAX_ACCOUNT_COUNT
             if len_account_list < ALTLimit.max_tx_account_cnt:
                 self._validation_error_msg = (
                     f'Number of accounts {len_account_list} less than {ALTLimit.max_tx_account_cnt}'

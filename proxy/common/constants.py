@@ -95,6 +95,7 @@ DEFAULT_KEY_FILE = None
 DEFAULT_LOG_FILE = None
 DEFAULT_LOG_FORMAT = '%(asctime)s - pid:%(process)d [%(levelname)-.1s] %(module)s.%(funcName)s:%(lineno)d - %(message)s'
 DEFAULT_LOG_LEVEL = 'INFO'
+DEFAULT_MAX_ACCOUNT_COUNT = 7
 DEFAULT_WEB_ACCESS_LOG_FORMAT = '{client_ip}:{client_port} - ' \
     '{request_method} {request_path} - {request_ua} - {connection_time_ms}ms'
 DEFAULT_HTTP_PROXY_ACCESS_LOG_FORMAT = '{client_ip}:{client_port} - ' + \

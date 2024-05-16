@@ -3,6 +3,7 @@ import math
 
 from typing import Dict, Any, List, Optional
 
+from ..common.constants import DEFAULT_MAX_ACCOUNT_COUNT
 from ..common_neon.evm_config import EVMConfig
 from ..common_neon.data import NeonEmulatorResult, SolanaOverrides
 from ..common_neon.utils.eth_proto import NeonTx
@@ -168,7 +169,7 @@ class GasEstimate:
         """Costs to create->extend->deactivate->close an Address Lookup Table
         """
         # ALT is used by TransactionStepFromAccount, TransactionStepFromAccountNoChainId which have 6 fixed accounts
-        acc_cnt = len(self._account_list) + 5
+        acc_cnt = len(self._account_list) + DEFAULT_MAX_ACCOUNT_COUNT
         if acc_cnt > ALTLimit.max_tx_account_cnt:
             return 5000 * 12  # ALT ix: create + ceil(256/30) extend + deactivate + close
 
