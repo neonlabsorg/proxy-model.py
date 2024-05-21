@@ -13,7 +13,7 @@ solders==0.21.0
 psycopg2-binary==2.9.9
 py-solc-x==1.1.1
 hvac==2.1.0
-requests==2.31.0
+requests==2.32.1
 base58==2.1.1
 web3==6.17.2
 aioprometheus==23.12.0
