@@ -11,7 +11,7 @@ rusty-rlp==0.4.0
 solana==0.34.0
 solders==0.21.0
 psycopg2-binary==2.9.9
-py-solc-x==1.1.1
+py-solc-x==2.0.3
 hvac==2.1.0
 requests==2.31.0
 base58==2.1.1
