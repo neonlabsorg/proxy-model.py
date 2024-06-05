@@ -295,6 +295,10 @@ class Indexer:
             if result:
                 self._last_finalized_slot = self._solana.get_finalized_slot()
                 self._last_tracer_slot = self._tracer_api.max_slot()
+                # if no connection to the tracer db, but config has a delay,
+                #    limit indexing by finalized slot
+                if (self._last_tracer_slot is None) and self._config.slot_processing_delay:
+                    self._last_confirmed_slot = self._last_finalized_slot
                 self._commit_progress_stat()
         return result
 

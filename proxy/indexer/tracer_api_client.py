@@ -43,8 +43,8 @@ class TracerAPIClient:
         request = f'''
             SELECT DISTINCT slot
               FROM events.update_account_distributed
-             WHERE slot >= (
-            SELECT max(slot) - ({self._config.slot_processing_delay} * 4)
+             WHERE slot <= (
+            SELECT max(slot) - ({self._config.slot_processing_delay})
               FROM events.update_account_distributed
             )
              ORDER BY slot DESC
